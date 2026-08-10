@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Check,
@@ -189,6 +189,7 @@ export function Hub() {
   const supabase = useMemo(createClient, []);
   const [sessionReady, setSessionReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [hubAccessToken, setHubAccessToken] = useState<string | null>(null);
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -216,10 +217,12 @@ export function Hub() {
     }
     supabase.auth.getSession().then(({ data }) => {
       setSignedIn(Boolean(data.session));
+      setHubAccessToken(data.session?.access_token ?? null);
       setSessionReady(true);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       setSignedIn(Boolean(session));
+      setHubAccessToken(session?.access_token ?? null);
       if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
     });
     return () => listener.subscription.unsubscribe();
@@ -482,6 +485,7 @@ export function Hub() {
       />}
       {activeWorkspace && <WorkspaceView
         workspace={activeWorkspace}
+        hubAccessToken={hubAccessToken}
         refreshKey={refreshKey}
         previewMode={previewMode}
         onPreviewMode={setPreviewMode}
@@ -623,8 +627,9 @@ function EmptyState({ label, compact = false }: { label: string; compact?: boole
   return <div className={`empty-state ${compact ? "compact" : ""}`}><CheckCircle2 size={16} /><span>{label}</span></div>;
 }
 
-function WorkspaceView({ workspace, refreshKey, previewMode, onPreviewMode, onRefresh, noteText, onNoteText, taskText, onTaskText, onAddNote, onAddTask, notes, tasks, onToggleTask }: {
+function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh, noteText, onNoteText, taskText, onTaskText, onAddNote, onAddTask, notes, tasks, onToggleTask }: {
   workspace: Workspace;
+  hubAccessToken: string | null;
   refreshKey: number;
   previewMode: "desktop" | "mobile";
   onPreviewMode: (mode: "desktop" | "mobile") => void;
@@ -666,7 +671,7 @@ function WorkspaceView({ workspace, refreshKey, previewMode, onPreviewMode, onRe
           {workspace.project === "site" && <div className="preview-toggle"><button className={previewMode === "desktop" ? "active" : ""} onClick={() => onPreviewMode("desktop")} aria-label="Visualizar desktop"><Monitor size={14} /></button><button className={previewMode === "mobile" ? "active" : ""} onClick={() => onPreviewMode("mobile")} aria-label="Visualizar celular"><Smartphone size={14} /></button></div>}
           <a href={workspace.url} target="_blank" rel="noreferrer" title="Abrir em outra aba"><ExternalLink size={16} /></a>
         </div></div>
-        <div className="frame-stage"><iframe key={refreshKey} src={workspace.url} title={workspace.label} allow="clipboard-write; autoplay; fullscreen" /></div>
+        <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} /></div>
       </article>
       <aside className="workspace-side">
         <CaptureCard noteText={noteText} onNoteText={onNoteText} onAddNote={onAddNote} projectLabel={workspace.label} />
@@ -675,6 +680,33 @@ function WorkspaceView({ workspace, refreshKey, previewMode, onPreviewMode, onRe
       </aside>
     </section>
   </div>;
+}
+
+function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey }: { workspace: Workspace; accessToken: string | null; refreshKey: number }) {
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const isVideoSystem = workspace.project === "videos";
+  const sourceUrl = isVideoSystem ? `${workspace.url}/embed` : workspace.url!;
+  const appOrigin = new URL(workspace.url!).origin;
+
+  function sendHubSession() {
+    if (!isVideoSystem || !accessToken) return;
+    frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_AUTH", accessToken }, appOrigin);
+  }
+
+  useEffect(() => {
+    if (!isVideoSystem) return;
+    function onVideoReady(event: MessageEvent) {
+      if (event.origin === appOrigin && event.data?.type === "ARTX_VIDEO_EMBED_READY") sendHubSession();
+    }
+    window.addEventListener("message", onVideoReady);
+    const retry = window.setTimeout(sendHubSession, 350);
+    return () => {
+      window.removeEventListener("message", onVideoReady);
+      window.clearTimeout(retry);
+    };
+  }, [accessToken, appOrigin, isVideoSystem]);
+
+  return <iframe ref={frameRef} key={refreshKey} src={sourceUrl} title={workspace.label} onLoad={sendHubSession} allow="clipboard-write; autoplay; fullscreen" />;
 }
 
 function CaptureCard({ noteText, onNoteText, onAddNote, projectLabel }: { noteText: string; onNoteText: (value: string) => void; onAddNote: () => void; projectLabel: string }) {

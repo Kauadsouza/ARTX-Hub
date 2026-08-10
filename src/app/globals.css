@@ -139,10 +139,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .settings-button { flex: 0 0 auto; }
 
 .sidebar-is-collapsed .sidebar { padding-right: 13px; padding-left: 13px; }
-.sidebar-is-collapsed .sidebar-top { padding-bottom: 25px; }
+.sidebar-is-collapsed .sidebar-top { flex-direction: column; gap: 10px; padding-bottom: 15px; }
 .sidebar-is-collapsed .brand-copy, .sidebar-is-collapsed .side-label, .sidebar-is-collapsed .nav-text, .sidebar-is-collapsed .sidebar-profile div, .sidebar-is-collapsed .settings-button { display: none; }
-.sidebar-is-collapsed .brand { margin: auto; }
-.sidebar-is-collapsed .sidebar-collapse { position: absolute; top: 56px; left: 21px; opacity: 0; pointer-events: none; }
+.sidebar-is-collapsed .brand { margin: 0 auto; }
+.sidebar-is-collapsed .sidebar-collapse { position: static; margin: 0; opacity: 1; pointer-events: auto; }
 .sidebar-is-collapsed .nav-button { justify-content: center; padding-right: 0; padding-left: 0; }
 .sidebar-is-collapsed .nav-button small { position: absolute; margin: -21px 0 0 24px; }
 .sidebar-is-collapsed .sidebar-group { margin-top: 15px; }
