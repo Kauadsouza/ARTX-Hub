@@ -14,6 +14,8 @@ export function Hub() {
   const [signedIn, setSignedIn] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
   const [notes, setNotes] = useState<Note[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -24,7 +26,10 @@ export function Hub() {
   useEffect(() => {
     if (!supabase) { setSessionReady(true); return; }
     supabase.auth.getSession().then(({ data }) => { setSignedIn(Boolean(data.session)); setSessionReady(true); });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setSignedIn(Boolean(session)));
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      setSignedIn(Boolean(session));
+      if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
+    });
     return () => listener.subscription.unsubscribe();
   }, [supabase]);
 
@@ -45,6 +50,18 @@ export function Hub() {
     setMessage("Entrando...");
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setMessage(error ? "E-mail ou senha inválidos." : "");
+  }
+
+  async function resetPassword(event: React.FormEvent) {
+    event.preventDefault();
+    if (!supabase) return;
+    if (newPassword.length < 8) { setMessage("Use pelo menos 8 caracteres na nova senha."); return; }
+    setMessage("Salvando nova senha...");
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) { setMessage("Não foi possível atualizar a senha. Abra o link do e-mail novamente."); return; }
+    setMessage("");
+    setNewPassword("");
+    setRecoveryMode(false);
   }
 
   async function addNote() {
@@ -68,6 +85,7 @@ export function Hub() {
 
   if (!sessionReady) return <main className="loading">Abrindo seu espaço...</main>;
   if (!supabase) return <SetupScreen />;
+  if (recoveryMode) return <main className="login"><form onSubmit={resetPassword}><p className="eyebrow">ACESSO RECUPERADO</p><h1>Crie sua senha</h1><p>Defina a nova senha para concluir o acesso ao seu ARTX Hub.</p><label>Nova senha<input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} required autoFocus /></label>{message && <span className="message">{message}</span>}<button className="primary" type="submit">Salvar nova senha</button></form></main>;
   if (!signedIn) return <Login email={email} password={password} message={message} onEmail={setEmail} onPassword={setPassword} onSubmit={login} />;
 
   const openTasks = tasks.filter((task) => !task.completed).length;
