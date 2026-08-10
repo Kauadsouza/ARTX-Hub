@@ -1,7 +1,7 @@
 import { BrainCircuit, Film, Globe2, GraduationCap, type LucideIcon } from "lucide-react";
 
 export type Project = {
-  slug: "site" | "videos" | "sat" | "condor";
+  slug: "site" | "videos" | "sat" | "university" | "condor";
   name: string;
   description: string;
   status: string;
@@ -40,6 +40,16 @@ export const projects: Project[] = [
     color: "blue",
     icon: GraduationCap,
     url: process.env.NEXT_PUBLIC_SAT_URL,
+    mode: "external",
+  },
+  {
+    slug: "university",
+    name: "University Path",
+    description: "Seu caminho pessoal para Computer Science em Oxford.",
+    status: "Novo projeto",
+    color: "green",
+    icon: GraduationCap,
+    url: "https://university-path-six.vercel.app",
     mode: "external",
   },
   {

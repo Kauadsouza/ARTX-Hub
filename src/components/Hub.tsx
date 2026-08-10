@@ -53,8 +53,8 @@ type Task = {
   created_at?: string;
 };
 
-type View = "overview" | "site" | "videos" | "sat" | "condor" | "notes" | "tasks";
-type ProjectKey = "site" | "videos" | "sat" | "condor" | "geral";
+type View = "overview" | "site" | "videos" | "sat" | "university" | "condor" | "notes" | "tasks";
+type ProjectKey = "site" | "videos" | "sat" | "university" | "condor" | "geral";
 type ComposerTarget = "note" | "task" | null;
 
 type Workspace = {
@@ -112,6 +112,17 @@ const workspaces: Record<Exclude<View, "overview" | "notes" | "tasks">, Workspac
     status: "Web",
     statusTone: "amber",
   },
+  university: {
+    label: "University Path",
+    eyebrow: "PLANO UNIVERSITÁRIO",
+    description: "Seu caminho prático para Computer Science em Oxford, com fontes oficiais e próximos passos.",
+    url: "https://university-path-six.vercel.app",
+    project: "university",
+    icon: GraduationCap,
+    accent: "mint",
+    status: "Novo projeto",
+    statusTone: "mint",
+  },
   condor: {
     label: "Condor",
     eyebrow: "SISTEMA LOCAL",
@@ -129,6 +140,7 @@ const projectLabels: Record<ProjectKey, string> = {
   site: "Meu site",
   videos: "Sistema de Vídeos",
   sat: "SAT & Inglês",
+  university: "University Path",
   condor: "Condor",
 };
 
@@ -137,6 +149,7 @@ const pageMeta: Record<View, { eyebrow: string; title: string }> = {
   site: { eyebrow: workspaces.site.eyebrow, title: workspaces.site.label },
   videos: { eyebrow: workspaces.videos.eyebrow, title: workspaces.videos.label },
   sat: { eyebrow: workspaces.sat.eyebrow, title: workspaces.sat.label },
+  university: { eyebrow: workspaces.university.eyebrow, title: workspaces.university.label },
   condor: { eyebrow: workspaces.condor.eyebrow, title: workspaces.condor.label },
   notes: { eyebrow: "ORGANIZAÇÃO PESSOAL", title: "Notas" },
   tasks: { eyebrow: "ORGANIZAÇÃO PESSOAL", title: "Tarefas" },
@@ -145,7 +158,7 @@ const pageMeta: Record<View, { eyebrow: string; title: string }> = {
 const workspaceKeys = Object.keys(workspaces) as Array<keyof typeof workspaces>;
 
 function isWorkspaceView(view: View): view is keyof typeof workspaces {
-  return view === "site" || view === "videos" || view === "sat" || view === "condor";
+  return view === "site" || view === "videos" || view === "sat" || view === "university" || view === "condor";
 }
 
 function noteTitle(content: string) {
@@ -417,6 +430,7 @@ export function Hub() {
     { id: "site", group: "Sistemas", label: "Abrir Meu site", icon: Compass, run: () => goTo("site") },
     { id: "videos", group: "Sistemas", label: "Abrir Sistema de Vídeos", icon: Video, run: () => goTo("videos") },
     { id: "sat", group: "Sistemas", label: "Abrir SAT & Inglês", icon: GraduationCap, run: () => goTo("sat") },
+    { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
     { id: "condor", group: "Sistemas", label: "Abrir Condor", icon: MonitorCog, run: () => goTo("condor") },
     { id: "notes", group: "Organização", label: "Ver todas as notas", icon: StickyNote, run: () => goTo("notes") },
     { id: "tasks", group: "Organização", label: "Ver tarefas", icon: ClipboardList, run: () => goTo("tasks") },
@@ -446,6 +460,7 @@ export function Hub() {
       </SidebarGroup>
       <SidebarGroup label="Estudos">
         <NavButton active={activeView === "sat"} icon={GraduationCap} label="SAT & Inglês" onClick={() => goTo("sat")} />
+        <NavButton active={activeView === "university"} icon={GraduationCap} label="University Path" onClick={() => goTo("university")} />
       </SidebarGroup>
       <SidebarGroup label="Sistemas">
         <NavButton active={activeView === "condor"} icon={MonitorCog} label="Condor" onClick={() => goTo("condor")} />
@@ -684,27 +699,28 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
 
 function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey }: { workspace: Workspace; accessToken: string | null; refreshKey: number }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const isVideoSystem = workspace.project === "videos";
-  const sourceUrl = isVideoSystem ? `${workspace.url}/embed` : workspace.url!;
+  const usesHubSession = workspace.project === "videos" || workspace.project === "university";
+  const sourceUrl = usesHubSession ? `${workspace.url}/embed` : workspace.url!;
   const appOrigin = new URL(workspace.url!).origin;
 
   function sendHubSession() {
-    if (!isVideoSystem || !accessToken) return;
+    if (!usesHubSession || !accessToken) return;
     frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_AUTH", accessToken }, appOrigin);
   }
 
   useEffect(() => {
-    if (!isVideoSystem) return;
-    function onVideoReady(event: MessageEvent) {
-      if (event.origin === appOrigin && event.data?.type === "ARTX_VIDEO_EMBED_READY") sendHubSession();
+    if (!usesHubSession) return;
+    function onWorkspaceReady(event: MessageEvent) {
+      const expectedMessage = workspace.project === "videos" ? "ARTX_VIDEO_EMBED_READY" : "UNIVERSITY_PATH_EMBED_READY";
+      if (event.origin === appOrigin && event.data?.type === expectedMessage) sendHubSession();
     }
-    window.addEventListener("message", onVideoReady);
+    window.addEventListener("message", onWorkspaceReady);
     const retry = window.setTimeout(sendHubSession, 350);
     return () => {
-      window.removeEventListener("message", onVideoReady);
+      window.removeEventListener("message", onWorkspaceReady);
       window.clearTimeout(retry);
     };
-  }, [accessToken, appOrigin, isVideoSystem]);
+  }, [accessToken, appOrigin, usesHubSession, workspace.project]);
 
   return <iframe ref={frameRef} key={refreshKey} src={sourceUrl} title={workspace.label} onLoad={sendHubSession} allow="clipboard-write; autoplay; fullscreen" />;
 }
