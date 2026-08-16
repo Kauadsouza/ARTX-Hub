@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Check,
@@ -21,8 +21,12 @@ import {
   Menu,
   Monitor,
   MonitorCog,
+  Maximize2,
+  Minimize2,
   PanelLeft,
   PanelLeftClose,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   RefreshCw,
   Search,
@@ -37,6 +41,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { CondorWorkspace } from "@/components/CondorWorkspace";
 
 type Note = {
   id: string;
@@ -57,11 +62,17 @@ type View = "overview" | "site" | "videos" | "sat" | "university" | "condor" | "
 type ProjectKey = "site" | "videos" | "sat" | "university" | "condor" | "geral";
 type ComposerTarget = "note" | "task" | null;
 
+type LocalHubSnapshot = {
+  notes?: Array<{ id: string; conteudo: string; projeto: string; criado: number }>;
+  tasks?: Array<{ id: string; titulo: string; projeto: string; status: string; criado: number }>;
+};
+
 type Workspace = {
   label: string;
   eyebrow: string;
   description: string;
   url?: string;
+  logo: string;
   project: Exclude<ProjectKey, "geral">;
   icon: LucideIcon;
   accent: "sky" | "violet" | "amber" | "mint";
@@ -78,12 +89,26 @@ type CommandItem = {
   run: () => void;
 };
 
+const assetPath = (path: string) => `${process.env.NEXT_PUBLIC_ARTX_BASE_PATH ?? ""}${path}`;
+
+async function localHubRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.erro || "O Condor não concluiu esta ação.");
+  return payload as T;
+}
+
 const workspaces: Record<Exclude<View, "overview" | "notes" | "tasks">, Workspace> = {
   site: {
     label: "Meu site",
     eyebrow: "PRESENÇA DIGITAL",
     description: "Veja a versão ao vivo, compare melhorias e registre decisões enquanto navega.",
     url: "https://kauaartx.vercel.app",
+    logo: assetPath("/brand/site.svg"),
     project: "site",
     icon: Compass,
     accent: "sky",
@@ -95,6 +120,7 @@ const workspaces: Record<Exclude<View, "overview" | "notes" | "tasks">, Workspac
     eyebrow: "PRODUÇÃO DE CONTEÚDO",
     description: "Use ideias, roteiros e o fluxo de produção sem sair da sua central.",
     url: "https://sistema-videos.vercel.app",
+    logo: assetPath("/brand/videos.svg"),
     project: "videos",
     icon: Video,
     accent: "violet",
@@ -106,6 +132,7 @@ const workspaces: Record<Exclude<View, "overview" | "notes" | "tasks">, Workspac
     eyebrow: "ÁREA DE ESTUDOS",
     description: "Entre nos simulados e mantenha sua rotina de estudo no mesmo lugar.",
     url: "https://sat-simulado.vercel.app",
+    logo: assetPath("/brand/sat.svg"),
     project: "sat",
     icon: GraduationCap,
     accent: "amber",
@@ -117,6 +144,7 @@ const workspaces: Record<Exclude<View, "overview" | "notes" | "tasks">, Workspac
     eyebrow: "PLANO UNIVERSITÁRIO",
     description: "Seu caminho prático para Computer Science em Oxford, com fontes oficiais e próximos passos.",
     url: "https://university-path-six.vercel.app",
+    logo: assetPath("/brand/university.svg"),
     project: "university",
     icon: GraduationCap,
     accent: "mint",
@@ -127,6 +155,7 @@ const workspaces: Record<Exclude<View, "overview" | "notes" | "tasks">, Workspac
     label: "Condor",
     eyebrow: "SISTEMA LOCAL",
     description: "Seu assistente de PC continua protegido e organizado a partir do Hub.",
+    logo: assetPath("/brand/condor.svg"),
     project: "condor",
     icon: MonitorCog,
     accent: "mint",
@@ -199,15 +228,17 @@ function isTypingTarget(target: EventTarget | null) {
 }
 
 export function Hub() {
-  const supabase = useMemo(createClient, []);
+  const supabase = useMemo(() => createClient(), []);
   const [sessionReady, setSessionReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [localMode, setLocalMode] = useState(false);
   const [hubAccessToken, setHubAccessToken] = useState<string | null>(null);
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [loginPending, setLoginPending] = useState(false);
   const [toast, setToast] = useState("");
   const [activeView, setActiveView] = useState<View>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -223,7 +254,41 @@ export function Hub() {
   const [project, setProject] = useState<ProjectKey>("geral");
   const [composerTarget, setComposerTarget] = useState<ComposerTarget>(null);
 
+  const loadWorkspace = useCallback(async () => {
+    if (localMode) {
+      await localHubRequest("/api/session", { method: "POST" });
+      const snapshot = await localHubRequest<LocalHubSnapshot>("/api/hub");
+      setNotes((snapshot.notes ?? []).map((note) => ({
+        id: note.id,
+        content: note.conteudo,
+        project_slug: note.projeto || null,
+        created_at: new Date(note.criado * 1000).toISOString(),
+      })));
+      setTasks((snapshot.tasks ?? []).map((task) => ({
+        id: task.id,
+        title: task.titulo,
+        project_slug: task.projeto || null,
+        completed: task.status === "concluida",
+        created_at: new Date(task.criado * 1000).toISOString(),
+      })));
+      return;
+    }
+    if (!supabase) return;
+    const [noteResult, taskResult] = await Promise.all([
+      supabase.from("hub_notes").select("*").order("created_at", { ascending: false }).limit(48),
+      supabase.from("hub_tasks").select("*").order("created_at", { ascending: false }).limit(48),
+    ]);
+    setNotes((noteResult.data as Note[]) ?? []);
+    setTasks((taskResult.data as Task[]) ?? []);
+  }, [localMode, supabase]);
+
   useEffect(() => {
+    if (["127.0.0.1", "localhost", "::1"].includes(window.location.hostname)) {
+      setLocalMode(true);
+      setSignedIn(true);
+      setSessionReady(true);
+      return;
+    }
     if (!supabase) {
       setSessionReady(true);
       return;
@@ -251,11 +316,9 @@ export function Hub() {
   }, [sidebarCollapsed]);
 
   useEffect(() => {
-    if (!supabase || !signedIn) return;
-    void loadWorkspace();
-    // Supabase is the single source of truth between computer and phone.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signedIn, supabase]);
+    if (!signedIn) return;
+    void loadWorkspace().catch(() => undefined);
+  }, [loadWorkspace, signedIn]);
 
   useEffect(() => {
     if (!toast) return;
@@ -297,33 +360,29 @@ export function Hub() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, []);
 
-  async function loadWorkspace() {
-    if (!supabase) return;
-    const [noteResult, taskResult] = await Promise.all([
-      supabase.from("hub_notes").select("*").order("created_at", { ascending: false }).limit(48),
-      supabase.from("hub_tasks").select("*").order("created_at", { ascending: false }).limit(48),
-    ]);
-    setNotes((noteResult.data as Note[]) ?? []);
-    setTasks((taskResult.data as Task[]) ?? []);
-  }
-
   function notify(text: string) {
     setToast(text);
   }
 
   async function login(event: React.FormEvent) {
     event.preventDefault();
-    if (!supabase) return;
+    if (!supabase || loginPending) return;
+    setLoginPending(true);
     setMessage("Entrando...");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setMessage(error ? "E-mail ou senha inválidos." : "");
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      setPassword("");
+      setMessage(error ? "Não foi possível entrar com essas credenciais." : "");
+    } finally {
+      setLoginPending(false);
+    }
   }
 
   async function resetPassword(event: React.FormEvent) {
     event.preventDefault();
     if (!supabase) return;
-    if (newPassword.length < 8) {
-      setMessage("Use pelo menos 8 caracteres na nova senha.");
+    if (newPassword.length < 12) {
+      setMessage("Use pelo menos 12 caracteres na nova senha.");
       return;
     }
     setMessage("Salvando nova senha...");
@@ -338,8 +397,23 @@ export function Hub() {
   }
 
   async function addNote() {
-    if (!supabase || !noteText.trim()) return;
+    if (!noteText.trim()) return;
     const content = noteText.trim();
+    if (localMode) {
+      try {
+        const result = await localHubRequest<{ item: { id: string; conteudo: string; projeto: string; criado: number } }>("/api/hub/notes", {
+          method: "POST",
+          body: JSON.stringify({ titulo: noteTitle(content), conteudo: content, projeto: project === "geral" ? "geral" : project }),
+        });
+        setNotes((current) => [{ id: result.item.id, content: result.item.conteudo, project_slug: result.item.projeto, created_at: new Date(result.item.criado * 1000).toISOString() }, ...current]);
+        setNoteText("");
+        notify("Nota salva");
+      } catch (reason) {
+        notify(reason instanceof Error ? reason.message : "Não foi possível salvar a nota.");
+      }
+      return;
+    }
+    if (!supabase) return;
     const { data, error } = await supabase
       .from("hub_notes")
       .insert({ content, project_slug: project === "geral" ? null : project })
@@ -355,8 +429,19 @@ export function Hub() {
   }
 
   async function updateNote(note: Note, content: string) {
-    if (!supabase || !content.trim() || content.trim() === note.content) return;
+    if (!content.trim() || content.trim() === note.content) return;
     const nextContent = content.trim();
+    if (localMode) {
+      try {
+        await localHubRequest(`/api/hub/notes/${note.id}`, { method: "PATCH", body: JSON.stringify({ titulo: noteTitle(nextContent), conteudo: nextContent }) });
+        setNotes((current) => current.map((item) => item.id === note.id ? { ...item, content: nextContent } : item));
+        notify("Alteração salva");
+      } catch (reason) {
+        notify(reason instanceof Error ? reason.message : "Não foi possível atualizar a nota.");
+      }
+      return;
+    }
+    if (!supabase) return;
     setNotes((current) => current.map((item) => item.id === note.id ? { ...item, content: nextContent } : item));
     const { error } = await supabase.from("hub_notes").update({ content: nextContent }).eq("id", note.id);
     if (error) {
@@ -368,8 +453,23 @@ export function Hub() {
   }
 
   async function addTask() {
-    if (!supabase || !taskText.trim()) return;
+    if (!taskText.trim()) return;
     const title = taskText.trim();
+    if (localMode) {
+      try {
+        const result = await localHubRequest<{ item: { id: string; titulo: string; projeto: string; status: string; criado: number } }>("/api/hub/tasks", {
+          method: "POST",
+          body: JSON.stringify({ titulo: title, projeto: project === "geral" ? "geral" : project, prioridade: "media" }),
+        });
+        setTasks((current) => [{ id: result.item.id, title: result.item.titulo, project_slug: result.item.projeto, completed: result.item.status === "concluida", created_at: new Date(result.item.criado * 1000).toISOString() }, ...current]);
+        setTaskText("");
+        notify("Tarefa criada");
+      } catch (reason) {
+        notify(reason instanceof Error ? reason.message : "Não foi possível criar a tarefa.");
+      }
+      return;
+    }
+    if (!supabase) return;
     const { data, error } = await supabase
       .from("hub_tasks")
       .insert({ title, project_slug: project === "geral" ? null : project })
@@ -385,8 +485,18 @@ export function Hub() {
   }
 
   async function toggleTask(task: Task) {
-    if (!supabase) return;
     const completed = !task.completed;
+    if (localMode) {
+      try {
+        await localHubRequest(`/api/hub/tasks/${task.id}`, { method: "PATCH", body: JSON.stringify({ status: completed ? "concluida" : "pendente" }) });
+        setTasks((current) => current.map((item) => item.id === task.id ? { ...item, completed } : item));
+        notify(completed ? "Tarefa concluída" : "Tarefa reaberta");
+      } catch (reason) {
+        notify(reason instanceof Error ? reason.message : "Não foi possível alterar a tarefa.");
+      }
+      return;
+    }
+    if (!supabase) return;
     setTasks((current) => current.map((item) => item.id === task.id ? { ...item, completed } : item));
     const { error } = await supabase.from("hub_tasks").update({ completed }).eq("id", task.id);
     if (error) {
@@ -412,11 +522,11 @@ export function Hub() {
   }
 
   if (!sessionReady) {
-    return <main className="loading"><span className="loading-mark">A</span><p>Abrindo sua central...</p></main>;
+    return <main className="loading"><img className="loading-logo" src={assetPath("/brand/artx-hub.svg")} alt="ARTX Hub" /><p>Abrindo sua central...</p></main>;
   }
-  if (!supabase) return <SetupScreen />;
+  if (!supabase && !localMode) return <SetupScreen />;
   if (recoveryMode) return <ResetPassword password={newPassword} message={message} onPassword={setNewPassword} onSubmit={resetPassword} />;
-  if (!signedIn) return <Login email={email} password={password} message={message} onEmail={setEmail} onPassword={setPassword} onSubmit={login} />;
+  if (!signedIn) return <Login email={email} password={password} message={message} pending={loginPending} onEmail={setEmail} onPassword={setPassword} onSubmit={login} />;
 
   const openTasks = tasks.filter((task) => !task.completed);
   const completedTasks = tasks.filter((task) => task.completed);
@@ -442,7 +552,7 @@ export function Hub() {
     <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
       <div className="sidebar-top">
         <button className="brand" onClick={() => goTo("overview")} aria-label="Abrir visão geral do ARTX Hub">
-          <span className="brand-mark">A</span>
+          <img className="brand-logo" src={assetPath("/brand/artx-hub.svg")} alt="" />
           <span className="brand-copy"><strong>ARTX Hub</strong><small>Central pessoal</small></span>
         </button>
         <button className="icon-button sidebar-collapse" onClick={() => setSidebarCollapsed((current) => !current)} aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}>
@@ -455,15 +565,15 @@ export function Hub() {
         <NavButton active={activeView === "overview"} icon={LayoutDashboard} label="Visão geral" onClick={() => goTo("overview")} />
       </SidebarGroup>
       <SidebarGroup label="Trabalho">
-        <NavButton active={activeView === "site"} icon={Compass} label="Meu site" onClick={() => goTo("site")} />
-        <NavButton active={activeView === "videos"} icon={Video} label="Sistema de vídeos" onClick={() => goTo("videos")} />
+        <NavButton active={activeView === "site"} icon={Compass} logo={workspaces.site.logo} label="Meu site" onClick={() => goTo("site")} />
+        <NavButton active={activeView === "videos"} icon={Video} logo={workspaces.videos.logo} label="Sistema de vídeos" onClick={() => goTo("videos")} />
       </SidebarGroup>
       <SidebarGroup label="Estudos">
-        <NavButton active={activeView === "sat"} icon={GraduationCap} label="SAT & Inglês" onClick={() => goTo("sat")} />
-        <NavButton active={activeView === "university"} icon={GraduationCap} label="University Path" onClick={() => goTo("university")} />
+        <NavButton active={activeView === "sat"} icon={GraduationCap} logo={workspaces.sat.logo} label="SAT & Inglês" onClick={() => goTo("sat")} />
+        <NavButton active={activeView === "university"} icon={GraduationCap} logo={workspaces.university.logo} label="University Path" onClick={() => goTo("university")} />
       </SidebarGroup>
       <SidebarGroup label="Sistemas">
-        <NavButton active={activeView === "condor"} icon={MonitorCog} label="Condor" onClick={() => goTo("condor")} />
+        <NavButton active={activeView === "condor"} icon={MonitorCog} logo={workspaces.condor.logo} label="Condor" onClick={() => goTo("condor")} />
       </SidebarGroup>
       <SidebarGroup label="Organização" className="organization-group">
         <NavButton active={activeView === "notes"} icon={StickyNote} label="Notas" onClick={() => goTo("notes")} />
@@ -486,8 +596,8 @@ export function Hub() {
         <div className="header-actions">
           <button className="command-trigger" onClick={() => setCommandOpen(true)}><Search size={16} /><span>Buscar</span><kbd>⌘ K</kbd></button>
           <button className="quick-create" onClick={() => { setCommandQuery(""); setCommandOpen(true); }}><Plus size={16} /><span>Criar</span></button>
-          <span className="synced" title="Notas e tarefas sincronizadas"><Cloud size={15} /><span>Salvo</span></span>
-          <button className="icon-button" onClick={() => void supabase.auth.signOut()} title="Sair" aria-label="Sair"><LogOut size={17} /></button>
+          <span className="synced" title={localMode ? "Dados no Condor" : "Notas e tarefas sincronizadas"}>{localMode ? <MonitorCog size={15} /> : <Cloud size={15} />}<span>{localMode ? "Local" : "Salvo"}</span></span>
+          {!localMode && supabase && <button className="icon-button" onClick={() => void supabase.auth.signOut()} title="Sair" aria-label="Sair"><LogOut size={17} /></button>}
         </div>
       </header>
 
@@ -548,9 +658,9 @@ function SidebarGroup({ label, children, className = "" }: { label: string; chil
   return <div className={`sidebar-group ${className}`}><p className="side-label">{label}</p><nav className="nav-list">{children}</nav></div>;
 }
 
-function NavButton({ active, icon: Icon, label, onClick, badge }: { active: boolean; icon: LucideIcon; label: string; onClick: () => void; badge?: number }) {
+function NavButton({ active, icon: Icon, logo, label, onClick, badge }: { active: boolean; icon: LucideIcon; logo?: string; label: string; onClick: () => void; badge?: number }) {
   return <button className={`nav-button ${active ? "active" : ""}`} onClick={onClick} title={label}>
-    <Icon size={17} strokeWidth={1.8} /><span className="nav-text">{label}</span>{badge ? <small>{badge}</small> : null}
+    {logo ? <img className="nav-logo" src={logo} alt="" /> : <Icon size={17} strokeWidth={1.8} />}<span className="nav-text">{label}</span>{badge ? <small>{badge}</small> : null}
   </button>;
 }
 
@@ -593,7 +703,7 @@ function Overview({ notes, tasks, onOpen, onNewNote, onNewTask }: {
       </article>
     </section>
 
-    <section className="section-heading systems-heading"><div><p className="eyebrow">SISTEMAS</p><h2>Seu espaço de trabalho</h2></div><span>4 ambientes conectados</span></section>
+    <section className="section-heading systems-heading"><div><p className="eyebrow">SISTEMAS</p><h2>Seu espaço de trabalho</h2></div><span>{workspaceKeys.length} ambientes conectados</span></section>
     <section className="systems-grid">
       {workspaceKeys.map((key) => <SystemCard key={key} workspace={workspaces[key]} onOpen={() => onOpen(key)} />)}
     </section>
@@ -622,10 +732,9 @@ function Metric({ value, label }: { value: number; label: string }) {
 }
 
 function SystemCard({ workspace, onOpen }: { workspace: Workspace; onOpen: () => void }) {
-  const Icon = workspace.icon;
   return <button className={`system-card ${workspace.accent}`} onClick={onOpen}>
-    <div className="system-card-top"><span className="system-icon"><Icon size={19} /></span><StatusPill tone={workspace.statusTone}>{workspace.status}</StatusPill></div>
-    <div><p>{workspace.eyebrow}</p><h3>{workspace.label}</h3><span className="system-description">{workspace.description}</span></div>
+    <div className="system-visual"><span className="system-orbit" /><span className="system-grid-art" /><img src={workspace.logo} alt={`Logo ${workspace.label}`} /><StatusPill tone={workspace.statusTone}>{workspace.status}</StatusPill></div>
+    <div className="system-card-copy"><p>{workspace.eyebrow}</p><h3>{workspace.label}</h3><span className="system-description">{workspace.description}</span></div>
     <span className="system-open">Abrir <ArrowUpRight size={15} /></span>
   </button>;
 }
@@ -659,40 +768,53 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
   tasks: Task[];
   onToggleTask: (task: Task) => void;
 }) {
-  const Icon = workspace.icon;
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+
+  useEffect(() => {
+    setSidePanelOpen(false);
+    setFocusMode(false);
+  }, [workspace.project]);
+
+  useEffect(() => {
+    if (!focusMode) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const leaveFocus = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFocusMode(false);
+    };
+    window.addEventListener("keydown", leaveFocus);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", leaveFocus);
+    };
+  }, [focusMode]);
+
   if (!workspace.url) {
-    return <section className="condor-page page-enter">
-      <div className="condor-spotlight" />
-      <div className="condor-header"><span className="condor-icon"><Icon size={25} /></span><StatusPill tone="mint">Local no PC</StatusPill></div>
-      <p className="eyebrow">{workspace.eyebrow}</p><h2>O Condor opera perto de você.</h2>
-      <p className="condor-copy">Ele continua executando diretamente no seu computador para manter arquivos, voz e automações protegidos. O Hub vira o lugar para acompanhar melhorias, registrar comandos e organizar a próxima evolução.</p>
-      <div className="condor-grid">
-        <article><Monitor size={18} /><h3>Ambiente local</h3><p>O acesso ao PC não é exposto à internet.</p></article>
-        <article><ClipboardList size={18} /><h3>Próximo passo</h3><p>Registre no Hub o que você quer automatizar ou melhorar.</p></article>
-        <article><Cloud size={18} /><h3>Centralizado</h3><p>As suas notas do Condor ficam sincronizadas aqui.</p></article>
-      </div>
-    </section>;
+    return <CondorWorkspace />;
   }
 
-  return <div className="workspace-page page-enter">
+  return <div className={`workspace-page page-enter ${sidePanelOpen ? "side-panel-open" : "side-panel-closed"} ${focusMode ? "focus-mode" : ""}`}>
     <section className="workspace-hero">
-      <div className={`workspace-hero-icon ${workspace.accent}`}><Icon size={21} /></div>
+      <img className="workspace-logo" src={workspace.logo} alt={`Logo ${workspace.label}`} />
       <div><p className="eyebrow">{workspace.eyebrow}</p><h2>{workspace.label}</h2><span>{workspace.description}</span></div>
       <div className="workspace-hero-actions"><StatusPill tone={workspace.statusTone}>{workspace.status}</StatusPill><button className="secondary-button" onClick={onRefresh}><RefreshCw size={15} /> Atualizar</button></div>
     </section>
     <section className="workspace-layout">
       <article className={`app-frame-card ${previewMode === "mobile" ? "mobile-preview" : ""}`}>
-        <div className="frame-toolbar"><div className="frame-label"><span><i /><i /><i /></span><strong>{workspace.label}</strong><small>Dentro do ARTX Hub</small></div><div className="frame-controls">
+        <div className="frame-toolbar"><div className="frame-label"><span><i /><i /><i /></span><img src={workspace.logo} alt="" /><strong>{workspace.label}</strong><small>Dentro do ARTX Hub</small></div><div className="frame-controls">
           {workspace.project === "site" && <div className="preview-toggle"><button className={previewMode === "desktop" ? "active" : ""} onClick={() => onPreviewMode("desktop")} aria-label="Visualizar desktop"><Monitor size={14} /></button><button className={previewMode === "mobile" ? "active" : ""} onClick={() => onPreviewMode("mobile")} aria-label="Visualizar celular"><Smartphone size={14} /></button></div>}
+          {!focusMode && <button className="frame-action" onClick={() => setSidePanelOpen((current) => !current)} aria-pressed={sidePanelOpen} title={sidePanelOpen ? "Ocultar notas e tarefas" : "Mostrar notas e tarefas"}>{sidePanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}<span>{sidePanelOpen ? "Ocultar painel" : "Mostrar painel"}</span></button>}
+          <button className="frame-action focus-action" onClick={() => setFocusMode((current) => !current)} aria-pressed={focusMode} title={focusMode ? "Sair da tela ampla" : "Abrir em tela ampla"}>{focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}<span>{focusMode ? "Voltar ao Hub" : "Tela ampla"}</span></button>
           <a href={workspace.url} target="_blank" rel="noreferrer" title="Abrir em outra aba"><ExternalLink size={16} /></a>
         </div></div>
         <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} /></div>
       </article>
-      <aside className="workspace-side">
+      {sidePanelOpen && !focusMode && <aside className="workspace-side">
         <CaptureCard noteText={noteText} onNoteText={onNoteText} onAddNote={onAddNote} projectLabel={workspace.label} />
         <TaskCard taskText={taskText} onTaskText={onTaskText} onAddTask={onAddTask} tasks={tasks} onToggleTask={onToggleTask} />
         <RecentNotes notes={notes} />
-      </aside>
+      </aside>}
     </section>
   </div>;
 }
@@ -703,10 +825,10 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey }: { worksp
   const sourceUrl = usesHubSession ? `${workspace.url}/embed` : workspace.url!;
   const appOrigin = new URL(workspace.url!).origin;
 
-  function sendHubSession() {
+  const sendHubSession = useCallback(() => {
     if (!usesHubSession || !accessToken) return;
     frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_AUTH", accessToken }, appOrigin);
-  }
+  }, [accessToken, appOrigin, usesHubSession]);
 
   useEffect(() => {
     if (!usesHubSession) return;
@@ -720,7 +842,7 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey }: { worksp
       window.removeEventListener("message", onWorkspaceReady);
       window.clearTimeout(retry);
     };
-  }, [accessToken, appOrigin, usesHubSession, workspace.project]);
+  }, [accessToken, appOrigin, sendHubSession, usesHubSession, workspace.project]);
 
   return <iframe ref={frameRef} key={refreshKey} src={sourceUrl} title={workspace.label} onLoad={sendHubSession} allow="clipboard-write; autoplay; fullscreen" />;
 }
@@ -816,14 +938,14 @@ function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boo
   }} placeholder="Buscar páginas e ações..." /><kbd>ESC</kbd></div><div className="command-results">{filtered.map((command, index) => { const Icon = command.icon; return <button key={command.id} className={index === activeIndex ? "active" : ""} onMouseEnter={() => setActiveIndex(index)} onClick={() => select(command)}><span className="command-icon"><Icon size={16} /></span><div><small>{command.group}</small><strong>{command.label}</strong></div>{command.shortcut ? <kbd>{command.shortcut}</kbd> : <ChevronRight size={15} />}</button>; })}{!filtered.length && <EmptyState label="Nenhum comando encontrado." />}</div><footer><Command size={14} /> Use ↑ ↓ para navegar e Enter para abrir</footer></section></div>;
 }
 
-function Login({ email, password, message, onEmail, onPassword, onSubmit }: { email: string; password: string; message: string; onEmail: (value: string) => void; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void }) {
-  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><span className="brand-mark">A</span><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ESPAÇO PRIVADO</p><h1>Seu espaço para construir.</h1><p>Entre para acessar projetos, anotações e seu dia de trabalho.</p><label>E-mail<input type="email" value={email} onChange={(event) => onEmail(event.target.value)} required /></label><label>Senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} required /></label>{message && <span className="message">{message}</span>}<button className="primary" type="submit">Entrar no Hub <ArrowUpRight size={16} /></button><small className="login-footer"><span /> Acesso particular e sincronizado</small></form></main>;
+function Login({ email, password, message, pending, onEmail, onPassword, onSubmit }: { email: string; password: string; message: string; pending: boolean; onEmail: (value: string) => void; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void }) {
+  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ESPAÇO PRIVADO</p><h1>Seu espaço para construir.</h1><p>Entre para acessar projetos, anotações e seu dia de trabalho.</p><label>E-mail<input type="email" value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" inputMode="email" required /></label><label>Senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="current-password" required /></label>{message && <span className="message" aria-live="polite">{message}</span>}<button className="primary" type="submit" disabled={pending}>{pending ? "Verificando..." : "Entrar no Hub"} {!pending && <ArrowUpRight size={16} />}</button><small className="login-footer"><span /> Acesso particular e sincronizado</small></form></main>;
 }
 
 function ResetPassword({ password, message, onPassword, onSubmit }: { password: string; message: string; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void }) {
-  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><span className="brand-mark">A</span><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ACESSO RECUPERADO</p><h1>Defina a nova senha.</h1><p>Escolha uma senha forte para concluir o acesso ao seu espaço privado.</p><label>Nova senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} minLength={8} required autoFocus /></label>{message && <span className="message">{message}</span>}<button className="primary" type="submit">Salvar nova senha <Check size={16} /></button></form></main>;
+  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ACESSO RECUPERADO</p><h1>Defina a nova senha.</h1><p>Escolha uma senha forte para concluir o acesso ao seu espaço privado.</p><label>Nova senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} minLength={12} autoComplete="new-password" required autoFocus /></label>{message && <span className="message" aria-live="polite">{message}</span>}<button className="primary" type="submit">Salvar nova senha <Check size={16} /></button></form></main>;
 }
 
 function SetupScreen() {
-  return <main className="login"><div className="login-orbit" /><div className="setup-card"><span className="brand-mark">A</span><p className="eyebrow">CONFIGURAÇÃO NECESSÁRIA</p><h1>Conecte o Hub.</h1><p>Adicione a URL e a chave pública do Supabase em <code>.env.local</code>. O guia completo está no README.</p></div></main>;
+  return <main className="login"><div className="login-orbit" /><div className="setup-card"><img className="setup-logo" src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><p className="eyebrow">CONFIGURAÇÃO NECESSÁRIA</p><h1>Conecte o Hub.</h1><p>Adicione a URL e a chave pública do Supabase em <code>.env.local</code>. O guia completo está no README.</p></div></main>;
 }
