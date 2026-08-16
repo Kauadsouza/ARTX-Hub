@@ -7,15 +7,11 @@ import {
   CheckCircle2,
   ChevronRight,
   Circle,
-  ClipboardList,
   Cloud,
   Command,
   Compass,
   ExternalLink,
-  FilePenLine,
-  FileText,
   GraduationCap,
-  Keyboard,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -25,16 +21,11 @@ import {
   Minimize2,
   PanelLeft,
   PanelLeftClose,
-  PanelRightClose,
-  PanelRightOpen,
-  Plus,
   RefreshCw,
   Search,
-  Send,
   Settings2,
   Smartphone,
   Sparkles,
-  StickyNote,
   Video,
   X,
   Zap,
@@ -42,13 +33,6 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { CondorWorkspace } from "@/components/CondorWorkspace";
-
-type Note = {
-  id: string;
-  content: string;
-  project_slug: string | null;
-  created_at: string;
-};
 
 type Task = {
   id: string;
@@ -58,12 +42,10 @@ type Task = {
   created_at?: string;
 };
 
-type View = "overview" | "site" | "videos" | "sat" | "university" | "condor" | "notes" | "tasks";
+type View = "overview" | "site" | "videos" | "sat" | "university" | "condor";
 type ProjectKey = "site" | "videos" | "sat" | "university" | "condor" | "geral";
-type ComposerTarget = "note" | "task" | null;
 
 type LocalHubSnapshot = {
-  notes?: Array<{ id: string; conteudo: string; projeto: string; criado: number }>;
   tasks?: Array<{ id: string; titulo: string; projeto: string; status: string; criado: number }>;
 };
 
@@ -102,7 +84,7 @@ async function localHubRequest<T>(path: string, init?: RequestInit): Promise<T> 
   return payload as T;
 }
 
-const workspaces: Record<Exclude<View, "overview" | "notes" | "tasks">, Workspace> = {
+const workspaces: Record<Exclude<View, "overview">, Workspace> = {
   site: {
     label: "Meu site",
     eyebrow: "PRESENÇA DIGITAL",
@@ -148,18 +130,18 @@ const workspaces: Record<Exclude<View, "overview" | "notes" | "tasks">, Workspac
     project: "university",
     icon: GraduationCap,
     accent: "mint",
-    status: "Novo projeto",
+    status: "Planejamento",
     statusTone: "mint",
   },
   condor: {
     label: "Condor",
-    eyebrow: "SISTEMA LOCAL",
-    description: "Seu assistente de PC continua protegido e organizado a partir do Hub.",
+    eyebrow: "INTELIGÊNCIA DO HUB",
+    description: "Cria atividades, organiza seu foco e prepara o Hub para o que vem agora.",
     logo: assetPath("/brand/condor.svg"),
     project: "condor",
     icon: MonitorCog,
     accent: "mint",
-    status: "Local",
+    status: "Ativo",
     statusTone: "mint",
   },
 };
@@ -180,30 +162,12 @@ const pageMeta: Record<View, { eyebrow: string; title: string }> = {
   sat: { eyebrow: workspaces.sat.eyebrow, title: workspaces.sat.label },
   university: { eyebrow: workspaces.university.eyebrow, title: workspaces.university.label },
   condor: { eyebrow: workspaces.condor.eyebrow, title: workspaces.condor.label },
-  notes: { eyebrow: "ORGANIZAÇÃO PESSOAL", title: "Notas" },
-  tasks: { eyebrow: "ORGANIZAÇÃO PESSOAL", title: "Tarefas" },
 };
 
 const workspaceKeys = Object.keys(workspaces) as Array<keyof typeof workspaces>;
 
 function isWorkspaceView(view: View): view is keyof typeof workspaces {
   return view === "site" || view === "videos" || view === "sat" || view === "university" || view === "condor";
-}
-
-function noteTitle(content: string) {
-  const text = content.trim().replace(/\s+/g, " ");
-  return text.length > 52 ? `${text.slice(0, 52).trimEnd()}…` : text;
-}
-
-function notePreview(content: string) {
-  const text = content.trim().replace(/\s+/g, " ");
-  return text.length > 116 ? `${text.slice(0, 116).trimEnd()}…` : text;
-}
-
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" })
-    .format(new Date(date))
-    .replace(".", "");
 }
 
 function fullDate() {
@@ -220,11 +184,6 @@ function greeting() {
   if (hour < 12) return "Bom dia";
   if (hour < 18) return "Boa tarde";
   return "Boa noite";
-}
-
-function isTypingTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false;
-  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
 }
 
 export function Hub() {
@@ -247,23 +206,12 @@ export function Hub() {
   const [commandQuery, setCommandQuery] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
-  const [notes, setNotes] = useState<Note[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [noteText, setNoteText] = useState("");
-  const [taskText, setTaskText] = useState("");
-  const [project, setProject] = useState<ProjectKey>("geral");
-  const [composerTarget, setComposerTarget] = useState<ComposerTarget>(null);
 
   const loadWorkspace = useCallback(async () => {
     if (localMode) {
       await localHubRequest("/api/session", { method: "POST" });
       const snapshot = await localHubRequest<LocalHubSnapshot>("/api/hub");
-      setNotes((snapshot.notes ?? []).map((note) => ({
-        id: note.id,
-        content: note.conteudo,
-        project_slug: note.projeto || null,
-        created_at: new Date(note.criado * 1000).toISOString(),
-      })));
       setTasks((snapshot.tasks ?? []).map((task) => ({
         id: task.id,
         title: task.titulo,
@@ -274,11 +222,7 @@ export function Hub() {
       return;
     }
     if (!supabase) return;
-    const [noteResult, taskResult] = await Promise.all([
-      supabase.from("hub_notes").select("*").order("created_at", { ascending: false }).limit(48),
-      supabase.from("hub_tasks").select("*").order("created_at", { ascending: false }).limit(48),
-    ]);
-    setNotes((noteResult.data as Note[]) ?? []);
+    const taskResult = await supabase.from("hub_tasks").select("*").order("created_at", { ascending: false }).limit(48);
     setTasks((taskResult.data as Task[]) ?? []);
   }, [localMode, supabase]);
 
@@ -327,33 +271,10 @@ export function Hub() {
   }, [toast]);
 
   useEffect(() => {
-    if (!composerTarget) return;
-    const timer = window.setTimeout(() => {
-      document.getElementById(composerTarget === "note" ? "note-composer" : "task-composer")?.focus();
-      setComposerTarget(null);
-    }, 40);
-    return () => window.clearTimeout(timer);
-  }, [activeView, composerTarget]);
-
-  useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setCommandOpen(true);
-        return;
-      }
-      if (isTypingTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key.toLowerCase() === "n") {
-        event.preventDefault();
-        setActiveView("notes");
-        setProject("geral");
-        setComposerTarget("note");
-      }
-      if (event.key.toLowerCase() === "t") {
-        event.preventDefault();
-        setActiveView("tasks");
-        setProject("geral");
-        setComposerTarget("task");
       }
     }
     window.addEventListener("keydown", handleShortcut);
@@ -396,92 +317,36 @@ export function Hub() {
     setRecoveryMode(false);
   }
 
-  async function addNote() {
-    if (!noteText.trim()) return;
-    const content = noteText.trim();
-    if (localMode) {
-      try {
-        const result = await localHubRequest<{ item: { id: string; conteudo: string; projeto: string; criado: number } }>("/api/hub/notes", {
-          method: "POST",
-          body: JSON.stringify({ titulo: noteTitle(content), conteudo: content, projeto: project === "geral" ? "geral" : project }),
-        });
-        setNotes((current) => [{ id: result.item.id, content: result.item.conteudo, project_slug: result.item.projeto, created_at: new Date(result.item.criado * 1000).toISOString() }, ...current]);
-        setNoteText("");
-        notify("Nota salva");
-      } catch (reason) {
-        notify(reason instanceof Error ? reason.message : "Não foi possível salvar a nota.");
-      }
-      return;
-    }
-    if (!supabase) return;
-    const { data, error } = await supabase
-      .from("hub_notes")
-      .insert({ content, project_slug: project === "geral" ? null : project })
-      .select()
-      .single();
-    if (error || !data) {
-      notify("Não foi possível salvar a nota.");
-      return;
-    }
-    setNotes((current) => [data as Note, ...current]);
-    setNoteText("");
-    notify("Nota salva na nuvem");
-  }
-
-  async function updateNote(note: Note, content: string) {
-    if (!content.trim() || content.trim() === note.content) return;
-    const nextContent = content.trim();
-    if (localMode) {
-      try {
-        await localHubRequest(`/api/hub/notes/${note.id}`, { method: "PATCH", body: JSON.stringify({ titulo: noteTitle(nextContent), conteudo: nextContent }) });
-        setNotes((current) => current.map((item) => item.id === note.id ? { ...item, content: nextContent } : item));
-        notify("Alteração salva");
-      } catch (reason) {
-        notify(reason instanceof Error ? reason.message : "Não foi possível atualizar a nota.");
-      }
-      return;
-    }
-    if (!supabase) return;
-    setNotes((current) => current.map((item) => item.id === note.id ? { ...item, content: nextContent } : item));
-    const { error } = await supabase.from("hub_notes").update({ content: nextContent }).eq("id", note.id);
-    if (error) {
-      setNotes((current) => current.map((item) => item.id === note.id ? note : item));
-      notify("Não foi possível atualizar a nota.");
-      return;
-    }
-    notify("Alteração salva");
-  }
-
-  async function addTask() {
-    if (!taskText.trim()) return;
-    const title = taskText.trim();
+  async function createActivity(title: string, projectSlug: string | null) {
+    const cleanTitle = title.trim();
+    if (!cleanTitle) return false;
     if (localMode) {
       try {
         const result = await localHubRequest<{ item: { id: string; titulo: string; projeto: string; status: string; criado: number } }>("/api/hub/tasks", {
           method: "POST",
-          body: JSON.stringify({ titulo: title, projeto: project === "geral" ? "geral" : project, prioridade: "media" }),
+          body: JSON.stringify({ titulo: cleanTitle, projeto: projectSlug ?? "geral", prioridade: "media" }),
         });
         setTasks((current) => [{ id: result.item.id, title: result.item.titulo, project_slug: result.item.projeto, completed: result.item.status === "concluida", created_at: new Date(result.item.criado * 1000).toISOString() }, ...current]);
-        setTaskText("");
-        notify("Tarefa criada");
+        notify("Atividade criada pelo Condor");
+        return true;
       } catch (reason) {
-        notify(reason instanceof Error ? reason.message : "Não foi possível criar a tarefa.");
+        notify(reason instanceof Error ? reason.message : "Não foi possível criar a atividade.");
+        return false;
       }
-      return;
     }
-    if (!supabase) return;
+    if (!supabase) return false;
     const { data, error } = await supabase
       .from("hub_tasks")
-      .insert({ title, project_slug: project === "geral" ? null : project })
+      .insert({ title: cleanTitle, project_slug: projectSlug })
       .select()
       .single();
     if (error || !data) {
-      notify("Não foi possível criar a tarefa.");
-      return;
+      notify("Não foi possível criar a atividade.");
+      return false;
     }
     setTasks((current) => [data as Task, ...current]);
-    setTaskText("");
-    notify("Tarefa criada");
+    notify("Atividade criada pelo Condor");
+    return true;
   }
 
   async function toggleTask(task: Task) {
@@ -490,9 +355,9 @@ export function Hub() {
       try {
         await localHubRequest(`/api/hub/tasks/${task.id}`, { method: "PATCH", body: JSON.stringify({ status: completed ? "concluida" : "pendente" }) });
         setTasks((current) => current.map((item) => item.id === task.id ? { ...item, completed } : item));
-        notify(completed ? "Tarefa concluída" : "Tarefa reaberta");
+        notify(completed ? "Atividade concluída" : "Atividade reaberta");
       } catch (reason) {
-        notify(reason instanceof Error ? reason.message : "Não foi possível alterar a tarefa.");
+        notify(reason instanceof Error ? reason.message : "Não foi possível alterar a atividade.");
       }
       return;
     }
@@ -501,24 +366,15 @@ export function Hub() {
     const { error } = await supabase.from("hub_tasks").update({ completed }).eq("id", task.id);
     if (error) {
       setTasks((current) => current.map((item) => item.id === task.id ? task : item));
-      notify("Não foi possível alterar a tarefa.");
+      notify("Não foi possível alterar a atividade.");
       return;
     }
-    notify(completed ? "Tarefa concluída" : "Tarefa reaberta");
+    notify(completed ? "Atividade concluída" : "Atividade reaberta");
   }
 
   function goTo(view: View) {
     setActiveView(view);
     setSidebarOpen(false);
-    if (isWorkspaceView(view)) setProject(workspaces[view].project);
-  }
-
-  function startCreate(target: Exclude<ComposerTarget, null>) {
-    setCommandOpen(false);
-    setCommandQuery("");
-    setProject("geral");
-    setActiveView(target === "note" ? "notes" : "tasks");
-    setComposerTarget(target);
   }
 
   if (!sessionReady) {
@@ -528,11 +384,7 @@ export function Hub() {
   if (recoveryMode) return <ResetPassword password={newPassword} message={message} onPassword={setNewPassword} onSubmit={resetPassword} />;
   if (!signedIn) return <Login email={email} password={password} message={message} pending={loginPending} onEmail={setEmail} onPassword={setPassword} onSubmit={login} />;
 
-  const openTasks = tasks.filter((task) => !task.completed);
-  const completedTasks = tasks.filter((task) => task.completed);
   const activeWorkspace = isWorkspaceView(activeView) ? workspaces[activeView] : null;
-  const scopedNotes = activeWorkspace ? notes.filter((note) => note.project_slug === activeWorkspace.project) : notes;
-  const scopedTasks = activeWorkspace ? tasks.filter((task) => task.project_slug === activeWorkspace.project) : tasks;
   const page = pageMeta[activeView];
 
   const commands: CommandItem[] = [
@@ -541,11 +393,8 @@ export function Hub() {
     { id: "videos", group: "Sistemas", label: "Abrir Sistema de Vídeos", icon: Video, run: () => goTo("videos") },
     { id: "sat", group: "Sistemas", label: "Abrir SAT & Inglês", icon: GraduationCap, run: () => goTo("sat") },
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
-    { id: "condor", group: "Sistemas", label: "Abrir Condor", icon: MonitorCog, run: () => goTo("condor") },
-    { id: "notes", group: "Organização", label: "Ver todas as notas", icon: StickyNote, run: () => goTo("notes") },
-    { id: "tasks", group: "Organização", label: "Ver tarefas", icon: ClipboardList, run: () => goTo("tasks") },
-    { id: "new-note", group: "Criar", label: "Nova nota", shortcut: "N", icon: FilePenLine, run: () => startCreate("note") },
-    { id: "new-task", group: "Criar", label: "Nova tarefa", shortcut: "T", icon: Plus, run: () => startCreate("task") },
+    { id: "condor", group: "Condor", label: "Conversar com o Condor", icon: MonitorCog, run: () => goTo("condor") },
+    { id: "activity", group: "Condor", label: "Criar uma atividade", icon: Sparkles, run: () => goTo("condor") },
   ];
 
   return <main className={`hub-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""}`}>
@@ -575,10 +424,6 @@ export function Hub() {
       <SidebarGroup label="Sistemas">
         <NavButton active={activeView === "condor"} icon={MonitorCog} logo={workspaces.condor.logo} label="Condor" onClick={() => goTo("condor")} />
       </SidebarGroup>
-      <SidebarGroup label="Organização" className="organization-group">
-        <NavButton active={activeView === "notes"} icon={StickyNote} label="Notas" onClick={() => goTo("notes")} />
-        <NavButton active={activeView === "tasks"} icon={ClipboardList} label="Tarefas" onClick={() => goTo("tasks")} badge={openTasks.length || undefined} />
-      </SidebarGroup>
 
       <div className="sidebar-bottom">
         <button className="sidebar-profile" onClick={() => setCommandOpen(true)} title="Abrir comandos">
@@ -595,51 +440,29 @@ export function Hub() {
         <div className="breadcrumb"><span>ARTX</span><ChevronRight size={13} /><strong>{page.title}</strong></div>
         <div className="header-actions">
           <button className="command-trigger" onClick={() => setCommandOpen(true)}><Search size={16} /><span>Buscar</span><kbd>⌘ K</kbd></button>
-          <button className="quick-create" onClick={() => { setCommandQuery(""); setCommandOpen(true); }}><Plus size={16} /><span>Criar</span></button>
-          <span className="synced" title={localMode ? "Dados no Condor" : "Notas e tarefas sincronizadas"}>{localMode ? <MonitorCog size={15} /> : <Cloud size={15} />}<span>{localMode ? "Local" : "Salvo"}</span></span>
+          <button className="quick-create" onClick={() => goTo("condor")}><Sparkles size={16} /><span>Falar com Condor</span></button>
+          <span className="synced" title={localMode ? "Atividades no Condor" : "Atividades protegidas e sincronizadas"}>{localMode ? <MonitorCog size={15} /> : <Cloud size={15} />}<span>{localMode ? "Local" : "Salvo"}</span></span>
           {!localMode && supabase && <button className="icon-button" onClick={() => void supabase.auth.signOut()} title="Sair" aria-label="Sair"><LogOut size={17} /></button>}
         </div>
       </header>
 
       {activeView === "overview" && <Overview
-        notes={notes}
         tasks={tasks}
         onOpen={goTo}
-        onNewNote={() => startCreate("note")}
-        onNewTask={() => startCreate("task")}
       />}
-      {activeWorkspace && <WorkspaceView
+      {activeView === "condor" && <CondorWorkspace
+        activities={tasks}
+        onCreateActivity={createActivity}
+        onToggleActivity={toggleTask}
+        onNavigate={goTo}
+      />}
+      {activeWorkspace && activeView !== "condor" && <WorkspaceView
         workspace={activeWorkspace}
         hubAccessToken={hubAccessToken}
         refreshKey={refreshKey}
         previewMode={previewMode}
         onPreviewMode={setPreviewMode}
         onRefresh={() => { setRefreshKey((key) => key + 1); notify("Preview atualizado"); }}
-        noteText={noteText}
-        onNoteText={setNoteText}
-        taskText={taskText}
-        onTaskText={setTaskText}
-        onAddNote={addNote}
-        onAddTask={addTask}
-        notes={scopedNotes}
-        tasks={scopedTasks}
-        onToggleTask={toggleTask}
-      />}
-      {(activeView === "notes" || activeView === "tasks") && <NotesTasksView
-        focus={activeView}
-        noteText={noteText}
-        onNoteText={setNoteText}
-        taskText={taskText}
-        onTaskText={setTaskText}
-        project={project}
-        onProject={setProject}
-        notes={notes}
-        openTasks={openTasks}
-        completedTasks={completedTasks}
-        onAddNote={addNote}
-        onUpdateNote={updateNote}
-        onAddTask={addTask}
-        onToggleTask={toggleTask}
       />}
     </section>
 
@@ -664,12 +487,9 @@ function NavButton({ active, icon: Icon, logo, label, onClick, badge }: { active
   </button>;
 }
 
-function Overview({ notes, tasks, onOpen, onNewNote, onNewTask }: {
-  notes: Note[];
+function Overview({ tasks, onOpen }: {
   tasks: Task[];
   onOpen: (view: View) => void;
-  onNewNote: () => void;
-  onNewTask: () => void;
 }) {
   const openTasks = tasks.filter((task) => !task.completed);
   const completedTasks = tasks.filter((task) => task.completed);
@@ -680,8 +500,8 @@ function Overview({ notes, tasks, onOpen, onNewNote, onNewTask }: {
     <section className="dashboard-intro">
       <div><p className="eyebrow"><Sparkles size={13} /> CENTRAL DE COMANDO</p><h2>{greeting()}, Kauã.</h2><p className="date-line">{fullDate()}</p></div>
       <div className="today-stats" aria-label="Resumo de hoje">
-        <Metric value={openTasks.length} label="tarefas abertas" />
-        <Metric value={notes.length} label="notas salvas" />
+        <Metric value={openTasks.length} label="atividades" />
+        <Metric value="ON" label="Condor ativo" />
         <Metric value={workspaceKeys.length} label="sistemas" />
       </div>
     </section>
@@ -690,14 +510,14 @@ function Overview({ notes, tasks, onOpen, onNewNote, onNewTask }: {
       <article className="focus-card">
         <div className="panel-kicker"><span>FOCO ATUAL</span><Zap size={15} /></div>
         <h3>{focusTask ? focusTask.title : "Defina o próximo passo"}</h3>
-        <p>{focusTask ? `${projectLabels[(focusTask.project_slug ?? "geral") as ProjectKey]} · tarefa em aberto` : "Quando criar tarefas, seu próximo passo aparece aqui."}</p>
+        <p>{focusTask ? `${projectLabels[(focusTask.project_slug ?? "geral") as ProjectKey]} · atividade preparada pelo Condor` : "Converse com o Condor para preparar seu próximo foco."}</p>
         <div className="progress-row"><div className="progress-track"><span style={{ width: `${progress}%` }} /></div><strong>{progress}%</strong></div>
       </article>
       <article className="quick-actions-card">
-        <div className="panel-kicker"><span>AÇÕES RÁPIDAS</span><Keyboard size={15} /></div>
+        <div className="panel-kicker"><span>AÇÕES RÁPIDAS</span><Sparkles size={15} /></div>
         <div className="quick-actions">
-          <button onClick={onNewTask}><Plus size={15} /> Nova tarefa <kbd>T</kbd></button>
-          <button onClick={onNewNote}><FilePenLine size={15} /> Nova nota <kbd>N</kbd></button>
+          <button onClick={() => onOpen("condor")}><MonitorCog size={15} /> Pedir ao Condor <ArrowUpRight size={14} /></button>
+          <button onClick={() => onOpen("condor")}><Sparkles size={15} /> Criar atividade <ArrowUpRight size={14} /></button>
           <button onClick={() => onOpen("videos")}><Video size={15} /> Abrir vídeos <ArrowUpRight size={14} /></button>
         </div>
       </article>
@@ -710,24 +530,25 @@ function Overview({ notes, tasks, onOpen, onNewNote, onNewTask }: {
 
     <section className="dashboard-lower">
       <article className="data-panel my-day-panel">
-        <PanelHeader eyebrow="MEU DIA" title={openTasks.length ? `${openTasks.length} em aberto` : "Tudo limpo por aqui"} icon={ClipboardList} action="Ver tarefas" onAction={() => onOpen("tasks")} />
+        <PanelHeader eyebrow="ATIVIDADES DO CONDOR" title={openTasks.length ? `${openTasks.length} em aberto` : "Tudo pronto por aqui"} icon={MonitorCog} action="Organizar" onAction={() => onOpen("condor")} />
         <div className="task-list">
           {openTasks.slice(0, 4).map((task) => <div key={task.id}><Circle size={15} /><span>{task.title}</span><small>{projectLabels[(task.project_slug ?? "geral") as ProjectKey]}</small></div>)}
-          {!openTasks.length && <EmptyState label="Nenhuma tarefa pendente agora." compact />}
+          {!openTasks.length && <EmptyState label="Nenhuma atividade pendente agora." compact />}
         </div>
       </article>
       <article className="data-panel recent-notes-panel">
-        <PanelHeader eyebrow="NOTAS RECENTES" title={notes.length ? "Últimas capturas" : "Seu bloco está vazio"} icon={StickyNote} action="Ver notas" onAction={() => onOpen("notes")} />
-        <div className="note-list-mini">
-          {notes.slice(0, 4).map((note) => <div key={note.id}><div><strong>{noteTitle(note.content)}</strong><span>{projectLabels[(note.project_slug ?? "geral") as ProjectKey]}</span></div><time>{formatDate(note.created_at)}</time></div>)}
-          {!notes.length && <EmptyState label="Salve uma ideia para ela aparecer aqui." compact />}
+        <PanelHeader eyebrow="HUB PREPARADO" title="Estrutura central ativa" icon={CheckCircle2} action="Abrir Condor" onAction={() => onOpen("condor")} />
+        <div className="note-list-mini hub-ready-list">
+          <div><div><strong>Condor conectado ao Hub</strong><span>Organização e atividades</span></div><CheckCircle2 size={16} /></div>
+          <div><div><strong>Sistemas independentes</strong><span>Acesso centralizado pelo Hub</span></div><CheckCircle2 size={16} /></div>
+          <div><div><strong>Espaço privado</strong><span>Seu acesso continua protegido</span></div><CheckCircle2 size={16} /></div>
         </div>
       </article>
     </section>
   </div>;
 }
 
-function Metric({ value, label }: { value: number; label: string }) {
+function Metric({ value, label }: { value: number | string; label: string }) {
   return <div><strong>{value}</strong><span>{label}</span></div>;
 }
 
@@ -751,28 +572,17 @@ function EmptyState({ label, compact = false }: { label: string; compact?: boole
   return <div className={`empty-state ${compact ? "compact" : ""}`}><CheckCircle2 size={16} /><span>{label}</span></div>;
 }
 
-function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh, noteText, onNoteText, taskText, onTaskText, onAddNote, onAddTask, notes, tasks, onToggleTask }: {
+function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh }: {
   workspace: Workspace;
   hubAccessToken: string | null;
   refreshKey: number;
   previewMode: "desktop" | "mobile";
   onPreviewMode: (mode: "desktop" | "mobile") => void;
   onRefresh: () => void;
-  noteText: string;
-  onNoteText: (value: string) => void;
-  taskText: string;
-  onTaskText: (value: string) => void;
-  onAddNote: () => void;
-  onAddTask: () => void;
-  notes: Note[];
-  tasks: Task[];
-  onToggleTask: (task: Task) => void;
 }) {
-  const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
 
   useEffect(() => {
-    setSidePanelOpen(false);
     setFocusMode(false);
   }, [workspace.project]);
 
@@ -790,11 +600,7 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
     };
   }, [focusMode]);
 
-  if (!workspace.url) {
-    return <CondorWorkspace />;
-  }
-
-  return <div className={`workspace-page page-enter ${sidePanelOpen ? "side-panel-open" : "side-panel-closed"} ${focusMode ? "focus-mode" : ""}`}>
+  return <div className={`workspace-page page-enter side-panel-closed ${focusMode ? "focus-mode" : ""}`}>
     <section className="workspace-hero">
       <img className="workspace-logo" src={workspace.logo} alt={`Logo ${workspace.label}`} />
       <div><p className="eyebrow">{workspace.eyebrow}</p><h2>{workspace.label}</h2><span>{workspace.description}</span></div>
@@ -804,17 +610,11 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
       <article className={`app-frame-card ${previewMode === "mobile" ? "mobile-preview" : ""}`}>
         <div className="frame-toolbar"><div className="frame-label"><span><i /><i /><i /></span><img src={workspace.logo} alt="" /><strong>{workspace.label}</strong><small>Dentro do ARTX Hub</small></div><div className="frame-controls">
           {workspace.project === "site" && <div className="preview-toggle"><button className={previewMode === "desktop" ? "active" : ""} onClick={() => onPreviewMode("desktop")} aria-label="Visualizar desktop"><Monitor size={14} /></button><button className={previewMode === "mobile" ? "active" : ""} onClick={() => onPreviewMode("mobile")} aria-label="Visualizar celular"><Smartphone size={14} /></button></div>}
-          {!focusMode && <button className="frame-action" onClick={() => setSidePanelOpen((current) => !current)} aria-pressed={sidePanelOpen} title={sidePanelOpen ? "Ocultar notas e tarefas" : "Mostrar notas e tarefas"}>{sidePanelOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}<span>{sidePanelOpen ? "Ocultar painel" : "Mostrar painel"}</span></button>}
           <button className="frame-action focus-action" onClick={() => setFocusMode((current) => !current)} aria-pressed={focusMode} title={focusMode ? "Sair da tela ampla" : "Abrir em tela ampla"}>{focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}<span>{focusMode ? "Voltar ao Hub" : "Tela ampla"}</span></button>
           <a href={workspace.url} target="_blank" rel="noreferrer" title="Abrir em outra aba"><ExternalLink size={16} /></a>
         </div></div>
         <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} /></div>
       </article>
-      {sidePanelOpen && !focusMode && <aside className="workspace-side">
-        <CaptureCard noteText={noteText} onNoteText={onNoteText} onAddNote={onAddNote} projectLabel={workspace.label} />
-        <TaskCard taskText={taskText} onTaskText={onTaskText} onAddTask={onAddTask} tasks={tasks} onToggleTask={onToggleTask} />
-        <RecentNotes notes={notes} />
-      </aside>}
     </section>
   </div>;
 }
@@ -847,77 +647,6 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey }: { worksp
   return <iframe ref={frameRef} key={refreshKey} src={sourceUrl} title={workspace.label} onLoad={sendHubSession} allow="clipboard-write; autoplay; fullscreen" />;
 }
 
-function CaptureCard({ noteText, onNoteText, onAddNote, projectLabel }: { noteText: string; onNoteText: (value: string) => void; onAddNote: () => void; projectLabel: string }) {
-  return <article className="side-card capture-card"><div className="side-card-heading"><span><StickyNote size={17} /></span><div><h3>Anotar enquanto usa</h3><p>Salvo em {projectLabel}.</p></div></div><textarea value={noteText} onChange={(event) => onNoteText(event.target.value)} placeholder="O que você quer lembrar ou melhorar?" /><button className="primary-button" onClick={onAddNote}><Send size={14} /> Salvar nota</button></article>;
-}
-
-function TaskCard({ taskText, onTaskText, onAddTask, tasks, onToggleTask }: { taskText: string; onTaskText: (value: string) => void; onAddTask: () => void; tasks: Task[]; onToggleTask: (task: Task) => void }) {
-  const openTasks = tasks.filter((task) => !task.completed);
-  return <article className="side-card"><div className="side-card-heading"><span><ClipboardList size={17} /></span><div><h3>Próximos passos</h3><p>{openTasks.length ? `${openTasks.length} tarefa${openTasks.length > 1 ? "s" : ""} aberta${openTasks.length > 1 ? "s" : ""}` : "Tudo em dia"}</p></div></div><div className="quick-add"><input value={taskText} onChange={(event) => onTaskText(event.target.value)} onKeyDown={(event) => event.key === "Enter" && onAddTask()} placeholder="Adicionar tarefa" /><button onClick={onAddTask} aria-label="Adicionar tarefa"><Plus size={16} /></button></div><div className="compact-tasks">{tasks.slice(0, 5).map((task) => <button key={task.id} className={task.completed ? "done" : ""} onClick={() => onToggleTask(task)}><span>{task.completed ? <Check size={13} /> : <Circle size={14} />}</span>{task.title}</button>)}{!tasks.length && <EmptyState label="Deixe claro o próximo passo." compact />}</div></article>;
-}
-
-function RecentNotes({ notes }: { notes: Note[] }) {
-  return <article className="side-card recent-card"><div className="side-card-heading"><span><FileText size={17} /></span><div><h3>Notas salvas</h3><p>Referências deste sistema.</p></div></div>{notes.slice(0, 3).map((note) => <div className="recent-note" key={note.id}><strong>{noteTitle(note.content)}</strong><small>{formatDate(note.created_at)}</small></div>)}{!notes.length && <EmptyState label="Suas observações ficam aqui." compact />}</article>;
-}
-
-function NotesTasksView({ focus, noteText, onNoteText, taskText, onTaskText, project, onProject, notes, openTasks, completedTasks, onAddNote, onUpdateNote, onAddTask, onToggleTask }: {
-  focus: "notes" | "tasks";
-  noteText: string;
-  onNoteText: (value: string) => void;
-  taskText: string;
-  onTaskText: (value: string) => void;
-  project: ProjectKey;
-  onProject: (project: ProjectKey) => void;
-  notes: Note[];
-  openTasks: Task[];
-  completedTasks: Task[];
-  onAddNote: () => void;
-  onUpdateNote: (note: Note, content: string) => void;
-  onAddTask: () => void;
-  onToggleTask: (task: Task) => void;
-}) {
-  const [noteQuery, setNoteQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(notes[0]?.id ?? null);
-  const selectedNote = notes.find((note) => note.id === selectedId) ?? null;
-  const [draft, setDraft] = useState(selectedNote?.content ?? "");
-
-  useEffect(() => {
-    if (!selectedId && notes[0]) setSelectedId(notes[0].id);
-  }, [notes, selectedId]);
-
-  useEffect(() => {
-    setDraft(selectedNote?.content ?? "");
-  }, [selectedNote?.id, selectedNote?.content]);
-
-  const filteredNotes = notes.filter((note) => note.content.toLowerCase().includes(noteQuery.toLowerCase()));
-
-  return <section className={`organization-page page-enter focus-${focus}`}>
-    <PageHeader eyebrow="ORGANIZAÇÃO" title={focus === "notes" ? "Notas e ideias" : "Tarefas"} description={focus === "notes" ? "Capture referências, decisões e melhorias do seu sistema." : "Mantenha visível apenas o que realmente vem agora."} />
-    <div className="organization-top">
-      <article className="create-panel note-composer-panel"><div className="panel-kicker"><span>NOVA NOTA</span><FilePenLine size={15} /></div><textarea id="note-composer" value={noteText} onChange={(event) => onNoteText(event.target.value)} placeholder="Escreva uma ideia, melhoria ou decisão..." /><div className="composer-footer"><ProjectPicker value={project} onChange={onProject} /><button className="primary-button" onClick={onAddNote}><Plus size={15} /> Salvar nota</button></div></article>
-      <article className="create-panel task-composer-panel"><div className="panel-kicker"><span>NOVA TAREFA</span><ClipboardList size={15} /></div><div className="task-composer"><input id="task-composer" value={taskText} onChange={(event) => onTaskText(event.target.value)} onKeyDown={(event) => event.key === "Enter" && onAddTask()} placeholder="Qual é o próximo passo?" /><button className="primary-button" onClick={onAddTask}><Plus size={15} /> Adicionar</button></div><div className="composer-footer"><ProjectPicker value={project} onChange={onProject} /><span className="saved-state"><Cloud size={14} /> Sincronizado</span></div></article>
-    </div>
-
-    <div className="organization-grid">
-      <section className="notes-library data-panel"><PanelHeader eyebrow="BLOCO DE NOTAS" title={`${notes.length} nota${notes.length === 1 ? "" : "s"}`} icon={StickyNote} /><div className="notes-search"><Search size={15} /><input value={noteQuery} onChange={(event) => setNoteQuery(event.target.value)} placeholder="Buscar nas notas" /></div><div className="notes-library-list">{filteredNotes.map((note) => <button className={note.id === selectedNote?.id ? "selected" : ""} key={note.id} onClick={() => setSelectedId(note.id)}><div><strong>{noteTitle(note.content)}</strong><span>{notePreview(note.content)}</span></div><time>{formatDate(note.created_at)}</time></button>)}{!filteredNotes.length && <EmptyState label={noteQuery ? "Nenhuma nota encontrada." : "Comece registrando a primeira ideia."} />}</div></section>
-      <section className="note-editor data-panel"><PanelHeader eyebrow="EDITOR" title={selectedNote ? formatDate(selectedNote.created_at) : "Selecione uma nota"} icon={FileText} />{selectedNote ? <><textarea value={draft} onChange={(event) => setDraft(event.target.value)} aria-label="Editar nota" /><div className="editor-footer"><StatusPill tone="violet">{projectLabels[(selectedNote.project_slug ?? "geral") as ProjectKey]}</StatusPill><button className="primary-button" onClick={() => onUpdateNote(selectedNote, draft)}><Check size={15} /> Salvar alteração</button></div></> : <EmptyState label="Selecione ou crie uma nota para editar." />}</section>
-      <section className="tasks-board data-panel"><PanelHeader eyebrow="TAREFAS" title={openTasks.length ? `${openTasks.length} em aberto` : "Tudo concluído"} icon={ClipboardList} /><div className="task-board-section"><p>EM ABERTO</p>{openTasks.slice(0, 8).map((task) => <TaskRow task={task} key={task.id} onToggle={onToggleTask} />)}{!openTasks.length && <EmptyState label="Nenhuma tarefa pendente." compact />}</div><div className="task-board-section completed"><p>CONCLUÍDAS</p>{completedTasks.slice(0, 4).map((task) => <TaskRow task={task} key={task.id} onToggle={onToggleTask} />)}{!completedTasks.length && <span className="empty-caption">As concluídas aparecem aqui.</span>}</div></section>
-    </div>
-  </section>;
-}
-
-function PageHeader({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
-  return <header className="page-header"><div><p className="eyebrow">{eyebrow}</p><h2>{title}</h2><span>{description}</span></div></header>;
-}
-
-function TaskRow({ task, onToggle }: { task: Task; onToggle: (task: Task) => void }) {
-  return <button className={`task-row ${task.completed ? "done" : ""}`} onClick={() => onToggle(task)}><span>{task.completed ? <Check size={13} /> : <Circle size={14} />}</span><strong>{task.title}</strong><small>{projectLabels[(task.project_slug ?? "geral") as ProjectKey]}</small></button>;
-}
-
-function ProjectPicker({ value, onChange }: { value: ProjectKey; onChange: (value: ProjectKey) => void }) {
-  return <select value={value} onChange={(event) => onChange(event.target.value as ProjectKey)} aria-label="Projeto relacionado">{(Object.keys(projectLabels) as ProjectKey[]).map((item) => <option key={item} value={item}>{projectLabels[item]}</option>)}</select>;
-}
-
 function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boolean; query: string; commands: CommandItem[]; onQuery: (value: string) => void; onClose: () => void }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const filtered = commands.filter((command) => `${command.group} ${command.label}`.toLowerCase().includes(query.toLowerCase()));
@@ -939,7 +668,7 @@ function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boo
 }
 
 function Login({ email, password, message, pending, onEmail, onPassword, onSubmit }: { email: string; password: string; message: string; pending: boolean; onEmail: (value: string) => void; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void }) {
-  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ESPAÇO PRIVADO</p><h1>Seu espaço para construir.</h1><p>Entre para acessar projetos, anotações e seu dia de trabalho.</p><label>E-mail<input type="email" value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" inputMode="email" required /></label><label>Senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="current-password" required /></label>{message && <span className="message" aria-live="polite">{message}</span>}<button className="primary" type="submit" disabled={pending}>{pending ? "Verificando..." : "Entrar no Hub"} {!pending && <ArrowUpRight size={16} />}</button><small className="login-footer"><span /> Acesso particular e sincronizado</small></form></main>;
+  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ESPAÇO PRIVADO</p><h1>Seu espaço para construir.</h1><p>Entre para acessar seus sistemas e organizar o dia com o Condor.</p><label>E-mail<input type="email" value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" inputMode="email" required /></label><label>Senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="current-password" required /></label>{message && <span className="message" aria-live="polite">{message}</span>}<button className="primary" type="submit" disabled={pending}>{pending ? "Verificando..." : "Entrar no Hub"} {!pending && <ArrowUpRight size={16} />}</button><small className="login-footer"><span /> Acesso particular e sincronizado</small></form></main>;
 }
 
 function ResetPassword({ password, message, onPassword, onSubmit }: { password: string; message: string; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void }) {
