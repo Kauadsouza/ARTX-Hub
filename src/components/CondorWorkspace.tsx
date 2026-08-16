@@ -10,11 +10,11 @@ import {
   ChevronRight,
   CircleDot,
   FlaskConical,
-  Gauge,
   Layers3,
   MessageSquare,
   Play,
   RotateCw,
+  Shield,
   Sparkles,
   Target,
   Zap,
@@ -35,11 +35,11 @@ type CondorPart = {
 
 const defaultParts: CondorPart[] = [
   { id: "helmet", nome: "Capacete", zona: "Interface", status: "conceito", progresso: 20, risco: "baixo", resumo: "HUD, áudio, sensores e ergonomia do conjunto da cabeça." },
-  { id: "chest", nome: "Núcleo peitoral", zona: "Computação", status: "simulação", progresso: 36, risco: "baixo", resumo: "Computação, telemetria e distribuição protegida de energia." },
+  { id: "chest", nome: "Tórax", zona: "Estrutura humana", status: "simulação", progresso: 42, risco: "baixo", resumo: "Caixa torácica, postura, ergonomia e encaixe humano da estrutura central." },
   { id: "left-arm", nome: "Braço esquerdo", zona: "Controle", status: "conceito", progresso: 18, risco: "baixo", resumo: "Sensores, feedback e controle gestual do lado esquerdo." },
   { id: "right-arm", nome: "Braço direito", zona: "Controle", status: "conceito", progresso: 18, risco: "baixo", resumo: "Sensores e comandos seguros integrados ao lado direito." },
   { id: "legs", nome: "Pernas", zona: "Mobilidade", status: "conceito", progresso: 12, risco: "médio", resumo: "Estrutura passiva, encaixe, equilíbrio e estudo ergonômico." },
-  { id: "power", nome: "Energia", zona: "Infraestrutura", status: "planejamento", progresso: 8, risco: "alto", resumo: "Energia de bancada com componentes certificados e proteção dedicada." },
+  { id: "power", nome: "Núcleo C", zona: "Energia e identidade", status: "conceito seguro", progresso: 18, risco: "alto", resumo: "A marca C concentra a identidade visual e representa apenas energia monitorada de bancada." },
 ];
 
 const partPlans: Record<string, { next: string; deliverables: string[] }> = {
@@ -48,17 +48,21 @@ const partPlans: Record<string, { next: string; deliverables: string[] }> = {
   "left-arm": { next: "Prototipar leitura de gesto em bancada.", deliverables: ["Mapa de movimento", "Sensor de gesto", "Feedback visual"] },
   "right-arm": { next: "Projetar comandos e feedback do módulo.", deliverables: ["Controle seguro", "Sensor de posição", "Teste isolado"] },
   legs: { next: "Validar medidas e amplitude de movimento.", deliverables: ["Medidas do corpo", "Articulações passivas", "Teste de equilíbrio"] },
-  power: { next: "Manter apenas estudo de bancada certificado.", deliverables: ["Carga estimada", "Proteções", "Plano de teste"] },
+  power: { next: "Validar a marca C e manter energia somente em simulação de bancada.", deliverables: ["Marca C", "Carga estimada", "Plano de proteção"] },
 };
 
 const assetPath = (path: string) => `${process.env.NEXT_PUBLIC_ARTX_BASE_PATH ?? ""}${path}`;
 
 async function localSession() {
-  const response = await fetch("/api/session", { method: "POST", credentials: "same-origin" });
+  const response = await fetch("/api/session", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "X-Condor-Client": "hub-local" },
+  });
   if (!response.ok) throw new Error("Condor local indisponível");
 }
 
-function Hologram({ selected, compact = false, onSelect }: { selected: string; compact?: boolean; onSelect?: (id: string) => void }) {
+function Hologram({ selected, compact = false, armorEnabled = false, onSelect }: { selected: string; compact?: boolean; armorEnabled?: boolean; onSelect?: (id: string) => void }) {
   const mount = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -96,7 +100,12 @@ function Hologram({ selected, compact = false, onSelect }: { selected: string; c
     const selectedWire = new THREE.MeshBasicMaterial({ color: 0xffbf67, wireframe: true, transparent: true, opacity: 0.66, depthWrite: false });
     const jointMaterial = new THREE.MeshStandardMaterial({ color: 0x15242d, emissive: 0x315d76, emissiveIntensity: 0.32, metalness: 0.82, roughness: 0.24 });
     const coreMaterial = new THREE.MeshStandardMaterial({ color: 0xffa13c, emissive: 0xff7b18, emissiveIntensity: 2.3, metalness: 0.28, roughness: 0.18 });
+    const coreBackMaterial = new THREE.MeshStandardMaterial({ color: 0x071219, metalness: 0.85, roughness: 0.22, transparent: true, opacity: 0.82 });
     const featureMaterial = new THREE.MeshStandardMaterial({ color: 0x9cf4ff, emissive: 0x35cdeb, emissiveIntensity: 1.35, metalness: 0.35, roughness: 0.22 });
+    const anatomyDetail = new THREE.MeshStandardMaterial({ color: 0x7be6ed, emissive: 0x1b8fa2, emissiveIntensity: 0.5, metalness: 0.25, roughness: 0.42, transparent: true, opacity: 0.7 });
+    const armorMaterial = new THREE.MeshStandardMaterial({ color: 0x172c3d, emissive: 0x095d78, emissiveIntensity: 0.55, metalness: 0.82, roughness: 0.2, transparent: true, opacity: 0.46, side: THREE.DoubleSide });
+    const armorSelected = new THREE.MeshStandardMaterial({ color: 0x5a381d, emissive: 0xff8b2d, emissiveIntensity: 0.9, metalness: 0.72, roughness: 0.18, transparent: true, opacity: 0.62, side: THREE.DoubleSide });
+    const armorWire = new THREE.MeshBasicMaterial({ color: 0x87edff, wireframe: true, transparent: true, opacity: 0.34, depthWrite: false });
     const softLine = new THREE.MeshBasicMaterial({ color: 0x7367ff, wireframe: true, transparent: true, opacity: 0.24 });
     const interactiveMeshes: THREE.Mesh[] = [];
 
@@ -133,6 +142,27 @@ function Hologram({ selected, compact = false, onSelect }: { selected: string; c
       joint.userData.id = id;
       body.add(joint);
       interactiveMeshes.push(joint);
+    };
+
+    const addArmor = (
+      geometry: THREE.BufferGeometry,
+      position: [number, number, number],
+      scale: [number, number, number],
+      id: string,
+      rotation: [number, number, number] = [0, 0, 0],
+    ) => {
+      const group = new THREE.Group();
+      group.position.set(...position);
+      group.scale.set(...scale);
+      group.rotation.set(...rotation);
+      const shell = new THREE.Mesh(geometry, selected === id ? armorSelected : armorMaterial);
+      shell.userData.id = id;
+      group.add(shell);
+      interactiveMeshes.push(shell);
+      const grid = new THREE.Mesh(geometry.clone(), armorWire);
+      grid.scale.setScalar(1.01);
+      group.add(grid);
+      body.add(group);
     };
 
     const addBetween = (start: THREE.Vector3, end: THREE.Vector3, radiusTop: number, radiusBottom: number, id: string) => {
@@ -207,6 +237,21 @@ function Hologram({ selected, compact = false, onSelect }: { selected: string; c
     mouth.rotation.z = Math.PI / 2;
     mouth.scale.z = 0.55;
     body.add(mouth);
+    // Sobrancelhas, maçãs do rosto e queixo preservam a leitura humana.
+    for (const side of [-1, 1] as const) {
+      const brow = new THREE.Mesh(new THREE.CapsuleGeometry(0.0035, 0.038, 4, 10), anatomyDetail);
+      brow.position.set(side * 0.039, 1.701, 0.098);
+      brow.rotation.z = Math.PI / 2 + side * 0.12;
+      body.add(brow);
+      const cheek = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), anatomyDetail);
+      cheek.position.set(side * 0.058, 1.642, 0.083);
+      cheek.scale.set(0.025, 0.018, 0.009);
+      body.add(cheek);
+    }
+    const chin = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), anatomyDetail);
+    chin.position.set(0, 1.574, 0.073);
+    chin.scale.set(0.043, 0.018, 0.015);
+    body.add(chin);
 
     // Tronco humano contínuo: ombros, caixa torácica, cintura, abdômen e quadril.
     const torsoProfile: Array<[number, number, number]> = [
@@ -224,6 +269,15 @@ function Hologram({ selected, compact = false, onSelect }: { selected: string; c
     addAnatomy(createOrganicGeometry(torsoProfile, 44), [0, 0, 0], [1, 1, 1], "chest");
     addAnatomy(new THREE.SphereGeometry(1, 32, 20), [0, 0.965, 0], [0.21, 0.12, 0.142], "chest");
     addAnatomy(new THREE.CapsuleGeometry(0.03, 0.42, 8, 16), [0, 1.265, -0.115], [1, 1, 0.8], "chest", [0, 0, 0], false);
+    for (const side of [-1, 1] as const) {
+      const clavicle = new THREE.Mesh(new THREE.CapsuleGeometry(0.005, 0.17, 5, 12), anatomyDetail);
+      clavicle.position.set(side * 0.09, 1.445, 0.142);
+      clavicle.rotation.z = Math.PI / 2 - side * 0.1;
+      body.add(clavicle);
+    }
+    const sternum = new THREE.Mesh(new THREE.CapsuleGeometry(0.004, 0.22, 5, 12), anatomyDetail);
+    sternum.position.set(0, 1.29, 0.151);
+    body.add(sternum);
 
     // Ombros, clavículas e braços em postura humana neutra.
     addBetween(new THREE.Vector3(-0.035, 1.47, 0.075), new THREE.Vector3(-0.245, 1.455, 0.055), 0.026, 0.02, "left-arm");
@@ -297,16 +351,24 @@ function Hologram({ selected, compact = false, onSelect }: { selected: string; c
     addAnatomy(new THREE.CapsuleGeometry(0.052, 0.145, 8, 18), [-0.105, 0.075, 0.075], [1, 1, 0.75], "legs", [Math.PI / 2, 0, 0]);
     addAnatomy(new THREE.CapsuleGeometry(0.052, 0.145, 8, 18), [0.105, 0.075, 0.075], [1, 1, 0.75], "legs", [Math.PI / 2, 0, 0]);
 
-    // Núcleo peitoral independente do volume anatômico.
+    // Núcleo peitoral: o C é a assinatura do Condor X, sem disco circular.
     const core = new THREE.Group();
-    core.position.set(0, 1.355, 0.145);
-    const coreDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.072, 0.072, 0.018, 32), coreMaterial);
-    coreDisc.rotation.x = Math.PI / 2;
-    coreDisc.userData.id = "power";
-    interactiveMeshes.push(coreDisc);
-    core.add(coreDisc);
-    const coreRing = new THREE.Mesh(new THREE.TorusGeometry(0.092, 0.009, 12, 40), selected === "power" ? selectedWire : baseWire);
-    core.add(coreRing);
+    core.position.set(0, 1.355, 0.164);
+    const cArc = Math.PI * 1.62;
+    const cMark = new THREE.Mesh(new THREE.TorusGeometry(0.069, 0.015, 18, 72, cArc), coreMaterial);
+    cMark.rotation.z = Math.PI - cArc / 2;
+    cMark.userData.id = "power";
+    interactiveMeshes.push(cMark);
+    core.add(cMark);
+    const cHalo = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.0035, 8, 64, cArc), selected === "power" ? selectedWire : baseWire);
+    cHalo.rotation.z = Math.PI - cArc / 2;
+    core.add(cHalo);
+    const cBackplate = new THREE.Mesh(new THREE.CylinderGeometry(0.088, 0.088, 0.008, 48), coreBackMaterial);
+    cBackplate.rotation.x = Math.PI / 2;
+    cBackplate.position.z = -0.012;
+    cBackplate.userData.id = "power";
+    interactiveMeshes.push(cBackplate);
+    core.add(cBackplate);
     body.add(core);
 
     // O corpo é normalizado para exatamente 1,80 m do piso ao topo da cabeça.
@@ -315,6 +377,23 @@ function Hologram({ selected, compact = false, onSelect }: { selected: string; c
     const exactScale = 1.8 / naturalHeight;
     body.scale.setScalar(exactScale);
     body.position.y = -bounds.min.y * exactScale;
+
+    // Armadura Fase 01: carenagem digital passiva sobre a anatomia real.
+    if (armorEnabled) {
+      addArmor(new THREE.SphereGeometry(1, 36, 24, 0, Math.PI * 2, 0, Math.PI * 0.7), [0, 1.692, -0.002], [0.116, 0.145, 0.112], "helmet");
+      addArmor(new THREE.BoxGeometry(1, 1, 1, 5, 5, 2), [0, 1.645, 0.112], [0.15, 0.055, 0.018], "helmet", [0.08, 0, 0]);
+      addArmor(createOrganicGeometry([
+        [1.02, 0.205, 0.153], [1.12, 0.205, 0.147], [1.24, 0.23, 0.157], [1.36, 0.286, 0.178], [1.47, 0.25, 0.155],
+      ], 44), [0, 0, 0], [1.035, 1, 1.045], "chest");
+      addArmor(new THREE.SphereGeometry(1, 28, 18), [-0.282, 1.438, 0], [0.096, 0.07, 0.1], "left-arm");
+      addArmor(new THREE.SphereGeometry(1, 28, 18), [0.282, 1.438, 0], [0.096, 0.07, 0.1], "right-arm");
+      addArmor(new THREE.CapsuleGeometry(0.058, 0.22, 8, 18), [-0.392, 1.02, 0.02], [1, 1, 0.86], "left-arm", [0, 0, -0.1]);
+      addArmor(new THREE.CapsuleGeometry(0.058, 0.22, 8, 18), [0.392, 1.02, 0.02], [1, 1, 0.86], "right-arm", [0, 0, 0.1]);
+      addArmor(new THREE.CapsuleGeometry(0.09, 0.24, 8, 20), [-0.108, 0.73, 0.008], [1, 1, 0.88], "legs");
+      addArmor(new THREE.CapsuleGeometry(0.09, 0.24, 8, 20), [0.108, 0.73, 0.008], [1, 1, 0.88], "legs");
+      addArmor(new THREE.CapsuleGeometry(0.067, 0.26, 8, 20), [-0.108, 0.36, 0.024], [1, 1, 0.82], "legs");
+      addArmor(new THREE.CapsuleGeometry(0.067, 0.26, 8, 20), [0.108, 0.36, 0.024], [1, 1, 0.82], "legs");
+    }
 
     // Plataforma, grade antropométrica e varredura vertical.
     for (let index = 0; index < 3; index += 1) {
@@ -421,13 +500,19 @@ function Hologram({ selected, compact = false, onSelect }: { selected: string; c
       selectedWire.dispose();
       jointMaterial.dispose();
       coreMaterial.dispose();
+      coreBackMaterial.dispose();
+      featureMaterial.dispose();
+      anatomyDetail.dispose();
+      armorMaterial.dispose();
+      armorSelected.dispose();
+      armorWire.dispose();
       softLine.dispose();
       scanMaterial.dispose();
       particleMaterial.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [compact, onSelect, selected]);
+  }, [armorEnabled, compact, onSelect, selected]);
 
   return <div ref={mount} className={`condor-hologram ${compact ? "is-compact" : ""}`} role="img" aria-label="Digital twin humano do Condor X com 1,80 metro e 85 quilos" />;
 }
@@ -435,6 +520,7 @@ function Hologram({ selected, compact = false, onSelect }: { selected: string; c
 export function CondorWorkspace() {
   const [view, setView] = useState<CondorView>("overview");
   const [selectedPart, setSelectedPart] = useState("chest");
+  const [armorMode, setArmorMode] = useState(true);
   const [parts] = useState<CondorPart[]>(defaultParts);
   const [launching, setLaunching] = useState(false);
   const [notice, setNotice] = useState("");
@@ -507,20 +593,21 @@ export function CondorWorkspace() {
     {view === "laboratory" && <div className="condor-laboratory">
       <header className="condor-section-title"><div><p><FlaskConical size={13} /> LABORATÓRIO</p><h1>Projetos do Condor</h1><span>Cada projeto nasce como protótipo e ganha sua própria estrutura.</span></div><small>1 PROJETO</small></header>
       <article className="condor-project-post">
-        <div className="condor-project-hologram"><div className="condor-project-code"><small>PROJECT</small><strong>CX-01</strong></div><Hologram selected="chest" compact /></div>
+        <div className="condor-project-hologram"><div className="condor-project-code"><small>PROJECT</small><strong>CX-01</strong></div><Hologram selected="chest" compact armorEnabled /></div>
         <div className="condor-project-copy"><div className="condor-project-brand"><img src={assetPath("/brand/condor-x.png")} alt="Logo Condor X" /><div><p>PROTÓTIPO EM DESENVOLVIMENTO</p><h2>Condor X</h2></div></div><span>Digital twin humano construído por módulos, com anatomia articulada e referência corporal real.</span><div className="condor-project-stats"><span><strong>{progress}%</strong><small>estrutura</small></span><span><strong>{parts.length}</strong><small>módulos</small></span><span><strong>1,80 m</strong><small>altura</small></span><span><strong>85 kg</strong><small>massa</small></span></div><button onClick={() => setView("condor-x")}>Entrar no projeto <ArrowUpRight size={16} /></button></div>
       </article>
     </div>}
 
     {view === "condor-x" && selected && <div className="condor-x-page">
-      <header className="condor-x-title"><button onClick={() => setView("laboratory")}><ArrowLeft size={15} /> Laboratório</button><div><p>CONDOR X · CX-01</p><h1>Estrutura do protótipo</h1><span>Selecione uma parte do corpo para abrir o módulo.</span></div><div className="condor-x-progress"><strong>{progress}%</strong><span><i style={{ width: `${progress}%` }} /></span><small>estrutura geral</small></div></header>
+      <header className="condor-x-title"><button onClick={() => setView("laboratory")}><ArrowLeft size={15} /> Laboratório</button><div><p>CONDOR X · CX-01</p><h1>Estrutura humana e armadura</h1><span>Corpo real de referência primeiro; carenagem passiva por cima.</span></div><div className="condor-x-progress"><strong>{progress}%</strong><span><i style={{ width: `${progress}%` }} /></span><small>estrutura geral</small></div></header>
+      <div className="condor-x-mode" role="group" aria-label="Camada do protótipo"><button className={!armorMode ? "active" : ""} onClick={() => setArmorMode(false)}>Anatomia humana</button><button className={armorMode ? "active" : ""} onClick={() => setArmorMode(true)}><Shield size={13} /> Armadura · Fase 01</button><span>{armorMode ? "Carenagem digital passiva" : "Referência corporal 1,80 m · 85 kg"}</span></div>
       <section className="condor-x-layout">
         <article className="condor-x-stage">
           <div className="condor-stage-corner top-left"><small>DIGITAL TWIN</small><strong>CX-01</strong></div>
           <div className="condor-stage-corner top-right"><small>MÓDULO ATIVO</small><strong>{selected.nome}</strong></div>
           <div className="condor-height-scale" aria-hidden="true"><span>180</span><i /><span>135</span><i /><span>90</span><i /><span>45</span><i /><span>0 cm</span></div>
           <div className="condor-body-specs"><span><strong>1,80 m</strong><small>altura de referência</small></span><span><strong>85 kg</strong><small>massa de referência</small></span></div>
-          <Hologram selected={selectedPart} onSelect={setSelectedPart} />
+          <Hologram selected={selectedPart} armorEnabled={armorMode} onSelect={setSelectedPart} />
           <div className="condor-rotate-hint"><RotateCw size={12} /> Arraste para girar · clique para selecionar</div>
           <div className="condor-selected-label"><CircleDot size={13} /><span>{selected.nome}</span><small>{selected.status}</small></div>
         </article>
@@ -531,7 +618,7 @@ export function CondorWorkspace() {
           <div className="condor-module-detail"><div><span>{selected.status}</span><small>{selected.zona}</small></div><h3>{selected.nome}</h3><p>{selected.resumo}</p><strong>Próximo passo</strong><p>{partPlans[selected.id]?.next}</p><ul>{partPlans[selected.id]?.deliverables.map((item) => <li key={item}><Target size={12} />{item}</li>)}</ul><button onClick={demoOnly}><Play size={14} /> Somente no app local</button></div>
         </aside>
       </section>
-      <footer className="condor-x-safe"><Gauge size={16} /><span>Demonstração do Hub: sem conversa, memória, arquivos ou ações do PC.</span></footer>
+      <footer className="condor-x-safe"><Shield size={16} /><span>Armadura Fase 01: sem armas, propulsão, chama, gás pressurizado ou atuadores de alta força. O Hub continua sem acesso ao PC.</span></footer>
     </div>}
 
     {notice && <div className="condor-notice"><RotateCw size={14} />{notice}</div>}
