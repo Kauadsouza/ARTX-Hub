@@ -14,7 +14,6 @@ import {
   MessageSquare,
   Play,
   RotateCw,
-  Shield,
   Sparkles,
   Target,
   Zap,
@@ -34,7 +33,7 @@ type CondorPart = {
 };
 
 const defaultParts: CondorPart[] = [
-  { id: "helmet", nome: "Capacete", zona: "Interface", status: "conceito", progresso: 20, risco: "baixo", resumo: "HUD, áudio, sensores e ergonomia do conjunto da cabeça." },
+  { id: "helmet", nome: "Cabeça", zona: "Anatomia e interface", status: "refinamento", progresso: 32, risco: "baixo", resumo: "Crânio, face, visão, audição e proporções craniofaciais do protótipo humano." },
   { id: "chest", nome: "Tórax", zona: "Estrutura humana", status: "simulação", progresso: 42, risco: "baixo", resumo: "Caixa torácica, postura, ergonomia e encaixe humano da estrutura central." },
   { id: "left-arm", nome: "Braço esquerdo", zona: "Controle", status: "conceito", progresso: 18, risco: "baixo", resumo: "Sensores, feedback e controle gestual do lado esquerdo." },
   { id: "right-arm", nome: "Braço direito", zona: "Controle", status: "conceito", progresso: 18, risco: "baixo", resumo: "Sensores e comandos seguros integrados ao lado direito." },
@@ -43,7 +42,7 @@ const defaultParts: CondorPart[] = [
 ];
 
 const partPlans: Record<string, { next: string; deliverables: string[] }> = {
-  helmet: { next: "Definir campo de visão e pontos de encaixe.", deliverables: ["Modelo ergonômico", "Mapa de sensores", "Teste de conforto"] },
+  helmet: { next: "Refinar proporções craniofaciais e campo de visão.", deliverables: ["Malha craniofacial", "Mapa de visão", "Simetria anatômica"] },
   chest: { next: "Fechar o diagrama do núcleo e da telemetria.", deliverables: ["Arquitetura elétrica", "Layout interno", "Telemetria"] },
   "left-arm": { next: "Prototipar leitura de gesto em bancada.", deliverables: ["Mapa de movimento", "Sensor de gesto", "Feedback visual"] },
   "right-arm": { next: "Projetar comandos e feedback do módulo.", deliverables: ["Controle seguro", "Sensor de posição", "Teste isolado"] },
@@ -62,7 +61,7 @@ async function localSession() {
   if (!response.ok) throw new Error("Condor local indisponível");
 }
 
-function Hologram({ selected, compact = false, armorEnabled = false, onSelect }: { selected: string; compact?: boolean; armorEnabled?: boolean; onSelect?: (id: string) => void }) {
+function Hologram({ selected, compact = false, onSelect }: { selected: string; compact?: boolean; onSelect?: (id: string) => void }) {
   const mount = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -94,18 +93,16 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
     const body = new THREE.Group();
     rig.add(body);
 
-    const baseFill = new THREE.MeshStandardMaterial({ color: 0x123a48, emissive: 0x0a8fac, emissiveIntensity: 0.42, metalness: 0.68, roughness: 0.3, transparent: true, opacity: 0.76, side: THREE.DoubleSide });
-    const selectedFill = new THREE.MeshStandardMaterial({ color: 0x734615, emissive: 0xff8a20, emissiveIntensity: 0.8, metalness: 0.58, roughness: 0.25, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
-    const baseWire = new THREE.MeshBasicMaterial({ color: 0x65e8ff, wireframe: true, transparent: true, opacity: 0.24, depthWrite: false });
+    const baseFill = new THREE.MeshStandardMaterial({ color: 0x2f6973, emissive: 0x08677b, emissiveIntensity: 0.3, metalness: 0.08, roughness: 0.58, transparent: true, opacity: 0.88, side: THREE.DoubleSide });
+    const selectedFill = new THREE.MeshStandardMaterial({ color: 0x81552c, emissive: 0xff8a20, emissiveIntensity: 0.7, metalness: 0.06, roughness: 0.52, transparent: true, opacity: 0.94, side: THREE.DoubleSide });
+    const baseWire = new THREE.MeshBasicMaterial({ color: 0x79efff, wireframe: true, transparent: true, opacity: 0.1, depthWrite: false });
     const selectedWire = new THREE.MeshBasicMaterial({ color: 0xffbf67, wireframe: true, transparent: true, opacity: 0.66, depthWrite: false });
-    const jointMaterial = new THREE.MeshStandardMaterial({ color: 0x15242d, emissive: 0x315d76, emissiveIntensity: 0.32, metalness: 0.82, roughness: 0.24 });
+    const jointMaterial = new THREE.MeshStandardMaterial({ color: 0x28535b, emissive: 0x1b7182, emissiveIntensity: 0.3, metalness: 0.08, roughness: 0.6 });
     const coreMaterial = new THREE.MeshStandardMaterial({ color: 0xffa13c, emissive: 0xff7b18, emissiveIntensity: 2.3, metalness: 0.28, roughness: 0.18 });
     const coreBackMaterial = new THREE.MeshStandardMaterial({ color: 0x071219, metalness: 0.85, roughness: 0.22, transparent: true, opacity: 0.82 });
-    const featureMaterial = new THREE.MeshStandardMaterial({ color: 0x9cf4ff, emissive: 0x35cdeb, emissiveIntensity: 1.35, metalness: 0.35, roughness: 0.22 });
-    const anatomyDetail = new THREE.MeshStandardMaterial({ color: 0x7be6ed, emissive: 0x1b8fa2, emissiveIntensity: 0.5, metalness: 0.25, roughness: 0.42, transparent: true, opacity: 0.7 });
-    const armorMaterial = new THREE.MeshStandardMaterial({ color: 0x172c3d, emissive: 0x095d78, emissiveIntensity: 0.55, metalness: 0.82, roughness: 0.2, transparent: true, opacity: 0.46, side: THREE.DoubleSide });
-    const armorSelected = new THREE.MeshStandardMaterial({ color: 0x5a381d, emissive: 0xff8b2d, emissiveIntensity: 0.9, metalness: 0.72, roughness: 0.18, transparent: true, opacity: 0.62, side: THREE.DoubleSide });
-    const armorWire = new THREE.MeshBasicMaterial({ color: 0x87edff, wireframe: true, transparent: true, opacity: 0.34, depthWrite: false });
+    const featureMaterial = new THREE.MeshStandardMaterial({ color: 0xb7f7ff, emissive: 0x35cdeb, emissiveIntensity: 0.9, metalness: 0.02, roughness: 0.42 });
+    const darkFeatureMaterial = new THREE.MeshStandardMaterial({ color: 0x07151c, emissive: 0x0d6072, emissiveIntensity: 0.55, metalness: 0.03, roughness: 0.68 });
+    const anatomyDetail = new THREE.MeshStandardMaterial({ color: 0x7be6ed, emissive: 0x1b8fa2, emissiveIntensity: 0.4, metalness: 0.04, roughness: 0.62, transparent: true, opacity: 0.66 });
     const softLine = new THREE.MeshBasicMaterial({ color: 0x7367ff, wireframe: true, transparent: true, opacity: 0.24 });
     const interactiveMeshes: THREE.Mesh[] = [];
 
@@ -144,27 +141,6 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
       interactiveMeshes.push(joint);
     };
 
-    const addArmor = (
-      geometry: THREE.BufferGeometry,
-      position: [number, number, number],
-      scale: [number, number, number],
-      id: string,
-      rotation: [number, number, number] = [0, 0, 0],
-    ) => {
-      const group = new THREE.Group();
-      group.position.set(...position);
-      group.scale.set(...scale);
-      group.rotation.set(...rotation);
-      const shell = new THREE.Mesh(geometry, selected === id ? armorSelected : armorMaterial);
-      shell.userData.id = id;
-      group.add(shell);
-      interactiveMeshes.push(shell);
-      const grid = new THREE.Mesh(geometry.clone(), armorWire);
-      grid.scale.setScalar(1.01);
-      group.add(grid);
-      body.add(group);
-    };
-
     const addBetween = (start: THREE.Vector3, end: THREE.Vector3, radiusTop: number, radiusBottom: number, id: string) => {
       const direction = end.clone().sub(start);
       const center = start.clone().add(end).multiplyScalar(0.5);
@@ -174,7 +150,7 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
       return group;
     };
 
-    const createOrganicGeometry = (profile: Array<[number, number, number]>, radialSegments = 32) => {
+    const createOrganicGeometry = (profile: Array<[number, number, number]>, radialSegments = 48) => {
       const vertices: number[] = [];
       const indices: number[] = [];
       for (const [y, radiusX, radiusZ] of profile) {
@@ -218,28 +194,63 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
       return group;
     };
 
-    // Cabeça humana: crânio, face, mandíbula, orelhas e pescoço.
-    addAnatomy(new THREE.SphereGeometry(1, 32, 24), [0, 1.685, 0], [0.108, 0.137, 0.102], "helmet");
-    addAnatomy(new THREE.SphereGeometry(1, 28, 20), [0, 1.622, 0.016], [0.092, 0.092, 0.088], "helmet");
+    // Cabeça humana de alta definição: crânio, face, mandíbula, orelhas e pescoço.
+    addAnatomy(new THREE.SphereGeometry(1, 48, 36), [0, 1.685, 0], [0.108, 0.137, 0.102], "helmet");
+    addAnatomy(new THREE.SphereGeometry(1, 44, 32), [0, 1.622, 0.016], [0.092, 0.092, 0.088], "helmet");
     addAnatomy(new THREE.CapsuleGeometry(0.055, 0.08, 10, 20), [0, 1.535, 0], [1, 1, 0.92], "chest");
-    addAnatomy(new THREE.SphereGeometry(1, 16, 12), [-0.11, 1.68, 0], [0.017, 0.033, 0.012], "helmet", [0, 0, 0], false);
-    addAnatomy(new THREE.SphereGeometry(1, 16, 12), [0.11, 1.68, 0], [0.017, 0.033, 0.012], "helmet", [0, 0, 0], false);
-    addAnatomy(new THREE.ConeGeometry(0.018, 0.052, 12), [0, 1.66, 0.104], [1, 1, 1], "helmet", [Math.PI / 2, 0, 0], false);
+    addAnatomy(new THREE.SphereGeometry(1, 24, 18), [-0.11, 1.68, 0], [0.017, 0.033, 0.012], "helmet", [0, 0, 0], false);
+    addAnatomy(new THREE.SphereGeometry(1, 24, 18), [0.11, 1.68, 0], [0.017, 0.033, 0.012], "helmet", [0, 0, 0], false);
+    for (const side of [-1, 1] as const) {
+      const earInner = new THREE.Mesh(new THREE.TorusGeometry(0.011, 0.0023, 8, 26), anatomyDetail);
+      earInner.position.set(side * 0.112, 1.68, 0.009);
+      earInner.scale.set(0.75, 1.45, 0.6);
+      body.add(earInner);
+    }
+    const noseBridge = new THREE.Mesh(new THREE.CapsuleGeometry(0.005, 0.044, 6, 18), anatomyDetail);
+    noseBridge.position.set(0, 1.676, 0.101);
+    body.add(noseBridge);
+    addAnatomy(new THREE.ConeGeometry(0.018, 0.052, 20), [0, 1.65, 0.105], [1, 1, 1], "helmet", [Math.PI / 2, 0, 0], false);
+    const noseTip = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), anatomyDetail);
+    noseTip.position.set(0, 1.646, 0.112);
+    noseTip.scale.set(0.015, 0.01, 0.01);
+    body.add(noseTip);
     addAnatomy(new THREE.SphereGeometry(1, 20, 14), [0, 1.585, 0.035], [0.056, 0.044, 0.068], "helmet", [0, 0, 0], false);
     for (const side of [-1, 1] as const) {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), featureMaterial);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), featureMaterial);
       eye.position.set(side * 0.039, 1.68, 0.096);
       eye.scale.set(0.012, 0.008, 0.005);
       body.add(eye);
+      const iris = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), darkFeatureMaterial);
+      iris.position.set(side * 0.039, 1.68, 0.1005);
+      iris.scale.set(0.0042, 0.0042, 0.002);
+      body.add(iris);
+      const upperLid = new THREE.Mesh(new THREE.TorusGeometry(0.0117, 0.00125, 6, 28, Math.PI), anatomyDetail);
+      upperLid.position.set(side * 0.039, 1.681, 0.101);
+      upperLid.rotation.z = Math.PI;
+      upperLid.scale.y = 0.64;
+      body.add(upperLid);
+      const lowerLid = new THREE.Mesh(new THREE.TorusGeometry(0.0113, 0.0009, 6, 28, Math.PI), anatomyDetail);
+      lowerLid.position.set(side * 0.039, 1.679, 0.1005);
+      lowerLid.scale.y = 0.58;
+      body.add(lowerLid);
+      const nostril = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), darkFeatureMaterial);
+      nostril.position.set(side * 0.006, 1.644, 0.119);
+      nostril.scale.set(0.0022, 0.0015, 0.0015);
+      body.add(nostril);
     }
-    const mouth = new THREE.Mesh(new THREE.CapsuleGeometry(0.003, 0.043, 4, 10), featureMaterial);
-    mouth.position.set(0, 1.617, 0.095);
-    mouth.rotation.z = Math.PI / 2;
-    mouth.scale.z = 0.55;
-    body.add(mouth);
+    const upperLip = new THREE.Mesh(new THREE.CapsuleGeometry(0.0026, 0.038, 5, 16), anatomyDetail);
+    upperLip.position.set(0, 1.619, 0.099);
+    upperLip.rotation.z = Math.PI / 2;
+    upperLip.scale.z = 0.64;
+    body.add(upperLip);
+    const lowerLip = new THREE.Mesh(new THREE.CapsuleGeometry(0.003, 0.035, 5, 16), anatomyDetail);
+    lowerLip.position.set(0, 1.6125, 0.0985);
+    lowerLip.rotation.z = Math.PI / 2;
+    lowerLip.scale.z = 0.7;
+    body.add(lowerLip);
     // Sobrancelhas, maçãs do rosto e queixo preservam a leitura humana.
     for (const side of [-1, 1] as const) {
-      const brow = new THREE.Mesh(new THREE.CapsuleGeometry(0.0035, 0.038, 4, 10), anatomyDetail);
+      const brow = new THREE.Mesh(new THREE.CapsuleGeometry(0.0035, 0.038, 5, 16), anatomyDetail);
       brow.position.set(side * 0.039, 1.701, 0.098);
       brow.rotation.z = Math.PI / 2 + side * 0.12;
       body.add(brow);
@@ -252,6 +263,18 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
     chin.position.set(0, 1.574, 0.073);
     chin.scale.set(0.043, 0.018, 0.015);
     body.add(chin);
+
+    // Planos temporais e linha mandibular quebram a aparência geométrica de boneco.
+    for (const side of [-1, 1] as const) {
+      const temple = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 16), anatomyDetail);
+      temple.position.set(side * 0.083, 1.702, 0.049);
+      temple.scale.set(0.018, 0.028, 0.012);
+      body.add(temple);
+      const jawLine = new THREE.Mesh(new THREE.CapsuleGeometry(0.003, 0.073, 5, 18), anatomyDetail);
+      jawLine.position.set(side * 0.052, 1.605, 0.069);
+      jawLine.rotation.z = side * 0.6;
+      body.add(jawLine);
+    }
 
     // Tronco humano contínuo: ombros, caixa torácica, cintura, abdômen e quadril.
     const torsoProfile: Array<[number, number, number]> = [
@@ -266,8 +289,8 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
       [1.455, 0.245, 0.145],
       [1.495, 0.128, 0.095],
     ];
-    addAnatomy(createOrganicGeometry(torsoProfile, 44), [0, 0, 0], [1, 1, 1], "chest");
-    addAnatomy(new THREE.SphereGeometry(1, 32, 20), [0, 0.965, 0], [0.21, 0.12, 0.142], "chest");
+    addAnatomy(createOrganicGeometry(torsoProfile, 64), [0, 0, 0], [1, 1, 1], "chest");
+    addAnatomy(new THREE.SphereGeometry(1, 44, 28), [0, 0.965, 0], [0.21, 0.12, 0.142], "chest");
     addAnatomy(new THREE.CapsuleGeometry(0.03, 0.42, 8, 16), [0, 1.265, -0.115], [1, 1, 0.8], "chest", [0, 0, 0], false);
     for (const side of [-1, 1] as const) {
       const clavicle = new THREE.Mesh(new THREE.CapsuleGeometry(0.005, 0.17, 5, 12), anatomyDetail);
@@ -278,6 +301,23 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
     const sternum = new THREE.Mesh(new THREE.CapsuleGeometry(0.004, 0.22, 5, 12), anatomyDetail);
     sternum.position.set(0, 1.29, 0.151);
     body.add(sternum);
+    for (const side of [-1, 1] as const) {
+      const pectoral = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 18), anatomyDetail);
+      pectoral.position.set(side * 0.095, 1.34, 0.151);
+      pectoral.scale.set(0.092, 0.052, 0.012);
+      body.add(pectoral);
+      const ribContour = new THREE.Mesh(new THREE.TorusGeometry(0.078, 0.0022, 6, 34, Math.PI * 0.8), anatomyDetail);
+      ribContour.position.set(side * 0.085, 1.245, 0.143);
+      ribContour.rotation.z = side === -1 ? -0.3 : Math.PI + 0.3;
+      ribContour.scale.set(0.95, 0.72, 1);
+      body.add(ribContour);
+    }
+    const lineaAlba = new THREE.Mesh(new THREE.CapsuleGeometry(0.0022, 0.24, 5, 14), anatomyDetail);
+    lineaAlba.position.set(0, 1.14, 0.13);
+    body.add(lineaAlba);
+    const navel = new THREE.Mesh(new THREE.TorusGeometry(0.006, 0.0012, 6, 22), darkFeatureMaterial);
+    navel.position.set(0, 1.08, 0.135);
+    body.add(navel);
 
     // Ombros, clavículas e braços em postura humana neutra.
     addBetween(new THREE.Vector3(-0.035, 1.47, 0.075), new THREE.Vector3(-0.245, 1.455, 0.055), 0.026, 0.02, "left-arm");
@@ -312,6 +352,10 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
     for (const side of [-1, 1] as const) {
       fingerLengths.forEach((length, index) => {
         const spread = (index - 1.5) * 0.014;
+        const knuckle = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), anatomyDetail);
+        knuckle.position.set(side * (0.41 - spread), 0.757, 0.044);
+        knuckle.scale.set(0.008, 0.007, 0.006);
+        body.add(knuckle);
         addAnatomy(
           new THREE.CapsuleGeometry(0.0065, length, 5, 9),
           [side * (0.41 - spread), 0.72 - Math.abs(index - 1.5) * 0.003, 0.042],
@@ -340,6 +384,12 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
     ], "legs");
     addJoint([leftKnee.x, leftKnee.y, leftKnee.z], [0.075, 0.068, 0.074], "legs");
     addJoint([rightKnee.x, rightKnee.y, rightKnee.z], [0.075, 0.068, 0.074], "legs");
+    for (const side of [-1, 1] as const) {
+      const patella = new THREE.Mesh(new THREE.SphereGeometry(1, 22, 16), anatomyDetail);
+      patella.position.set(side * 0.112, 0.555, 0.079);
+      patella.scale.set(0.04, 0.047, 0.015);
+      body.add(patella);
+    }
     addOrganicBetween(leftKnee, leftAnkle, [
       [0, 0.061, 0.063], [0.18, 0.07, 0.07], [0.42, 0.076, 0.071], [0.72, 0.055, 0.052], [1, 0.038, 0.04],
     ], "legs");
@@ -350,6 +400,18 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
     addJoint([rightAnkle.x, rightAnkle.y, rightAnkle.z], [0.048, 0.05, 0.046], "legs");
     addAnatomy(new THREE.CapsuleGeometry(0.052, 0.145, 8, 18), [-0.105, 0.075, 0.075], [1, 1, 0.75], "legs", [Math.PI / 2, 0, 0]);
     addAnatomy(new THREE.CapsuleGeometry(0.052, 0.145, 8, 18), [0.105, 0.075, 0.075], [1, 1, 0.75], "legs", [Math.PI / 2, 0, 0]);
+    for (const side of [-1, 1] as const) {
+      const achilles = new THREE.Mesh(new THREE.CapsuleGeometry(0.0045, 0.075, 5, 14), anatomyDetail);
+      achilles.position.set(side * 0.105, 0.135, -0.036);
+      body.add(achilles);
+      const toeLengths = [0.032, 0.038, 0.043, 0.039, 0.032];
+      toeLengths.forEach((length, index) => {
+        const toe = new THREE.Mesh(new THREE.CapsuleGeometry(0.007, length, 5, 12), anatomyDetail);
+        toe.position.set(side * (0.105 + (index - 2) * 0.013), 0.046, 0.161 + length * 0.25);
+        toe.rotation.x = Math.PI / 2;
+        body.add(toe);
+      });
+    }
 
     // Núcleo peitoral: o C é a assinatura do Condor X, sem disco circular.
     const core = new THREE.Group();
@@ -377,23 +439,6 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
     const exactScale = 1.8 / naturalHeight;
     body.scale.setScalar(exactScale);
     body.position.y = -bounds.min.y * exactScale;
-
-    // Armadura Fase 01: carenagem digital passiva sobre a anatomia real.
-    if (armorEnabled) {
-      addArmor(new THREE.SphereGeometry(1, 36, 24, 0, Math.PI * 2, 0, Math.PI * 0.7), [0, 1.692, -0.002], [0.116, 0.145, 0.112], "helmet");
-      addArmor(new THREE.BoxGeometry(1, 1, 1, 5, 5, 2), [0, 1.645, 0.112], [0.15, 0.055, 0.018], "helmet", [0.08, 0, 0]);
-      addArmor(createOrganicGeometry([
-        [1.02, 0.205, 0.153], [1.12, 0.205, 0.147], [1.24, 0.23, 0.157], [1.36, 0.286, 0.178], [1.47, 0.25, 0.155],
-      ], 44), [0, 0, 0], [1.035, 1, 1.045], "chest");
-      addArmor(new THREE.SphereGeometry(1, 28, 18), [-0.282, 1.438, 0], [0.096, 0.07, 0.1], "left-arm");
-      addArmor(new THREE.SphereGeometry(1, 28, 18), [0.282, 1.438, 0], [0.096, 0.07, 0.1], "right-arm");
-      addArmor(new THREE.CapsuleGeometry(0.058, 0.22, 8, 18), [-0.392, 1.02, 0.02], [1, 1, 0.86], "left-arm", [0, 0, -0.1]);
-      addArmor(new THREE.CapsuleGeometry(0.058, 0.22, 8, 18), [0.392, 1.02, 0.02], [1, 1, 0.86], "right-arm", [0, 0, 0.1]);
-      addArmor(new THREE.CapsuleGeometry(0.09, 0.24, 8, 20), [-0.108, 0.73, 0.008], [1, 1, 0.88], "legs");
-      addArmor(new THREE.CapsuleGeometry(0.09, 0.24, 8, 20), [0.108, 0.73, 0.008], [1, 1, 0.88], "legs");
-      addArmor(new THREE.CapsuleGeometry(0.067, 0.26, 8, 20), [-0.108, 0.36, 0.024], [1, 1, 0.82], "legs");
-      addArmor(new THREE.CapsuleGeometry(0.067, 0.26, 8, 20), [0.108, 0.36, 0.024], [1, 1, 0.82], "legs");
-    }
 
     // Plataforma, grade antropométrica e varredura vertical.
     for (let index = 0; index < 3; index += 1) {
@@ -502,17 +547,15 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
       coreMaterial.dispose();
       coreBackMaterial.dispose();
       featureMaterial.dispose();
+      darkFeatureMaterial.dispose();
       anatomyDetail.dispose();
-      armorMaterial.dispose();
-      armorSelected.dispose();
-      armorWire.dispose();
       softLine.dispose();
       scanMaterial.dispose();
       particleMaterial.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [armorEnabled, compact, onSelect, selected]);
+  }, [compact, onSelect, selected]);
 
   return <div ref={mount} className={`condor-hologram ${compact ? "is-compact" : ""}`} role="img" aria-label="Digital twin humano do Condor X com 1,80 metro e 85 quilos" />;
 }
@@ -520,7 +563,6 @@ function Hologram({ selected, compact = false, armorEnabled = false, onSelect }:
 export function CondorWorkspace() {
   const [view, setView] = useState<CondorView>("overview");
   const [selectedPart, setSelectedPart] = useState("chest");
-  const [armorMode, setArmorMode] = useState(true);
   const [parts] = useState<CondorPart[]>(defaultParts);
   const [launching, setLaunching] = useState(false);
   const [notice, setNotice] = useState("");
@@ -593,21 +635,20 @@ export function CondorWorkspace() {
     {view === "laboratory" && <div className="condor-laboratory">
       <header className="condor-section-title"><div><p><FlaskConical size={13} /> LABORATÓRIO</p><h1>Projetos do Condor</h1><span>Cada projeto nasce como protótipo e ganha sua própria estrutura.</span></div><small>1 PROJETO</small></header>
       <article className="condor-project-post">
-        <div className="condor-project-hologram"><div className="condor-project-code"><small>PROJECT</small><strong>CX-01</strong></div><Hologram selected="chest" compact armorEnabled /></div>
+        <div className="condor-project-hologram"><div className="condor-project-code"><small>PROJECT</small><strong>CX-01</strong></div><Hologram selected="chest" compact /></div>
         <div className="condor-project-copy"><div className="condor-project-brand"><img src={assetPath("/brand/condor-x.png")} alt="Logo Condor X" /><div><p>PROTÓTIPO EM DESENVOLVIMENTO</p><h2>Condor X</h2></div></div><span>Digital twin humano construído por módulos, com anatomia articulada e referência corporal real.</span><div className="condor-project-stats"><span><strong>{progress}%</strong><small>estrutura</small></span><span><strong>{parts.length}</strong><small>módulos</small></span><span><strong>1,80 m</strong><small>altura</small></span><span><strong>85 kg</strong><small>massa</small></span></div><button onClick={() => setView("condor-x")}>Entrar no projeto <ArrowUpRight size={16} /></button></div>
       </article>
     </div>}
 
     {view === "condor-x" && selected && <div className="condor-x-page">
-      <header className="condor-x-title"><button onClick={() => setView("laboratory")}><ArrowLeft size={15} /> Laboratório</button><div><p>CONDOR X · CX-01</p><h1>Estrutura humana e armadura</h1><span>Corpo real de referência primeiro; carenagem passiva por cima.</span></div><div className="condor-x-progress"><strong>{progress}%</strong><span><i style={{ width: `${progress}%` }} /></span><small>estrutura geral</small></div></header>
-      <div className="condor-x-mode" role="group" aria-label="Camada do protótipo"><button className={!armorMode ? "active" : ""} onClick={() => setArmorMode(false)}>Anatomia humana</button><button className={armorMode ? "active" : ""} onClick={() => setArmorMode(true)}><Shield size={13} /> Armadura · Fase 01</button><span>{armorMode ? "Carenagem digital passiva" : "Referência corporal 1,80 m · 85 kg"}</span></div>
+      <header className="condor-x-title"><button onClick={() => setView("laboratory")}><ArrowLeft size={15} /> Laboratório</button><div><p>CONDOR X · CX-01</p><h1>Protótipo humano de alta fidelidade</h1><span>Anatomia proporcional, postura neutra e referência corporal real.</span></div><div className="condor-x-progress"><strong>{progress}%</strong><span><i style={{ width: `${progress}%` }} /></span><small>estrutura geral</small></div></header>
       <section className="condor-x-layout">
         <article className="condor-x-stage">
           <div className="condor-stage-corner top-left"><small>DIGITAL TWIN</small><strong>CX-01</strong></div>
           <div className="condor-stage-corner top-right"><small>MÓDULO ATIVO</small><strong>{selected.nome}</strong></div>
           <div className="condor-height-scale" aria-hidden="true"><span>180</span><i /><span>135</span><i /><span>90</span><i /><span>45</span><i /><span>0 cm</span></div>
           <div className="condor-body-specs"><span><strong>1,80 m</strong><small>altura de referência</small></span><span><strong>85 kg</strong><small>massa de referência</small></span></div>
-          <Hologram selected={selectedPart} armorEnabled={armorMode} onSelect={setSelectedPart} />
+          <Hologram selected={selectedPart} onSelect={setSelectedPart} />
           <div className="condor-rotate-hint"><RotateCw size={12} /> Arraste para girar · clique para selecionar</div>
           <div className="condor-selected-label"><CircleDot size={13} /><span>{selected.nome}</span><small>{selected.status}</small></div>
         </article>
@@ -618,7 +659,7 @@ export function CondorWorkspace() {
           <div className="condor-module-detail"><div><span>{selected.status}</span><small>{selected.zona}</small></div><h3>{selected.nome}</h3><p>{selected.resumo}</p><strong>Próximo passo</strong><p>{partPlans[selected.id]?.next}</p><ul>{partPlans[selected.id]?.deliverables.map((item) => <li key={item}><Target size={12} />{item}</li>)}</ul><button onClick={demoOnly}><Play size={14} /> Somente no app local</button></div>
         </aside>
       </section>
-      <footer className="condor-x-safe"><Shield size={16} /><span>Armadura Fase 01: sem armas, propulsão, chama, gás pressurizado ou atuadores de alta força. O Hub continua sem acesso ao PC.</span></footer>
+      <footer className="condor-x-safe"><CircleDot size={16} /><span>Protótipo humano digital: anatomia, proporção e ergonomia. O Hub continua sem acesso ao PC.</span></footer>
     </div>}
 
     {notice && <div className="condor-notice"><RotateCw size={14} />{notice}</div>}
