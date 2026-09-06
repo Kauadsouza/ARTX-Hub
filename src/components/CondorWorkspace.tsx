@@ -39,19 +39,19 @@ type Message = {
 };
 
 const destinations: Array<{ key: Destination; label: string; icon: typeof Compass }> = [
-  { key: "site", label: "Meu site", icon: Compass },
-  { key: "videos", label: "Vídeos", icon: Video },
-  { key: "sat", label: "Inglês & Provas", icon: GraduationCap },
+  { key: "site", label: "Site KauaArtx", icon: Compass },
+  { key: "videos", label: "KauaArtx Video Studio", icon: Video },
+  { key: "sat", label: "SAT & English Learning", icon: GraduationCap },
   { key: "university", label: "University Path", icon: GraduationCap },
 ];
 
 const labels: Record<string, string> = {
   geral: "Geral",
-  site: "Meu site",
-  videos: "Vídeos",
-  sat: "Inglês & Provas",
+  site: "Site KauaArtx",
+  videos: "KauaArtx Video Studio",
+  sat: "SAT & English Learning",
   university: "University Path",
-  condor: "Condor",
+  condor: "Condor AI",
 };
 
 function classify(text: string) {
@@ -121,7 +121,7 @@ export function CondorWorkspace({ activities, onCreateActivity, onToggleActivity
     <header className="condor-workspace-header">
       <div className="condor-identity">
         <span><Bot size={20} /></span>
-        <div><small>INTELIGÊNCIA DO HUB</small><strong>Condor</strong></div>
+        <div><small>INTELIGÊNCIA DO HUB</small><strong>Condor AI</strong></div>
       </div>
       <div className="condor-presence online"><i />Ativo no Hub</div>
     </header>

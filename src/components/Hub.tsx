@@ -89,7 +89,7 @@ async function localHubRequest<T>(path: string, init?: RequestInit): Promise<T> 
 
 const workspaces: Record<Exclude<View, "overview" | "career">, Workspace> = {
   site: {
-    label: "Meu site",
+    label: "Site KauaArtx",
     eyebrow: "PRESENÇA DIGITAL",
     description: "Veja a versão ao vivo, compare melhorias e registre decisões enquanto navega.",
     url: "https://kauaartx.vercel.app",
@@ -113,7 +113,7 @@ const workspaces: Record<Exclude<View, "overview" | "career">, Workspace> = {
     statusTone: "violet",
   },
   sat: {
-    label: "Inglês & Provas",
+    label: "SAT & English Learning",
     eyebrow: "ÁREA DE ESTUDOS",
     description: "Cursos gratuitos, conversação e seu plano de inglês, com abas SAT, ACT e TOEFL.",
     url: "https://sat-simulado.vercel.app",
@@ -137,7 +137,7 @@ const workspaces: Record<Exclude<View, "overview" | "career">, Workspace> = {
     statusTone: "mint",
   },
   condor: {
-    label: "Condor",
+    label: "Condor AI",
     eyebrow: "INTELIGÊNCIA DO HUB",
     description: "Assistente independente. Os estudos e o canal funcionam sem depender dele.",
     logo: assetPath("/brand/condor.svg"),
@@ -598,9 +598,9 @@ export function Hub() {
 
   const commands: CommandItem[] = [
     { id: "overview", group: "Navegar", label: "Abrir visão geral", icon: LayoutDashboard, run: () => goTo("overview") },
-    { id: "site", group: "Sistemas", label: "Abrir Meu site", icon: Compass, run: () => goTo("site") },
+    { id: "site", group: "Sistemas", label: "Abrir Site KauaArtx", icon: Compass, run: () => goTo("site") },
     { id: "videos", group: "Sistemas", label: "Abrir KauaArtx Video Studio", icon: Video, run: () => goTo("videos") },
-    { id: "sat", group: "Sistemas", label: "Abrir Inglês, SAT, ACT e TOEFL", icon: GraduationCap, run: () => goTo("sat") },
+    { id: "sat", group: "Sistemas", label: "Abrir SAT & English Learning", icon: GraduationCap, run: () => goTo("sat") },
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
     { id: "career", group: "Estudos", label: "Abrir Currículo & Cursos", icon: Award, run: () => goTo("career") },
 
@@ -627,11 +627,11 @@ export function Hub() {
         <NavButton active={activeView === "overview"} icon={LayoutDashboard} label="Visão geral" onClick={() => goTo("overview")} />
       </SidebarGroup>
       <SidebarGroup label="Canal">
-        <NavButton active={activeView === "site"} icon={Compass} logo={workspaces.site.logo} label="Meu site" onClick={() => goTo("site")} />
-        <NavButton active={activeView === "videos"} icon={Video} logo={workspaces.videos.logo} label="Sistema de vídeos" onClick={() => goTo("videos")} />
+        <NavButton active={activeView === "site"} icon={Compass} logo={workspaces.site.logo} label="Site KauaArtx" onClick={() => goTo("site")} />
+        <NavButton active={activeView === "videos"} icon={Video} logo={workspaces.videos.logo} label="KauaArtx Video Studio" onClick={() => goTo("videos")} />
       </SidebarGroup>
       <SidebarGroup label="Estudos">
-        <NavButton active={activeView === "sat"} icon={GraduationCap} logo={workspaces.sat.logo} label="Inglês & Provas" onClick={() => goTo("sat")} />
+        <NavButton active={activeView === "sat"} icon={GraduationCap} logo={workspaces.sat.logo} label="SAT & English Learning" onClick={() => goTo("sat")} />
         <NavButton active={activeView === "university"} icon={GraduationCap} logo={workspaces.university.logo} label="University Path" onClick={() => goTo("university")} />
         <NavButton active={activeView === "career"} icon={Award} label="Currículo & Cursos" onClick={() => goTo("career")} badge={courseProgress.filter((item) => courseCatalog.some((course) => course.id === item.course_id) && item.status === "in_progress").length} />
       </SidebarGroup>

@@ -34,7 +34,7 @@ export const projects: Project[] = [
   },
   {
     slug: "sat",
-    name: "Inglês & Provas",
+    name: "SAT & English Learning",
     description: "Cursos gratuitos, conversação e preparação SAT, ACT e TOEFL.",
     status: "Em estudo",
     color: "blue",
@@ -54,7 +54,7 @@ export const projects: Project[] = [
   },
   {
     slug: "condor",
-    name: "Condor",
+    name: "Condor AI",
     description: "Seu assistente local e centro de automações no PC.",
     status: "Local no PC",
     color: "orange",
