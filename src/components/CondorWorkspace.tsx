@@ -41,7 +41,7 @@ type Message = {
 const destinations: Array<{ key: Destination; label: string; icon: typeof Compass }> = [
   { key: "site", label: "Meu site", icon: Compass },
   { key: "videos", label: "Vídeos", icon: Video },
-  { key: "sat", label: "SAT & Inglês", icon: GraduationCap },
+  { key: "sat", label: "Inglês & Provas", icon: GraduationCap },
   { key: "university", label: "University Path", icon: GraduationCap },
 ];
 
@@ -49,7 +49,7 @@ const labels: Record<string, string> = {
   geral: "Geral",
   site: "Meu site",
   videos: "Vídeos",
-  sat: "SAT & Inglês",
+  sat: "Inglês & Provas",
   university: "University Path",
   condor: "Condor",
 };

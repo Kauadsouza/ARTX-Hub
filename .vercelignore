@@ -1,0 +1,8 @@
+
+.claude
+.env
+.env.*
+node_modules
+.next
+out
+dist

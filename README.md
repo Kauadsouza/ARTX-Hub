@@ -1,54 +1,76 @@
 # ARTX Hub
 
-Seu painel privado de projetos, notas e tarefas. Site, Vídeos, SAT, University
-Path e Condor continuam sistemas independentes; o Hub organiza o acesso sem
-misturar código, banco ou identidade de cada projeto.
+ARTX Hub is a private command centre for Kaua's independent products, studies and creator workflow. It brings every system into one focused interface without merging their codebases, databases or security boundaries.
 
-## Build local atual
+[Open the live Hub](https://artx-hub.vercel.app) · Authentication required
+
+## What it connects
+
+| System | Purpose | Integration |
+| --- | --- | --- |
+| KauaArtx | Public bilingual content platform and personal brand | External application |
+| Video Production System | YouTube ideas, scripts and publishing workflow | Authenticated embedded application |
+| SAT & English | English learning and SAT, ACT and TOEFL practice | Authenticated embedded application |
+| University Path | UK Computer Science application planning | Authenticated embedded application |
+| Condor | Local-first personal AI system | Local overview and organisation layer |
+
+## Core capabilities
+
+- One private dashboard for systems, notes, tasks and current priorities.
+- Supabase authentication with owner-scoped data and Row Level Security.
+- Shared Hub session for compatible embedded applications.
+- Responsive PWA experience for desktop and mobile.
+- Local export and recovery paths for important planning data.
+- Security headers, no public sign-up flow and no service-role credentials in the client.
+
+## Architecture
+
+The Hub is an orchestration layer, not a monolith. Each connected product remains independently deployable and keeps its own source code, data model and runtime. Condor's operational interface and computer permissions remain local to the owner's PC; the Hub never receives Condor memory, files or device-control access.
+
+## Tech stack
+
+Next.js 16, React 19, TypeScript, Supabase Auth/PostgreSQL, CSS and Vercel.
+
+## Local development
 
 ```powershell
 npm.cmd install
-$env:CONDOR_LOCAL_BUILD = "1"
+Copy-Item .env.example .env.local
+npm.cmd run dev
+```
+
+Required public client configuration:
+
+```text
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+NEXT_PUBLIC_SITE_URL
+NEXT_PUBLIC_VIDEOS_URL
+NEXT_PUBLIC_SAT_URL
+```
+
+Only Supabase public/publishable client values belong in browser variables. Never use a `service_role` key in this application.
+
+## Verification
+
+```powershell
+npm.cmd run lint
 npm.cmd run build
+npm.cmd audit --omit=dev
 ```
 
-O resultado fica em `out/` e pode ser servido pelo Condor em
-`http://127.0.0.1:7777/hub/index.html`. Sem essa variável, o projeto mantém o
-build normal do ARTX Hub.
+## Repository map
 
-## Configuração inicial
-
-1. Crie um projeto no Supabase.
-2. Em **Authentication > Users**, crie manualmente seu único usuário com e-mail e senha. Não habilite cadastro público.
-3. Abra o **SQL Editor** e execute `supabase/schema.sql`.
-4. Copie `.env.example` para `.env.local` e complete a URL e a chave pública do Supabase. Preencha também as URLs publicadas do Sistema de Vídeos e SAT quando estiverem disponíveis.
-5. Instale e rode:
-
-```bash
-npm install
-npm run dev
+```text
+src/app/          Next.js application shell and global styles
+src/components/   Hub, dashboards and system workspaces
+src/lib/          Project registry, Supabase client and shared data
+supabase/         Owner-scoped database and storage policies
+tests/            Behaviour and integration-focused checks
 ```
 
-Abra `http://localhost:3000`.
+## Status
 
-## Publicar como aplicativo
+Active personal infrastructure. The source is public for portfolio review, while the deployed Hub and its data remain private by design.
 
-Publique este projeto na Vercel e abra a URL no Chrome/Edge (PC) ou Safari/Chrome (celular). Use **Instalar aplicativo** / **Adicionar à Tela de Início**. O Hub já inclui o manifesto PWA e abre sem a barra normal do navegador depois de instalado.
-
-## Segurança de publicação
-
-- Mantenha o repositório privado e nunca versione `.env.local` ou `.vercel/`.
-- Use somente a chave pública/publishable do Supabase no frontend. Nunca use a
-  chave `service_role` no Hub.
-- Desative novos cadastros em **Authentication > Sign In / Providers > User
-  Signups** depois de criar o usuário proprietário.
-- Aplique `supabase/schema.sql`: as tabelas usam RLS por proprietário e removem
-  acesso do papel anônimo.
-- A publicação inclui CSP, HSTS, bloqueio de iframe, política de permissões,
-  `no-referrer` e `noindex`.
-- Ative a proteção de deployments e de forks Git no projeto Vercel. A URL de
-  produção continua exigindo a autenticação do próprio Hub.
-
-## Projetos conectados
-
-O Hub não mistura os bancos ou o código dos outros sistemas. Ele os abre como sistemas próprios em uma nova aba/tela, mantendo logins e dados seguros. As URLs são configuradas em `.env.local`.
+Built and maintained by [Kauã Diniz Souza](https://github.com/Kauadsouza).

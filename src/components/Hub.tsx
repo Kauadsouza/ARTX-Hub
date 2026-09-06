@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
+  Award,
   Check,
   CheckCircle2,
   ChevronRight,
-  Circle,
   Cloud,
   Command,
   Compass,
@@ -28,11 +28,13 @@ import {
   Sparkles,
   Video,
   X,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { certificateBucket, certificatePath, certificateReference, downloadCertificate, localCertificate, parseCertificateReference, isStoredCertificate, validateCertificate } from "@/lib/course-certificates";
+import { PersonalDashboard } from "@/components/PersonalDashboard";
 import { CondorWorkspace } from "@/components/CondorWorkspace";
+import { CoursesResume, courseCatalog, type CourseProgress, type CourseProgressPatch, type CourseProgressStatus } from "@/components/CoursesResume";
 
 type Task = {
   id: string;
@@ -42,8 +44,9 @@ type Task = {
   created_at?: string;
 };
 
-type View = "overview" | "site" | "videos" | "sat" | "university" | "condor";
+type View = "overview" | "site" | "videos" | "sat" | "university" | "career" | "condor";
 type ProjectKey = "site" | "videos" | "sat" | "university" | "condor" | "geral";
+type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
 
 type LocalHubSnapshot = {
   tasks?: Array<{ id: string; titulo: string; projeto: string; status: string; criado: number }>;
@@ -84,7 +87,7 @@ async function localHubRequest<T>(path: string, init?: RequestInit): Promise<T> 
   return payload as T;
 }
 
-const workspaces: Record<Exclude<View, "overview">, Workspace> = {
+const workspaces: Record<Exclude<View, "overview" | "career">, Workspace> = {
   site: {
     label: "Meu site",
     eyebrow: "PRESENÇA DIGITAL",
@@ -110,9 +113,9 @@ const workspaces: Record<Exclude<View, "overview">, Workspace> = {
     statusTone: "violet",
   },
   sat: {
-    label: "SAT & Inglês",
+    label: "Inglês & Provas",
     eyebrow: "ÁREA DE ESTUDOS",
-    description: "Entre nos simulados e mantenha sua rotina de estudo no mesmo lugar.",
+    description: "Cursos gratuitos, conversação e seu plano de inglês, com abas SAT, ACT e TOEFL.",
     url: "https://sat-simulado.vercel.app",
     logo: assetPath("/brand/sat.svg"),
     project: "sat",
@@ -136,23 +139,14 @@ const workspaces: Record<Exclude<View, "overview">, Workspace> = {
   condor: {
     label: "Condor",
     eyebrow: "INTELIGÊNCIA DO HUB",
-    description: "Cria atividades, organiza seu foco e prepara o Hub para o que vem agora.",
+    description: "Assistente independente. Os estudos e o canal funcionam sem depender dele.",
     logo: assetPath("/brand/condor.svg"),
     project: "condor",
     icon: MonitorCog,
     accent: "mint",
-    status: "Ativo",
+    status: "Separado",
     statusTone: "mint",
   },
-};
-
-const projectLabels: Record<ProjectKey, string> = {
-  geral: "Geral",
-  site: "Meu site",
-  videos: "Sistema de Vídeos",
-  sat: "SAT & Inglês",
-  university: "University Path",
-  condor: "Condor",
 };
 
 const pageMeta: Record<View, { eyebrow: string; title: string }> = {
@@ -161,29 +155,14 @@ const pageMeta: Record<View, { eyebrow: string; title: string }> = {
   videos: { eyebrow: workspaces.videos.eyebrow, title: workspaces.videos.label },
   sat: { eyebrow: workspaces.sat.eyebrow, title: workspaces.sat.label },
   university: { eyebrow: workspaces.university.eyebrow, title: workspaces.university.label },
+  career: { eyebrow: "DESENVOLVIMENTO PESSOAL", title: "Currículo & Cursos" },
   condor: { eyebrow: workspaces.condor.eyebrow, title: workspaces.condor.label },
 };
 
-const workspaceKeys = Object.keys(workspaces) as Array<keyof typeof workspaces>;
+
 
 function isWorkspaceView(view: View): view is keyof typeof workspaces {
   return view === "site" || view === "videos" || view === "sat" || view === "university" || view === "condor";
-}
-
-function fullDate() {
-  const value = new Intl.DateTimeFormat("pt-BR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  }).format(new Date());
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Bom dia";
-  if (hour < 18) return "Boa tarde";
-  return "Boa noite";
 }
 
 export function Hub() {
@@ -198,6 +177,7 @@ export function Hub() {
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loginPending, setLoginPending] = useState(false);
+  const [recoveryPending, setRecoveryPending] = useState(false);
   const [toast, setToast] = useState("");
   const [activeView, setActiveView] = useState<View>("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -207,11 +187,32 @@ export function Hub() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [notes, setNotes] = useState<Array<{ id: string; content: string; created_at: string }>>([]);
+  const [courseProgress, setCourseProgress] = useState<CourseProgress[]>([]);
+  const [savingCourseId, setSavingCourseId] = useState<string | null>(null);
+  const [certificateBusyId, setCertificateBusyId] = useState<string | null>(null);
+  const certificateOperation = useRef(false);
+  const courseMutationPending = useRef(false);
+  const [syncError, setSyncError] = useState("");
+  const [syncing, setSyncing] = useState(true);
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [systemSignals, setSystemSignals] = useState<Partial<Record<ProjectKey, SystemSignal>>>({});
+  const sessionIdentity = useRef<string | null>(null);
+  const loadVersion = useRef(0);
 
   const loadWorkspace = useCallback(async () => {
+    if (courseMutationPending.current || certificateOperation.current) return;
+    const version = ++loadVersion.current;
+    const owner = sessionUserId;
+    const isCurrent = () => version === loadVersion.current && owner === sessionIdentity.current;
+    setSyncing(true);
+    setSyncError("");
+    try {
     if (localMode) {
+      try { setCourseProgress(JSON.parse(window.localStorage.getItem("artx-course-progress") ?? "[]")); } catch { setCourseProgress([]); }
       await localHubRequest("/api/session", { method: "POST" });
       const snapshot = await localHubRequest<LocalHubSnapshot>("/api/hub");
+      if (!isCurrent()) return;
       setTasks((snapshot.tasks ?? []).map((task) => ({
         id: task.id,
         title: task.titulo,
@@ -222,12 +223,23 @@ export function Hub() {
       return;
     }
     if (!supabase) return;
-    const taskResult = await supabase.from("hub_tasks").select("*").order("created_at", { ascending: false }).limit(48);
+    const [taskResult, noteResult, courseResult] = await Promise.all([
+      supabase.from("hub_tasks").select("id,title,project_slug,completed,created_at").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("hub_notes").select("id,content,created_at").order("created_at", { ascending: false }).limit(100),
+      supabase.from("hub_course_progress").select("course_id,status,progress_percent,current_step,next_step,private_note,certificate_url,completed_at,updated_at").order("updated_at", { ascending: false }),
+    ]);
+    if (!isCurrent()) return;
+    if (taskResult.error || noteResult.error || courseResult.error) throw new Error("sync_failed");
     setTasks((taskResult.data as Task[]) ?? []);
-  }, [localMode, supabase]);
+    setNotes(noteResult.data ?? []);
+    setCourseProgress((courseResult.data as CourseProgress[]) ?? []);
+    } catch {
+      if (isCurrent()) setSyncError("Não foi possível sincronizar. Confira a conexão e tente novamente; os dados exibidos podem estar desatualizados.");
+    } finally { if (isCurrent()) setSyncing(false); }
+  }, [localMode, supabase, sessionUserId]);
 
   useEffect(() => {
-    if (["127.0.0.1", "localhost", "::1"].includes(window.location.hostname)) {
+    if (process.env.NEXT_PUBLIC_ARTX_BASE_PATH === "/hub" && ["127.0.0.1", "localhost", "::1"].includes(window.location.hostname)) {
       setLocalMode(true);
       setSignedIn(true);
       setSessionReady(true);
@@ -237,22 +249,35 @@ export function Hub() {
       setSessionReady(true);
       return;
     }
+    const authTimeout = window.setTimeout(() => { setSessionReady(true); setMessage("A conexão demorou. Tente entrar novamente."); }, 15000);
     supabase.auth.getSession().then(({ data }) => {
+      window.clearTimeout(authTimeout);
+      sessionIdentity.current = data.session?.user.id ?? null;
+      setSessionUserId(sessionIdentity.current);
       setSignedIn(Boolean(data.session));
       setHubAccessToken(data.session?.access_token ?? null);
       setSessionReady(true);
-    });
+    }).catch(() => { window.clearTimeout(authTimeout); setSessionReady(true); setMessage("Falha de conexão. Tente novamente."); });
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      const nextOwner = session?.user.id ?? null;
+      if (sessionIdentity.current !== nextOwner) {
+        ++loadVersion.current;
+        setTasks([]); setNotes([]); setCourseProgress([]); setSyncError("");
+      }
+      sessionIdentity.current = nextOwner;
+      setSessionUserId(nextOwner);
       setSignedIn(Boolean(session));
       setHubAccessToken(session?.access_token ?? null);
+      if (!session) { setTasks([]); setNotes([]); setCourseProgress([]); }
       if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
     });
-    return () => listener.subscription.unsubscribe();
+    return () => { window.clearTimeout(authTimeout); listener.subscription.unsubscribe(); };
   }, [supabase]);
 
   useEffect(() => {
     const savedState = window.localStorage.getItem("artx-sidebar-collapsed");
     setSidebarCollapsed(savedState === "true");
+    try { setSystemSignals(JSON.parse(window.localStorage.getItem("artx-system-signals") ?? "{}")); } catch { setSystemSignals({}); }
   }, []);
 
   useEffect(() => {
@@ -260,8 +285,17 @@ export function Hub() {
   }, [sidebarCollapsed]);
 
   useEffect(() => {
+    window.localStorage.setItem("artx-system-signals", JSON.stringify(systemSignals));
+  }, [systemSignals]);
+
+  useEffect(() => {
     if (!signedIn) return;
-    void loadWorkspace().catch(() => undefined);
+    void loadWorkspace();
+    const refresh = () => { if (document.visibilityState === "visible") void loadWorkspace(); };
+    window.addEventListener("online", refresh);
+    window.addEventListener("focus", refresh);
+    const timer = window.setInterval(refresh, 60000);
+    return () => { window.removeEventListener("online", refresh); window.removeEventListener("focus", refresh); window.clearInterval(timer); };
   }, [loadWorkspace, signedIn]);
 
   useEffect(() => {
@@ -294,16 +328,39 @@ export function Hub() {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
       setPassword("");
       setMessage(error ? "Não foi possível entrar com essas credenciais." : "");
-    } finally {
+    } catch { setMessage("Falha de conexão. Tente novamente."); } finally {
       setLoginPending(false);
+    }
+  }
+
+  async function requestPasswordReset() {
+    if (!supabase || recoveryPending) return;
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setMessage("Informe seu e-mail para recuperar o acesso.");
+      return;
+    }
+    setRecoveryPending(true);
+    setMessage("Enviando o link seguro...");
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo: window.location.origin,
+      });
+      setMessage(error
+        ? "Não foi possível enviar o link agora. Tente novamente."
+        : "Link enviado. Abra o e-mail e volte por ele para definir a nova senha.");
+    } catch {
+      setMessage("Não foi possível enviar o link agora. Tente novamente.");
+    } finally {
+      setRecoveryPending(false);
     }
   }
 
   async function resetPassword(event: React.FormEvent) {
     event.preventDefault();
     if (!supabase) return;
-    if (newPassword.length < 12) {
-      setMessage("Use pelo menos 12 caracteres na nova senha.");
+    if (newPassword.length < 8) {
+      setMessage("Use pelo menos 8 caracteres na nova senha.");
       return;
     }
     setMessage("Salvando nova senha...");
@@ -319,7 +376,7 @@ export function Hub() {
 
   async function createActivity(title: string, projectSlug: string | null) {
     const cleanTitle = title.trim();
-    if (!cleanTitle) return false;
+    if (!cleanTitle || cleanTitle.length > 500) return false;
     if (localMode) {
       try {
         const result = await localHubRequest<{ item: { id: string; titulo: string; projeto: string; status: string; criado: number } }>("/api/hub/tasks", {
@@ -327,7 +384,7 @@ export function Hub() {
           body: JSON.stringify({ titulo: cleanTitle, projeto: projectSlug ?? "geral", prioridade: "media" }),
         });
         setTasks((current) => [{ id: result.item.id, title: result.item.titulo, project_slug: result.item.projeto, completed: result.item.status === "concluida", created_at: new Date(result.item.criado * 1000).toISOString() }, ...current]);
-        notify("Atividade criada pelo Condor");
+        notify("Atividade salva");
         return true;
       } catch (reason) {
         notify(reason instanceof Error ? reason.message : "Não foi possível criar a atividade.");
@@ -345,8 +402,17 @@ export function Hub() {
       return false;
     }
     setTasks((current) => [data as Task, ...current]);
-    notify("Atividade criada pelo Condor");
+    notify("Atividade salva");
     return true;
+  }
+
+  async function createNote(content: string) {
+    if (!supabase || !content.trim() || content.length > 5000) return false;
+    try {
+      const { data, error } = await supabase.from("hub_notes").insert({ content: content.trim() }).select("id,content,created_at").single();
+      if (error || !data) throw new Error("save_failed");
+      setNotes(current => [data, ...current]); notify("Nota salva"); return true;
+    } catch { notify("Não foi possível salvar. Sua nota continua no campo de texto."); return false; }
   }
 
   async function toggleTask(task: Task) {
@@ -372,9 +438,152 @@ export function Hub() {
     notify(completed ? "Atividade concluída" : "Atividade reaberta");
   }
 
+  async function updateCourseProgress(courseId: string, patch: CourseProgressPatch) {
+    if (courseMutationPending.current || (!localMode && (syncing || syncError))) return false;
+    courseMutationPending.current = true;
+    ++loadVersion.current;
+    const owner = sessionUserId;
+    const previous = courseProgress.find((item) => item.course_id === courseId);
+    let status = (patch.status ?? previous?.status ?? "planned") as CourseProgressStatus;
+    const requestedPercent = Number.isFinite(patch.progress_percent)
+      ? Math.min(100, Math.max(0, Math.round(patch.progress_percent ?? 0)))
+      : Math.min(100, Math.max(0, previous?.progress_percent ?? 0));
+    const progressPercent = status === "completed" ? 100 : patch.status === "planned" || (patch.status === "in_progress" && requestedPercent === 100) ? 0 : requestedPercent;
+    if (patch.progress_percent !== undefined && progressPercent === 100) status = "completed";
+    if (patch.progress_percent !== undefined && progressPercent > 0 && status === "planned") status = "in_progress";
+    const next: CourseProgress = {
+      course_id: courseId,
+      status,
+      progress_percent: status === "completed" ? 100 : progressPercent,
+      current_step: patch.current_step !== undefined ? patch.current_step : previous?.current_step ?? null,
+      next_step: patch.next_step !== undefined ? patch.next_step : previous?.next_step ?? null,
+      private_note: patch.private_note !== undefined ? patch.private_note : previous?.private_note ?? null,
+      certificate_url: patch.certificate_url !== undefined ? patch.certificate_url : previous?.certificate_url ?? null,
+      completed_at: patch.completed_at !== undefined ? patch.completed_at : status === "completed" ? previous?.completed_at ?? new Date().toISOString().slice(0, 10) : null,
+      updated_at: new Date().toISOString(),
+    };
+    const optimistic = [...courseProgress.filter((item) => item.course_id !== courseId), next];
+    setCourseProgress(optimistic);
+    setSavingCourseId(courseId);
+    try {
+      if (localMode) {
+        window.localStorage.setItem("artx-course-progress", JSON.stringify(optimistic));
+      } else {
+        if (!supabase || !sessionUserId) throw new Error("missing_session");
+        const { error } = await supabase.from("hub_course_progress").upsert({
+          user_id: sessionUserId,
+          course_id: courseId,
+          status: next.status,
+          progress_percent: next.progress_percent,
+          current_step: next.current_step,
+          next_step: next.next_step,
+          private_note: next.private_note,
+          certificate_url: next.certificate_url,
+          completed_at: next.completed_at,
+          updated_at: next.updated_at,
+        }, { onConflict: "user_id,course_id" });
+        if (error) throw error;
+      }
+      if (!localMode && owner !== sessionIdentity.current) return false;
+      notify(patch.certificate_url !== undefined ? "Certificado anexado" : patch.status !== undefined ? "Status atualizado" : "Anotação salva");
+      return true;
+    } catch {
+      if (!localMode && owner !== sessionIdentity.current) return false;
+      setCourseProgress((current) => previous
+        ? [...current.filter((item) => item.course_id !== courseId), previous]
+        : current.filter((item) => item.course_id !== courseId));
+      notify("Não foi possível salvar a alteração. Tente novamente.");
+      return false;
+    } finally {
+      courseMutationPending.current = false;
+      setSavingCourseId(null);
+    }
+  }
+
+  async function attachCourseCertificate(courseId: string, file: File): Promise<boolean> {
+    if (certificateOperation.current || courseMutationPending.current) return false;
+    if (courseProgress.find((item) => item.course_id === courseId)?.status !== "completed") return false;
+    certificateOperation.current = true;
+    setCertificateBusyId(courseId);
+    const owner = localMode ? "local" : sessionUserId;
+    const origin = localMode ? null : process.env.NEXT_PUBLIC_SUPABASE_URL ?? null;
+    let uploadedPath: string | null = null;
+    let reference: string | null = null;
+    let committed = false;
+    try {
+      if (!owner || (!localMode && (!supabase || !origin))) throw new Error("Entre na sua conta para anexar o certificado.");
+      await validateCertificate(file);
+      const path = certificatePath(owner, courseId, file.name);
+      reference = certificateReference(origin, path);
+      if (localMode) await localCertificate("put", reference, file);
+      else {
+        const { error } = await supabase!.storage.from(certificateBucket).upload(path, file, { contentType: file.type, upsert: false });
+        if (error) throw new Error("Não foi possível enviar o certificado. Confira a conexão e o acesso ao cofre.");
+      }
+      uploadedPath = path;
+      if (!localMode && owner !== sessionIdentity.current) throw new Error("A sessão mudou. Entre novamente para anexar.");
+      committed = await updateCourseProgress(courseId, { certificate_url: reference });
+      return committed;
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Não foi possível anexar o certificado.");
+      return false;
+    } finally {
+      // Roll back only the newly uploaded file if saving its reference failed.
+      if (!committed && uploadedPath && reference) {
+        if (localMode) await localCertificate("delete", reference).catch(() => undefined);
+        else await supabase?.storage.from(certificateBucket).remove([uploadedPath]).catch(() => undefined);
+      }
+      certificateOperation.current = false;
+      setCertificateBusyId(null);
+    }
+  }
+
+  async function retrieveCourseCertificate(courseId: string, reference: string) {
+    if (certificateOperation.current) return;
+    certificateOperation.current = true;
+    setCertificateBusyId(courseId);
+    try {
+      const owner = localMode ? "local" : sessionUserId;
+      const origin = localMode ? null : process.env.NEXT_PUBLIC_SUPABASE_URL ?? null;
+      if (!owner || !isStoredCertificate(reference)) throw new Error("Certificado indisponível.");
+      const { path, name } = parseCertificateReference(reference, origin, owner, courseId);
+      let blob: Blob | undefined;
+      if (localMode) blob = await localCertificate("get", reference);
+      else {
+        if (!supabase || !origin) throw new Error("Entre novamente para baixar o certificado.");
+        const result = await supabase.storage.from(certificateBucket).download(path);
+        if (result.error) throw new Error("Não foi possível baixar o certificado. Tente novamente.");
+        if (owner !== sessionIdentity.current) throw new Error("A sessão mudou. Entre novamente.");
+        blob = result.data;
+      }
+      if (!blob) throw new Error("O arquivo não foi encontrado neste dispositivo.");
+      downloadCertificate(blob, name);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "Não foi possível baixar o certificado.");
+    } finally {
+      certificateOperation.current = false;
+      setCertificateBusyId(null);
+    }
+  }
+
   function goTo(view: View) {
     setActiveView(view);
     setSidebarOpen(false);
+  }
+
+  function registerSystemSignal(project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) {
+    setSystemSignals(current => ({ ...current, [project]: { ...signal, updatedAt: new Date().toISOString() } }));
+  }
+
+  function downloadHubBackup() {
+    const blob = new Blob([JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), tasks, notes, courseProgress, systemSignals }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `artx-hub-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    notify("Backup do Hub exportado");
   }
 
   if (!sessionReady) {
@@ -382,7 +591,7 @@ export function Hub() {
   }
   if (!supabase && !localMode) return <SetupScreen />;
   if (recoveryMode) return <ResetPassword password={newPassword} message={message} onPassword={setNewPassword} onSubmit={resetPassword} />;
-  if (!signedIn) return <Login email={email} password={password} message={message} pending={loginPending} onEmail={setEmail} onPassword={setPassword} onSubmit={login} />;
+  if (!signedIn) return <Login email={email} password={password} message={message} pending={loginPending} recoveryPending={recoveryPending} onEmail={setEmail} onPassword={setPassword} onSubmit={login} onRecover={requestPasswordReset} />;
 
   const activeWorkspace = isWorkspaceView(activeView) ? workspaces[activeView] : null;
   const page = pageMeta[activeView];
@@ -391,10 +600,14 @@ export function Hub() {
     { id: "overview", group: "Navegar", label: "Abrir visão geral", icon: LayoutDashboard, run: () => goTo("overview") },
     { id: "site", group: "Sistemas", label: "Abrir Meu site", icon: Compass, run: () => goTo("site") },
     { id: "videos", group: "Sistemas", label: "Abrir Sistema de Vídeos", icon: Video, run: () => goTo("videos") },
-    { id: "sat", group: "Sistemas", label: "Abrir SAT & Inglês", icon: GraduationCap, run: () => goTo("sat") },
+    { id: "sat", group: "Sistemas", label: "Abrir Inglês, SAT, ACT e TOEFL", icon: GraduationCap, run: () => goTo("sat") },
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
-    { id: "condor", group: "Condor", label: "Conversar com o Condor", icon: MonitorCog, run: () => goTo("condor") },
-    { id: "activity", group: "Condor", label: "Criar uma atividade", icon: Sparkles, run: () => goTo("condor") },
+    { id: "career", group: "Estudos", label: "Abrir Currículo & Cursos", icon: Award, run: () => goTo("career") },
+
+    { id: "activity", group: "Pessoal", label: "Criar uma atividade", icon: Sparkles, run: () => goTo("overview") },
+    { id: "backup", group: "Segurança", label: "Exportar backup do Hub", icon: Cloud, run: downloadHubBackup },
+    ...tasks.slice(0, 20).map(task => ({ id: `task-${task.id}`, group: "Atividades", label: task.title, icon: CheckCircle2, run: () => goTo("overview") })),
+    ...notes.slice(0, 20).map(note => ({ id: `note-${note.id}`, group: "Notas", label: note.content.slice(0, 90), icon: Command, run: () => goTo("overview") })),
   ];
 
   return <main className={`hub-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""}`}>
@@ -413,16 +626,14 @@ export function Hub() {
       <SidebarGroup label="Central">
         <NavButton active={activeView === "overview"} icon={LayoutDashboard} label="Visão geral" onClick={() => goTo("overview")} />
       </SidebarGroup>
-      <SidebarGroup label="Trabalho">
+      <SidebarGroup label="Canal">
         <NavButton active={activeView === "site"} icon={Compass} logo={workspaces.site.logo} label="Meu site" onClick={() => goTo("site")} />
         <NavButton active={activeView === "videos"} icon={Video} logo={workspaces.videos.logo} label="Sistema de vídeos" onClick={() => goTo("videos")} />
       </SidebarGroup>
       <SidebarGroup label="Estudos">
-        <NavButton active={activeView === "sat"} icon={GraduationCap} logo={workspaces.sat.logo} label="SAT & Inglês" onClick={() => goTo("sat")} />
+        <NavButton active={activeView === "sat"} icon={GraduationCap} logo={workspaces.sat.logo} label="Inglês & Provas" onClick={() => goTo("sat")} />
         <NavButton active={activeView === "university"} icon={GraduationCap} logo={workspaces.university.logo} label="University Path" onClick={() => goTo("university")} />
-      </SidebarGroup>
-      <SidebarGroup label="Sistemas">
-        <NavButton active={activeView === "condor"} icon={MonitorCog} logo={workspaces.condor.logo} label="Condor" onClick={() => goTo("condor")} />
+        <NavButton active={activeView === "career"} icon={Award} label="Currículo & Cursos" onClick={() => goTo("career")} badge={courseProgress.filter((item) => courseCatalog.some((course) => course.id === item.course_id) && item.status === "in_progress").length} />
       </SidebarGroup>
 
       <div className="sidebar-bottom">
@@ -440,16 +651,14 @@ export function Hub() {
         <div className="breadcrumb"><span>ARTX</span><ChevronRight size={13} /><strong>{page.title}</strong></div>
         <div className="header-actions">
           <button className="command-trigger" onClick={() => setCommandOpen(true)}><Search size={16} /><span>Buscar</span><kbd>⌘ K</kbd></button>
-          <button className="quick-create" onClick={() => goTo("condor")}><Sparkles size={16} /><span>Falar com Condor</span></button>
-          <span className="synced" title={localMode ? "Atividades no Condor" : "Atividades protegidas e sincronizadas"}>{localMode ? <MonitorCog size={15} /> : <Cloud size={15} />}<span>{localMode ? "Local" : "Salvo"}</span></span>
+          <button className="quick-create" onClick={() => goTo("overview")}><Sparkles size={16} /><span>Meu foco</span></button>
+          <button className="synced sync-status" onClick={() => void loadWorkspace()} title="Atualizar dados" aria-live="polite"><Cloud size={15} /><span>{syncing ? "Sincronizando…" : syncError ? "Verificar conexão" : localMode ? "Local" : "Sincronizado"}</span></button>
           {!localMode && supabase && <button className="icon-button" onClick={() => void supabase.auth.signOut()} title="Sair" aria-label="Sair"><LogOut size={17} /></button>}
         </div>
       </header>
 
-      {activeView === "overview" && <Overview
-        tasks={tasks}
-        onOpen={goTo}
-      />}
+      {activeView === "overview" && <PersonalDashboard tasks={tasks} notes={notes} systemSignals={systemSignals} syncing={syncing} syncError={syncError} onOpen={goTo} onCreate={createActivity} onToggle={toggleTask} onNote={createNote} onRetry={() => void loadWorkspace()} onBackup={downloadHubBackup} />}
+      {activeView === "career" && <CoursesResume progress={courseProgress} savingCourseId={savingCourseId ?? certificateBusyId ?? (!localMode && (syncing || syncError) ? "sync" : null)} localOnly={localMode} onUpdate={updateCourseProgress} onAttach={attachCourseCertificate} onDownload={retrieveCourseCertificate} />}
       {activeView === "condor" && <CondorWorkspace
         activities={tasks}
         onCreateActivity={createActivity}
@@ -462,6 +671,7 @@ export function Hub() {
         refreshKey={refreshKey}
         previewMode={previewMode}
         onPreviewMode={setPreviewMode}
+        onStatus={registerSystemSignal}
         onRefresh={() => { setRefreshKey((key) => key + 1); notify("Preview atualizado"); }}
       />}
     </section>
@@ -487,98 +697,22 @@ function NavButton({ active, icon: Icon, logo, label, onClick, badge }: { active
   </button>;
 }
 
-function Overview({ tasks, onOpen }: {
-  tasks: Task[];
-  onOpen: (view: View) => void;
-}) {
-  const openTasks = tasks.filter((task) => !task.completed);
-  const completedTasks = tasks.filter((task) => task.completed);
-  const focusTask = openTasks[0];
-  const progress = tasks.length ? Math.round((completedTasks.length / tasks.length) * 100) : 0;
-
-  return <div className="overview-page page-enter">
-    <section className="dashboard-intro">
-      <div><p className="eyebrow"><Sparkles size={13} /> CENTRAL DE COMANDO</p><h2>{greeting()}, Kauã.</h2><p className="date-line">{fullDate()}</p></div>
-      <div className="today-stats" aria-label="Resumo de hoje">
-        <Metric value={openTasks.length} label="atividades" />
-        <Metric value="ON" label="Condor ativo" />
-        <Metric value={workspaceKeys.length} label="sistemas" />
-      </div>
-    </section>
-
-    <section className="focus-grid">
-      <article className="focus-card">
-        <div className="panel-kicker"><span>FOCO ATUAL</span><Zap size={15} /></div>
-        <h3>{focusTask ? focusTask.title : "Defina o próximo passo"}</h3>
-        <p>{focusTask ? `${projectLabels[(focusTask.project_slug ?? "geral") as ProjectKey]} · atividade preparada pelo Condor` : "Converse com o Condor para preparar seu próximo foco."}</p>
-        <div className="progress-row"><div className="progress-track"><span style={{ width: `${progress}%` }} /></div><strong>{progress}%</strong></div>
-      </article>
-      <article className="quick-actions-card">
-        <div className="panel-kicker"><span>AÇÕES RÁPIDAS</span><Sparkles size={15} /></div>
-        <div className="quick-actions">
-          <button onClick={() => onOpen("condor")}><MonitorCog size={15} /> Pedir ao Condor <ArrowUpRight size={14} /></button>
-          <button onClick={() => onOpen("condor")}><Sparkles size={15} /> Criar atividade <ArrowUpRight size={14} /></button>
-          <button onClick={() => onOpen("videos")}><Video size={15} /> Abrir vídeos <ArrowUpRight size={14} /></button>
-        </div>
-      </article>
-    </section>
-
-    <section className="section-heading systems-heading"><div><p className="eyebrow">SISTEMAS</p><h2>Seu espaço de trabalho</h2></div><span>{workspaceKeys.length} ambientes conectados</span></section>
-    <section className="systems-grid">
-      {workspaceKeys.map((key) => <SystemCard key={key} workspace={workspaces[key]} onOpen={() => onOpen(key)} />)}
-    </section>
-
-    <section className="dashboard-lower">
-      <article className="data-panel my-day-panel">
-        <PanelHeader eyebrow="ATIVIDADES DO CONDOR" title={openTasks.length ? `${openTasks.length} em aberto` : "Tudo pronto por aqui"} icon={MonitorCog} action="Organizar" onAction={() => onOpen("condor")} />
-        <div className="task-list">
-          {openTasks.slice(0, 4).map((task) => <div key={task.id}><Circle size={15} /><span>{task.title}</span><small>{projectLabels[(task.project_slug ?? "geral") as ProjectKey]}</small></div>)}
-          {!openTasks.length && <EmptyState label="Nenhuma atividade pendente agora." compact />}
-        </div>
-      </article>
-      <article className="data-panel recent-notes-panel">
-        <PanelHeader eyebrow="HUB PREPARADO" title="Estrutura central ativa" icon={CheckCircle2} action="Abrir Condor" onAction={() => onOpen("condor")} />
-        <div className="note-list-mini hub-ready-list">
-          <div><div><strong>Condor conectado ao Hub</strong><span>Organização e atividades</span></div><CheckCircle2 size={16} /></div>
-          <div><div><strong>Sistemas independentes</strong><span>Acesso centralizado pelo Hub</span></div><CheckCircle2 size={16} /></div>
-          <div><div><strong>Espaço privado</strong><span>Seu acesso continua protegido</span></div><CheckCircle2 size={16} /></div>
-        </div>
-      </article>
-    </section>
-  </div>;
-}
-
-function Metric({ value, label }: { value: number | string; label: string }) {
-  return <div><strong>{value}</strong><span>{label}</span></div>;
-}
-
-function SystemCard({ workspace, onOpen }: { workspace: Workspace; onOpen: () => void }) {
-  return <button className={`system-card ${workspace.accent}`} onClick={onOpen}>
-    <div className="system-visual"><span className="system-orbit" /><span className="system-grid-art" /><img src={workspace.logo} alt={`Logo ${workspace.label}`} /><StatusPill tone={workspace.statusTone}>{workspace.status}</StatusPill></div>
-    <div className="system-card-copy"><p>{workspace.eyebrow}</p><h3>{workspace.label}</h3><span className="system-description">{workspace.description}</span></div>
-    <span className="system-open">Abrir <ArrowUpRight size={15} /></span>
-  </button>;
-}
-
 function StatusPill({ tone, children }: { tone: "blue" | "violet" | "amber" | "mint"; children: React.ReactNode }) {
   return <span className={`status-pill ${tone}`}><i />{children}</span>;
-}
-
-function PanelHeader({ eyebrow, title, icon: Icon, action, onAction }: { eyebrow: string; title: string; icon: LucideIcon; action?: string; onAction?: () => void }) {
-  return <div className="panel-header"><div><p>{eyebrow}</p><h3>{title}</h3></div><div>{onAction && action ? <button onClick={onAction}>{action}<ChevronRight size={14} /></button> : <Icon size={18} />}</div></div>;
 }
 
 function EmptyState({ label, compact = false }: { label: string; compact?: boolean }) {
   return <div className={`empty-state ${compact ? "compact" : ""}`}><CheckCircle2 size={16} /><span>{label}</span></div>;
 }
 
-function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh }: {
+function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh, onStatus }: {
   workspace: Workspace;
   hubAccessToken: string | null;
   refreshKey: number;
   previewMode: "desktop" | "mobile";
   onPreviewMode: (mode: "desktop" | "mobile") => void;
   onRefresh: () => void;
+  onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void;
 }) {
   const [focusMode, setFocusMode] = useState(false);
 
@@ -613,15 +747,15 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
           <button className="frame-action focus-action" onClick={() => setFocusMode((current) => !current)} aria-pressed={focusMode} title={focusMode ? "Sair da tela ampla" : "Abrir em tela ampla"}>{focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}<span>{focusMode ? "Voltar ao Hub" : "Tela ampla"}</span></button>
           <a href={workspace.url} target="_blank" rel="noreferrer" title="Abrir em outra aba"><ExternalLink size={16} /></a>
         </div></div>
-        <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} /></div>
+        <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} onStatus={onStatus} /></div>
       </article>
     </section>
   </div>;
 }
 
-function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey }: { workspace: Workspace; accessToken: string | null; refreshKey: number }) {
+function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey, onStatus }: { workspace: Workspace; accessToken: string | null; refreshKey: number; onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void }) {
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const usesHubSession = workspace.project === "videos" || workspace.project === "university";
+  const usesHubSession = workspace.project === "videos" || workspace.project === "university" || workspace.project === "sat";
   const sourceUrl = usesHubSession ? `${workspace.url}/embed` : workspace.url!;
   const appOrigin = new URL(workspace.url!).origin;
 
@@ -631,20 +765,23 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey }: { worksp
   }, [accessToken, appOrigin, usesHubSession]);
 
   useEffect(() => {
-    if (!usesHubSession) return;
     function onWorkspaceReady(event: MessageEvent) {
-      const expectedMessage = workspace.project === "videos" ? "ARTX_VIDEO_EMBED_READY" : "UNIVERSITY_PATH_EMBED_READY";
-      if (event.origin === appOrigin && event.data?.type === expectedMessage) sendHubSession();
+      if (event.source !== frameRef.current?.contentWindow || event.origin !== appOrigin) return;
+      const expectedMessage = workspace.project === "videos" ? "ARTX_VIDEO_EMBED_READY" : workspace.project === "sat" ? "ARTX_STUDY_EMBED_READY" : "UNIVERSITY_PATH_EMBED_READY";
+      if (usesHubSession && event.data?.type === expectedMessage) sendHubSession();
+      if (event.data?.type === "ARTX_SYSTEM_STATUS" && event.data.system === workspace.project && ["ready", "syncing", "attention"].includes(event.data.state) && typeof event.data.title === "string" && typeof event.data.detail === "string") {
+        onStatus(workspace.project, { state: event.data.state, title: event.data.title.slice(0, 100), detail: event.data.detail.slice(0, 180) });
+      }
     }
     window.addEventListener("message", onWorkspaceReady);
-    const retry = window.setTimeout(sendHubSession, 350);
+    const retry = usesHubSession ? window.setTimeout(sendHubSession, 350) : undefined;
     return () => {
       window.removeEventListener("message", onWorkspaceReady);
-      window.clearTimeout(retry);
+      if (retry !== undefined) window.clearTimeout(retry);
     };
-  }, [accessToken, appOrigin, sendHubSession, usesHubSession, workspace.project]);
+  }, [accessToken, appOrigin, onStatus, sendHubSession, usesHubSession, workspace.project]);
 
-  return <iframe ref={frameRef} key={refreshKey} src={sourceUrl} title={workspace.label} onLoad={sendHubSession} allow="clipboard-write; autoplay; fullscreen" />;
+  return <iframe ref={frameRef} key={refreshKey} src={sourceUrl} title={workspace.label} onLoad={sendHubSession} allow={workspace.project === "sat" ? "clipboard-write; autoplay; fullscreen; microphone https://sat-simulado.vercel.app" : "clipboard-write; autoplay; fullscreen"} />;
 }
 
 function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boolean; query: string; commands: CommandItem[]; onQuery: (value: string) => void; onClose: () => void }) {
@@ -667,12 +804,12 @@ function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boo
   }} placeholder="Buscar páginas e ações..." /><kbd>ESC</kbd></div><div className="command-results">{filtered.map((command, index) => { const Icon = command.icon; return <button key={command.id} className={index === activeIndex ? "active" : ""} onMouseEnter={() => setActiveIndex(index)} onClick={() => select(command)}><span className="command-icon"><Icon size={16} /></span><div><small>{command.group}</small><strong>{command.label}</strong></div>{command.shortcut ? <kbd>{command.shortcut}</kbd> : <ChevronRight size={15} />}</button>; })}{!filtered.length && <EmptyState label="Nenhum comando encontrado." />}</div><footer><Command size={14} /> Use ↑ ↓ para navegar e Enter para abrir</footer></section></div>;
 }
 
-function Login({ email, password, message, pending, onEmail, onPassword, onSubmit }: { email: string; password: string; message: string; pending: boolean; onEmail: (value: string) => void; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void }) {
-  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ESPAÇO PRIVADO</p><h1>Seu espaço para construir.</h1><p>Entre para acessar seus sistemas e organizar o dia com o Condor.</p><label>E-mail<input type="email" value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" inputMode="email" required /></label><label>Senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="current-password" required /></label>{message && <span className="message" aria-live="polite">{message}</span>}<button className="primary" type="submit" disabled={pending}>{pending ? "Verificando..." : "Entrar no Hub"} {!pending && <ArrowUpRight size={16} />}</button><small className="login-footer"><span /> Acesso particular e sincronizado</small></form></main>;
+function Login({ email, password, message, pending, recoveryPending, onEmail, onPassword, onSubmit, onRecover }: { email: string; password: string; message: string; pending: boolean; recoveryPending: boolean; onEmail: (value: string) => void; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onRecover: () => void }) {
+  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ESPAÇO PRIVADO</p><h1>Seu espaço para construir.</h1><p>Entre para acessar seus sistemas e continuar seus estudos e a produção do canal.</p><label>E-mail<input type="email" value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" inputMode="email" required /></label><label>Senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="current-password" required /></label><button className="login-recovery" type="button" onClick={onRecover} disabled={pending || recoveryPending}>{recoveryPending ? "Enviando link..." : "Esqueci minha senha"}</button>{message && <span className="message" aria-live="polite">{message}</span>}<button className="primary" type="submit" disabled={pending || recoveryPending}>{pending ? "Verificando..." : "Entrar no Hub"} {!pending && <ArrowUpRight size={16} />}</button><small className="login-footer"><span /> Acesso particular e sincronizado</small></form></main>;
 }
 
 function ResetPassword({ password, message, onPassword, onSubmit }: { password: string; message: string; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void }) {
-  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ACESSO RECUPERADO</p><h1>Defina a nova senha.</h1><p>Escolha uma senha forte para concluir o acesso ao seu espaço privado.</p><label>Nova senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} minLength={12} autoComplete="new-password" required autoFocus /></label>{message && <span className="message" aria-live="polite">{message}</span>}<button className="primary" type="submit">Salvar nova senha <Check size={16} /></button></form></main>;
+  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ACESSO RECUPERADO</p><h1>Defina a nova senha.</h1><p>Escolha uma senha com pelo menos 8 caracteres para concluir o acesso.</p><label>Nova senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} minLength={8} autoComplete="new-password" required autoFocus /></label>{message && <span className="message" aria-live="polite">{message}</span>}<button className="primary" type="submit">Salvar nova senha <Check size={16} /></button></form></main>;
 }
 
 function SetupScreen() {
