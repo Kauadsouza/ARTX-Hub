@@ -8,8 +8,8 @@ ARTX Hub is a private command centre for Kaua's independent products, studies an
 
 | System | Purpose | Integration |
 | --- | --- | --- |
-| KauaArtx | Public bilingual content platform and personal brand | External application |
-| Video Production System | YouTube ideas, scripts and publishing workflow | Authenticated embedded application |
+| Site KauaArtx | Public bilingual content platform and personal brand | External application |
+| KauaArtx Video Studio | YouTube ideas, scripts and publishing workflow | Authenticated embedded application |
 | SAT & English | English learning and SAT, ACT and TOEFL practice | Authenticated embedded application |
 | University Path | UK Computer Science application planning | Authenticated embedded application |
 | Condor | Local-first personal AI system | Local overview and organisation layer |

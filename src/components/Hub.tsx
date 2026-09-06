@@ -101,7 +101,7 @@ const workspaces: Record<Exclude<View, "overview" | "career">, Workspace> = {
     statusTone: "blue",
   },
   videos: {
-    label: "Sistema de Vídeos",
+    label: "KauaArtx Video Studio",
     eyebrow: "PRODUÇÃO DE CONTEÚDO",
     description: "Use ideias, roteiros e o fluxo de produção sem sair da sua central.",
     url: "https://sistema-videos.vercel.app",
@@ -599,7 +599,7 @@ export function Hub() {
   const commands: CommandItem[] = [
     { id: "overview", group: "Navegar", label: "Abrir visão geral", icon: LayoutDashboard, run: () => goTo("overview") },
     { id: "site", group: "Sistemas", label: "Abrir Meu site", icon: Compass, run: () => goTo("site") },
-    { id: "videos", group: "Sistemas", label: "Abrir Sistema de Vídeos", icon: Video, run: () => goTo("videos") },
+    { id: "videos", group: "Sistemas", label: "Abrir KauaArtx Video Studio", icon: Video, run: () => goTo("videos") },
     { id: "sat", group: "Sistemas", label: "Abrir Inglês, SAT, ACT e TOEFL", icon: GraduationCap, run: () => goTo("sat") },
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
     { id: "career", group: "Estudos", label: "Abrir Currículo & Cursos", icon: Award, run: () => goTo("career") },

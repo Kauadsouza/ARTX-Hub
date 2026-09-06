@@ -14,7 +14,7 @@ export type Project = {
 export const projects: Project[] = [
   {
     slug: "site",
-    name: "KauaArtx Site",
+    name: "Site KauaArtx",
     description: "Sua presença pública, blog e jornada documentada.",
     status: "Em evolução",
     color: "green",
@@ -24,7 +24,7 @@ export const projects: Project[] = [
   },
   {
     slug: "videos",
-    name: "Sistema de Vídeos",
+    name: "KauaArtx Video Studio",
     description: "Ideias, roteiros, gravação, edição e publicação.",
     status: "Projeto principal",
     color: "violet",
