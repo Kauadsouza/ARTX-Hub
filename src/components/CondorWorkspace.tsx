@@ -15,6 +15,7 @@ import {
   WandSparkles,
   Zap,
 } from "lucide-react";
+import { useI18n } from "./I18n";
 
 export type CondorActivity = {
   id: string;
@@ -75,6 +76,7 @@ function navigationCommand(text: string): Destination | null {
 }
 
 export function CondorWorkspace({ activities, onCreateActivity, onToggleActivity, onNavigate }: CondorWorkspaceProps) {
+  const { t, locale } = useI18n();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -96,7 +98,7 @@ export function CondorWorkspace({ activities, onCreateActivity, onToggleActivity
       return;
     }
 
-    if (/organizar|prepare|preparar|prioridade|meu dia|meu hub/.test(text.toLocaleLowerCase("pt-BR"))) {
+    if (/organizar|prepare|preparar|prioridade|meu dia|meu hub/.test(text.toLocaleLowerCase(locale))) {
       const summary = openActivities.length
         ? `Seu Hub tem ${openActivities.length} atividade${openActivities.length === 1 ? "" : "s"} em aberto. A próxima é: “${openActivities[0].title}”.`
         : "Seu Hub está livre. Diga o próximo objetivo e eu transformo em atividade.";
@@ -121,59 +123,59 @@ export function CondorWorkspace({ activities, onCreateActivity, onToggleActivity
     <header className="condor-workspace-header">
       <div className="condor-identity">
         <span><Bot size={20} /></span>
-        <div><small>INTELIGÊNCIA DO HUB</small><strong>Condor AI</strong></div>
+        <div><small>{t("INTELIGÊNCIA DO HUB")}</small><strong>Condor AI</strong></div>
       </div>
-      <div className="condor-presence online"><i />Ativo no Hub</div>
+      <div className="condor-presence online"><i />{t("Ativo no Hub")}</div>
     </header>
 
     <section className="condor-assistant-hero">
       <div>
-        <p><Sparkles size={13} /> CENTRAL INTELIGENTE</p>
-        <h1>Fale. O Condor organiza.</h1>
-        <span>Crie atividades, prepare seu foco e abra qualquer sistema do ARTX Hub em uma só conversa.</span>
+        <p><Sparkles size={13} />{t(" CENTRAL INTELIGENTE")}</p>
+        <h1>{t("Fale. O Condor organiza.")}</h1>
+        <span>{t("Crie atividades, prepare seu foco e abra qualquer sistema do ARTX Hub em uma só conversa.")}</span>
       </div>
       <div className="condor-hero-core" aria-hidden="true"><span>C</span><i /><i /></div>
     </section>
 
     <div className="condor-assistant-grid">
       <section className="condor-chat-panel">
-        <header><div><WandSparkles size={17} /><span><strong>Conversa com o Condor</strong><small>Comandos do Hub</small></span></div><span className="condor-live"><i />ONLINE</span></header>
+        <header><div><WandSparkles size={17} /><span><strong>{t("Conversa com o Condor")}</strong><small>{t("Comandos do Hub")}</small></span></div><span className="condor-live"><i />ONLINE</span></header>
         <div className="condor-messages" aria-live="polite">
           {messages.map((message) => <div className={`condor-message ${message.role}`} key={message.id}>
             {message.role === "condor" && <span className="condor-avatar">C</span>}
-            <p>{message.text}</p>
+            <p>{t(message.text)}</p>
           </div>)}
           {sending && <div className="condor-message condor"><span className="condor-avatar">C</span><p className="condor-thinking"><i /><i /><i /></p></div>}
         </div>
         <div className="condor-suggestions">
-          <button onClick={() => void submit("Preparar meu Hub")}>Preparar meu Hub</button>
-          <button onClick={() => void submit("Criar roteiro para o próximo vídeo")}>Criar atividade de vídeo</button>
-          <button onClick={() => void submit("Abrir University Path")}>Abrir University Path</button>
+          <button onClick={() => void submit("Preparar meu Hub")}>{t("Preparar meu Hub")}</button>
+          <button onClick={() => void submit("Criar roteiro para o próximo vídeo")}>{t("Criar atividade de vídeo")}</button>
+          <button onClick={() => void submit("Abrir University Path")}>{t("Abrir University Path")}</button>
         </div>
         <form className="condor-composer" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-          <input value={input} onChange={(event) => setInput(event.target.value)} placeholder="Ex.: preparar o roteiro do próximo vídeo" aria-label="Falar com o Condor" />
+          <input value={input} onChange={(event) => setInput(event.target.value)} placeholder={t("Ex.: preparar o roteiro do próximo vídeo")} aria-label={t("Falar com o Condor")} />
           <button type="submit" disabled={!input.trim() || sending} aria-label="Enviar ao Condor"><Send size={17} /></button>
         </form>
       </section>
 
       <aside className="condor-ready-panel">
-        <header><div><Zap size={17} /><span><strong>Hub preparado</strong><small>{openActivities.length} atividade{openActivities.length === 1 ? "" : "s"} em aberto</small></span></div></header>
+        <header><div><Zap size={17} /><span><strong>{t("Hub preparado")}</strong><small>{t(openActivities.length)}{t(" atividade")}{openActivities.length === 1 ? "" : "s"}{t(" em aberto")}</small></span></div></header>
         <div className="condor-next-action">
-          <small>PRÓXIMA AÇÃO</small>
-          <strong>{openActivities[0]?.title ?? "Seu foco está livre"}</strong>
-          <span>{openActivities[0] ? labels[openActivities[0].project_slug ?? "geral"] : "Converse com o Condor para começar"}</span>
+          <small>{t("PRÓXIMA AÇÃO")}</small>
+          <strong>{t(openActivities[0]?.title) ?? t("Seu foco está livre")}</strong>
+          <span>{openActivities[0] ? t(labels[openActivities[0].project_slug ?? "geral"]) : t("Converse com o Condor para começar")}</span>
         </div>
         <div className="condor-activity-list">
           {openActivities.slice(0, 5).map((activity) => <button key={activity.id} onClick={() => onToggleActivity(activity)}>
-            <Circle size={15} /><span><strong>{activity.title}</strong><small>{labels[activity.project_slug ?? "geral"]}</small></span><Check size={14} />
+            <Circle size={15} /><span><strong>{t(activity.title)}</strong><small>{t(labels[activity.project_slug ?? "geral"])}</small></span><Check size={14} />
           </button>)}
-          {!openActivities.length && <div className="condor-empty"><Check size={18} /><span>Nenhuma atividade pendente.</span></div>}
+          {!openActivities.length && <div className="condor-empty"><Check size={18} /><span>{t("Nenhuma atividade pendente.")}</span></div>}
         </div>
         <div className="condor-destinations">
-          <small>ABRIR SISTEMA</small>
-          <div>{destinations.map(({ key, label, icon: Icon }) => <button key={key} onClick={() => onNavigate(key)}><Icon size={15} /><span>{label}</span><ArrowRight size={13} /></button>)}</div>
+          <small>{t("ABRIR SISTEMA")}</small>
+          <div>{destinations.map(({ key, label, icon: Icon }) => <button key={key} onClick={() => onNavigate(key)}><Icon size={15} /><span>{t(label)}</span><ArrowRight size={13} /></button>)}</div>
         </div>
-        <button className="condor-overview-button" onClick={() => onNavigate("overview")}><LayoutDashboard size={15} /> Voltar à visão geral</button>
+        <button className="condor-overview-button" onClick={() => onNavigate("overview")}><LayoutDashboard size={15} />{t(" Voltar à visão geral")}</button>
       </aside>
     </div>
   </section>;

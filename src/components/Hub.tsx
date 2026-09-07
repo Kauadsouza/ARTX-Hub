@@ -35,6 +35,7 @@ import { certificateBucket, certificatePath, certificateReference, downloadCerti
 import { PersonalDashboard } from "@/components/PersonalDashboard";
 import { CondorWorkspace } from "@/components/CondorWorkspace";
 import { CoursesResume, courseCatalog, type CourseProgress, type CourseProgressPatch, type CourseProgressStatus } from "@/components/CoursesResume";
+import { useI18n, LanguageSwitch } from "./I18n";
 
 type Task = {
   id: string;
@@ -127,7 +128,7 @@ const workspaces: Record<Exclude<View, "overview" | "career">, Workspace> = {
   university: {
     label: "University Path",
     eyebrow: "PLANO UNIVERSITÁRIO",
-    description: "Seu caminho prático para Computer Science em Oxford, com fontes oficiais e próximos passos.",
+    description: "Quiz e roteiro de candidatura ao Reino Unido, adaptados à sua formação, com fontes oficiais.",
     url: "https://university-path-six.vercel.app",
     logo: assetPath("/brand/university.svg"),
     project: "university",
@@ -166,6 +167,7 @@ function isWorkspaceView(view: View): view is keyof typeof workspaces {
 }
 
 export function Hub() {
+  const { t } = useI18n();
   const supabase = useMemo(() => createClient(), []);
   const [sessionReady, setSessionReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
@@ -587,7 +589,7 @@ export function Hub() {
   }
 
   if (!sessionReady) {
-    return <main className="loading"><img className="loading-logo" src={assetPath("/brand/artx-hub.svg")} alt="ARTX Hub" /><p>Abrindo sua central...</p></main>;
+    return <main className="loading"><img className="loading-logo" src={assetPath("/brand/artx-hub.svg")} alt="ARTX Hub" /><p>{t("Abrindo sua central...")}</p></main>;
   }
   if (!supabase && !localMode) return <SetupScreen />;
   if (recoveryMode) return <ResetPassword password={newPassword} message={message} onPassword={setNewPassword} onSubmit={resetPassword} />;
@@ -613,18 +615,18 @@ export function Hub() {
   return <main className={`hub-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""}`}>
     <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
       <div className="sidebar-top">
-        <button className="brand" onClick={() => goTo("overview")} aria-label="Abrir visão geral do ARTX Hub">
+        <button className="brand" onClick={() => goTo("overview")} aria-label={t("Abrir visão geral do ARTX Hub")}>
           <img className="brand-logo" src={assetPath("/brand/artx-hub.svg")} alt="" />
-          <span className="brand-copy"><strong>ARTX Hub</strong><small>Central pessoal</small></span>
+          <span className="brand-copy"><strong>ARTX Hub</strong><small>{t("Central pessoal")}</small></span>
         </button>
         <button className="icon-button sidebar-collapse" onClick={() => setSidebarCollapsed((current) => !current)} aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}>
           {sidebarCollapsed ? <PanelLeft size={17} /> : <PanelLeftClose size={17} />}
         </button>
-        <button className="icon-button close-menu" onClick={() => setSidebarOpen(false)} aria-label="Fechar menu"><X size={18} /></button>
+        <button className="icon-button close-menu" onClick={() => setSidebarOpen(false)} aria-label={t("Fechar menu")}><X size={18} /></button>
       </div>
 
       <SidebarGroup label="Central">
-        <NavButton active={activeView === "overview"} icon={LayoutDashboard} label="Visão geral" onClick={() => goTo("overview")} />
+        <NavButton active={activeView === "overview"} icon={LayoutDashboard} label={t("Visão geral")} onClick={() => goTo("overview")} />
       </SidebarGroup>
       <SidebarGroup label="Canal">
         <NavButton active={activeView === "site"} icon={Compass} logo={workspaces.site.logo} label="Site KauaArtx" onClick={() => goTo("site")} />
@@ -633,27 +635,27 @@ export function Hub() {
       <SidebarGroup label="Estudos">
         <NavButton active={activeView === "sat"} icon={GraduationCap} logo={workspaces.sat.logo} label="SAT & English Learning" onClick={() => goTo("sat")} />
         <NavButton active={activeView === "university"} icon={GraduationCap} logo={workspaces.university.logo} label="University Path" onClick={() => goTo("university")} />
-        <NavButton active={activeView === "career"} icon={Award} label="Currículo & Cursos" onClick={() => goTo("career")} badge={courseProgress.filter((item) => courseCatalog.some((course) => course.id === item.course_id) && item.status === "in_progress").length} />
+        <NavButton active={activeView === "career"} icon={Award} label={t("Currículo & Cursos")} onClick={() => goTo("career")} badge={courseProgress.filter((item) => courseCatalog.some((course) => course.id === item.course_id) && item.status === "in_progress").length} />
       </SidebarGroup>
 
       <div className="sidebar-bottom">
-        <button className="sidebar-profile" onClick={() => setCommandOpen(true)} title="Abrir comandos">
-          <span>K</span><div><strong>Kauã</strong><small>Espaço privado</small></div>
+        <button className="sidebar-profile" onClick={() => setCommandOpen(true)} title={t("Abrir comandos")}>
+          <span>K</span><div><strong>Kauã</strong><small>{t("Espaço privado")}</small></div>
         </button>
-        <button className="icon-button settings-button" onClick={() => setCommandOpen(true)} aria-label="Abrir comandos"><Settings2 size={16} /></button>
+        <button className="icon-button settings-button" onClick={() => setCommandOpen(true)} aria-label={t("Abrir comandos")}><Settings2 size={16} /></button>
       </div>
     </aside>
-    {sidebarOpen && <button className="backdrop" aria-label="Fechar menu" onClick={() => setSidebarOpen(false)} />}
+    {sidebarOpen && <button className="backdrop" aria-label={t("Fechar menu")} onClick={() => setSidebarOpen(false)} />}
 
     <section className="hub-main">
       <header className="hub-header">
-        <button className="icon-button menu-button" onClick={() => setSidebarOpen(true)} aria-label="Abrir menu"><Menu size={19} /></button>
-        <div className="breadcrumb"><span>ARTX</span><ChevronRight size={13} /><strong>{page.title}</strong></div>
-        <div className="header-actions">
-          <button className="command-trigger" onClick={() => setCommandOpen(true)}><Search size={16} /><span>Buscar</span><kbd>⌘ K</kbd></button>
-          <button className="quick-create" onClick={() => goTo("overview")}><Sparkles size={16} /><span>Meu foco</span></button>
-          <button className="synced sync-status" onClick={() => void loadWorkspace()} title="Atualizar dados" aria-live="polite"><Cloud size={15} /><span>{syncing ? "Sincronizando…" : syncError ? "Verificar conexão" : localMode ? "Local" : "Sincronizado"}</span></button>
-          {!localMode && supabase && <button className="icon-button" onClick={() => void supabase.auth.signOut()} title="Sair" aria-label="Sair"><LogOut size={17} /></button>}
+        <button className="icon-button menu-button" onClick={() => setSidebarOpen(true)} aria-label={t("Abrir menu")}><Menu size={19} /></button>
+        <div className="breadcrumb"><span>ARTX</span><ChevronRight size={13} /><strong>{t(page.title)}</strong></div>
+        <div className="header-actions"><LanguageSwitch />
+          <button className="command-trigger" onClick={() => setCommandOpen(true)}><Search size={16} /><span>{t("Buscar")}</span><kbd>⌘ K</kbd></button>
+          <button className="quick-create" onClick={() => goTo("overview")}><Sparkles size={16} /><span>{t("Meu foco")}</span></button>
+          <button className="synced sync-status" onClick={() => void loadWorkspace()} title={t("Atualizar dados")} aria-live="polite"><Cloud size={15} /><span>{syncing ? t("Sincronizando…") : syncError ? t("Verificar conexão") : localMode ? "Local" : t("Sincronizado")}</span></button>
+          {!localMode && supabase && <button className="icon-button" onClick={() => void supabase.auth.signOut()} title={t("Sair")} aria-label={t("Sair")}><LogOut size={17} /></button>}
         </div>
       </header>
 
@@ -683,26 +685,30 @@ export function Hub() {
       onQuery={setCommandQuery}
       onClose={() => { setCommandOpen(false); setCommandQuery(""); }}
     />
-    {toast && <div className="toast" role="status"><CheckCircle2 size={16} />{toast}</div>}
+    {toast && <div className="toast" role="status"><CheckCircle2 size={16} />{t(toast)}</div>}
   </main>;
 }
 
 function SidebarGroup({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) {
-  return <div className={`sidebar-group ${className}`}><p className="side-label">{label}</p><nav className="nav-list">{children}</nav></div>;
+  const { t } = useI18n();
+  return <div className={`sidebar-group ${className}`}><p className="side-label">{t(label)}</p><nav className="nav-list">{t(children)}</nav></div>;
 }
 
 function NavButton({ active, icon: Icon, logo, label, onClick, badge }: { active: boolean; icon: LucideIcon; logo?: string; label: string; onClick: () => void; badge?: number }) {
-  return <button className={`nav-button ${active ? "active" : ""}`} onClick={onClick} title={label}>
-    {logo ? <img className="nav-logo" src={logo} alt="" /> : <Icon size={17} strokeWidth={1.8} />}<span className="nav-text">{label}</span>{badge ? <small>{badge}</small> : null}
+  const { t } = useI18n();
+  return <button className={`nav-button ${active ? "active" : ""}`} onClick={onClick} title={t(label)}>
+    {logo ? <img className="nav-logo" src={logo} alt="" /> : <Icon size={17} strokeWidth={1.8} />}<span className="nav-text">{t(label)}</span>{badge ? <small>{t(badge)}</small> : null}
   </button>;
 }
 
 function StatusPill({ tone, children }: { tone: "blue" | "violet" | "amber" | "mint"; children: React.ReactNode }) {
-  return <span className={`status-pill ${tone}`}><i />{children}</span>;
+  const { t } = useI18n();
+  return <span className={`status-pill ${tone}`}><i />{t(children)}</span>;
 }
 
 function EmptyState({ label, compact = false }: { label: string; compact?: boolean }) {
-  return <div className={`empty-state ${compact ? "compact" : ""}`}><CheckCircle2 size={16} /><span>{label}</span></div>;
+  const { t } = useI18n();
+  return <div className={`empty-state ${compact ? "compact" : ""}`}><CheckCircle2 size={16} /><span>{t(label)}</span></div>;
 }
 
 function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh, onStatus }: {
@@ -714,6 +720,7 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
   onRefresh: () => void;
   onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void;
 }) {
+  const { t } = useI18n();
   const [focusMode, setFocusMode] = useState(false);
 
   useEffect(() => {
@@ -737,15 +744,15 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
   return <div className={`workspace-page page-enter side-panel-closed ${focusMode ? "focus-mode" : ""}`}>
     <section className="workspace-hero">
       <img className="workspace-logo" src={workspace.logo} alt={`Logo ${workspace.label}`} />
-      <div><p className="eyebrow">{workspace.eyebrow}</p><h2>{workspace.label}</h2><span>{workspace.description}</span></div>
-      <div className="workspace-hero-actions"><StatusPill tone={workspace.statusTone}>{workspace.status}</StatusPill><button className="secondary-button" onClick={onRefresh}><RefreshCw size={15} /> Atualizar</button></div>
+      <div><p className="eyebrow">{t(workspace.eyebrow)}</p><h2>{t(workspace.label)}</h2><span>{t(workspace.description)}</span></div>
+      <div className="workspace-hero-actions"><StatusPill tone={workspace.statusTone}>{t(workspace.status)}</StatusPill><button className="secondary-button" onClick={onRefresh}><RefreshCw size={15} />{t(" Atualizar")}</button></div>
     </section>
     <section className="workspace-layout">
       <article className={`app-frame-card ${previewMode === "mobile" ? "mobile-preview" : ""}`}>
-        <div className="frame-toolbar"><div className="frame-label"><span><i /><i /><i /></span><img src={workspace.logo} alt="" /><strong>{workspace.label}</strong><small>Dentro do ARTX Hub</small></div><div className="frame-controls">
-          {workspace.project === "site" && <div className="preview-toggle"><button className={previewMode === "desktop" ? "active" : ""} onClick={() => onPreviewMode("desktop")} aria-label="Visualizar desktop"><Monitor size={14} /></button><button className={previewMode === "mobile" ? "active" : ""} onClick={() => onPreviewMode("mobile")} aria-label="Visualizar celular"><Smartphone size={14} /></button></div>}
-          <button className="frame-action focus-action" onClick={() => setFocusMode((current) => !current)} aria-pressed={focusMode} title={focusMode ? "Sair da tela ampla" : "Abrir em tela ampla"}>{focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}<span>{focusMode ? "Voltar ao Hub" : "Tela ampla"}</span></button>
-          <a href={workspace.url} target="_blank" rel="noreferrer" title="Abrir em outra aba"><ExternalLink size={16} /></a>
+        <div className="frame-toolbar"><div className="frame-label"><span><i /><i /><i /></span><img src={workspace.logo} alt="" /><strong>{t(workspace.label)}</strong><small>{t("Dentro do ARTX Hub")}</small></div><div className="frame-controls">
+          {workspace.project === "site" && <div className="preview-toggle"><button className={previewMode === "desktop" ? "active" : ""} onClick={() => onPreviewMode("desktop")} aria-label={t("Visualizar desktop")}><Monitor size={14} /></button><button className={previewMode === "mobile" ? "active" : ""} onClick={() => onPreviewMode("mobile")} aria-label={t("Visualizar celular")}><Smartphone size={14} /></button></div>}
+          <button className="frame-action focus-action" onClick={() => setFocusMode((current) => !current)} aria-pressed={focusMode} title={focusMode ? t("Sair da tela ampla") : t("Abrir em tela ampla")}>{focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}<span>{focusMode ? t("Voltar ao Hub") : t("Tela ampla")}</span></button>
+          <a href={workspace.url} target="_blank" rel="noreferrer" title={t("Abrir em outra aba")}><ExternalLink size={16} /></a>
         </div></div>
         <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} onStatus={onStatus} /></div>
       </article>
@@ -754,15 +761,17 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
 }
 
 function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey, onStatus }: { workspace: Workspace; accessToken: string | null; refreshKey: number; onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void }) {
+  const { t, language } = useI18n();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const usesHubSession = workspace.project === "videos" || workspace.project === "university" || workspace.project === "sat";
   const sourceUrl = usesHubSession ? `${workspace.url}/embed` : workspace.url!;
   const appOrigin = new URL(workspace.url!).origin;
 
   const sendHubSession = useCallback(() => {
+    if (usesHubSession) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_LANGUAGE", language }, appOrigin);
     if (!usesHubSession || !accessToken) return;
     frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_AUTH", accessToken }, appOrigin);
-  }, [accessToken, appOrigin, usesHubSession]);
+  }, [accessToken, appOrigin, usesHubSession, language]);
 
   useEffect(() => {
     function onWorkspaceReady(event: MessageEvent) {
@@ -781,10 +790,11 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey, onStatus }
     };
   }, [accessToken, appOrigin, onStatus, sendHubSession, usesHubSession, workspace.project]);
 
-  return <iframe ref={frameRef} key={refreshKey} src={sourceUrl} title={workspace.label} onLoad={sendHubSession} allow={workspace.project === "sat" ? "clipboard-write; autoplay; fullscreen; microphone https://sat-simulado.vercel.app" : "clipboard-write; autoplay; fullscreen"} />;
+  return <iframe ref={frameRef} key={refreshKey} src={sourceUrl} title={t(workspace.label)} onLoad={sendHubSession} allow={workspace.project === "sat" ? "clipboard-write; autoplay; fullscreen; microphone https://sat-simulado.vercel.app" : "clipboard-write; autoplay; fullscreen"} />;
 }
 
 function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boolean; query: string; commands: CommandItem[]; onQuery: (value: string) => void; onClose: () => void }) {
+  const { t } = useI18n();
   const [activeIndex, setActiveIndex] = useState(0);
   const filtered = commands.filter((command) => `${command.group} ${command.label}`.toLowerCase().includes(query.toLowerCase()));
 
@@ -796,22 +806,25 @@ function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boo
     onClose();
   }
 
-  return <div className="command-overlay" role="presentation" onMouseDown={onClose}><section className="command-palette" role="dialog" aria-modal="true" aria-label="Comandos rápidos" onMouseDown={(event) => event.stopPropagation()}><div className="command-input"><Search size={18} /><input autoFocus value={query} onChange={(event) => onQuery(event.target.value)} onKeyDown={(event) => {
+  return <div className="command-overlay" role="presentation" onMouseDown={onClose}><section className="command-palette" role="dialog" aria-modal="true" aria-label={t("Comandos rápidos")} onMouseDown={(event) => event.stopPropagation()}><div className="command-input"><Search size={18} /><input autoFocus value={query} onChange={(event) => onQuery(event.target.value)} onKeyDown={(event) => {
     if (event.key === "Escape") onClose();
     if (event.key === "ArrowDown") { event.preventDefault(); setActiveIndex((current) => Math.min(current + 1, filtered.length - 1)); }
     if (event.key === "ArrowUp") { event.preventDefault(); setActiveIndex((current) => Math.max(current - 1, 0)); }
     if (event.key === "Enter" && filtered[activeIndex]) select(filtered[activeIndex]);
-  }} placeholder="Buscar páginas e ações..." /><kbd>ESC</kbd></div><div className="command-results">{filtered.map((command, index) => { const Icon = command.icon; return <button key={command.id} className={index === activeIndex ? "active" : ""} onMouseEnter={() => setActiveIndex(index)} onClick={() => select(command)}><span className="command-icon"><Icon size={16} /></span><div><small>{command.group}</small><strong>{command.label}</strong></div>{command.shortcut ? <kbd>{command.shortcut}</kbd> : <ChevronRight size={15} />}</button>; })}{!filtered.length && <EmptyState label="Nenhum comando encontrado." />}</div><footer><Command size={14} /> Use ↑ ↓ para navegar e Enter para abrir</footer></section></div>;
+  }} placeholder={t("Buscar páginas e ações...")} /><kbd>ESC</kbd></div><div className="command-results">{filtered.map((command, index) => { const Icon = command.icon; return <button key={command.id} className={index === activeIndex ? "active" : ""} onMouseEnter={() => setActiveIndex(index)} onClick={() => select(command)}><span className="command-icon"><Icon size={16} /></span><div><small>{t(command.group)}</small><strong>{t(command.label)}</strong></div>{command.shortcut ? <kbd>{t(command.shortcut)}</kbd> : <ChevronRight size={15} />}</button>; })}{!filtered.length && <EmptyState label={t("Nenhum comando encontrado.")} />}</div><footer><Command size={14} />{t(" Use ↑ ↓ para navegar e Enter para abrir")}</footer></section></div>;
 }
 
 function Login({ email, password, message, pending, recoveryPending, onEmail, onPassword, onSubmit, onRecover }: { email: string; password: string; message: string; pending: boolean; recoveryPending: boolean; onEmail: (value: string) => void; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onRecover: () => void }) {
-  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ESPAÇO PRIVADO</p><h1>Seu espaço para construir.</h1><p>Entre para acessar seus sistemas e continuar seus estudos e a produção do canal.</p><label>E-mail<input type="email" value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" inputMode="email" required /></label><label>Senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="current-password" required /></label><button className="login-recovery" type="button" onClick={onRecover} disabled={pending || recoveryPending}>{recoveryPending ? "Enviando link..." : "Esqueci minha senha"}</button>{message && <span className="message" aria-live="polite">{message}</span>}<button className="primary" type="submit" disabled={pending || recoveryPending}>{pending ? "Verificando..." : "Entrar no Hub"} {!pending && <ArrowUpRight size={16} />}</button><small className="login-footer"><span /> Acesso particular e sincronizado</small></form></main>;
+  const { t } = useI18n();
+  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}><LanguageSwitch /></div><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>{t("Central pessoal")}</small></div></div><p className="eyebrow">{t("ESPAÇO PRIVADO")}</p><h1>{t("Seu espaço para construir.")}</h1><p>{t("Entre para acessar seus sistemas e continuar seus estudos e a produção do canal.")}</p><label>E-mail<input type="email" value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" inputMode="email" required /></label><label>{t("Senha")}<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="current-password" required /></label><button className="login-recovery" type="button" onClick={onRecover} disabled={pending || recoveryPending}>{recoveryPending ? t("Enviando link...") : t("Esqueci minha senha")}</button>{message && <span className="message" aria-live="polite">{t(message)}</span>}<button className="primary" type="submit" disabled={pending || recoveryPending}>{pending ? t("Verificando...") : t("Entrar no Hub")} {!pending && <ArrowUpRight size={16} />}</button><small className="login-footer"><span />{t(" Acesso particular e sincronizado")}</small></form></main>;
 }
 
 function ResetPassword({ password, message, onPassword, onSubmit }: { password: string; message: string; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void }) {
-  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>Central pessoal</small></div></div><p className="eyebrow">ACESSO RECUPERADO</p><h1>Defina a nova senha.</h1><p>Escolha uma senha com pelo menos 8 caracteres para concluir o acesso.</p><label>Nova senha<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} minLength={8} autoComplete="new-password" required autoFocus /></label>{message && <span className="message" aria-live="polite">{message}</span>}<button className="primary" type="submit">Salvar nova senha <Check size={16} /></button></form></main>;
+  const { t } = useI18n();
+  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}><LanguageSwitch /></div><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>{t("Central pessoal")}</small></div></div><p className="eyebrow">{t("ACESSO RECUPERADO")}</p><h1>{t("Defina a nova senha.")}</h1><p>{t("Escolha uma senha com pelo menos 8 caracteres para concluir o acesso.")}</p><label>{t("Nova senha")}<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} minLength={8} autoComplete="new-password" required autoFocus /></label>{message && <span className="message" aria-live="polite">{t(message)}</span>}<button className="primary" type="submit">{t("Salvar nova senha ")}<Check size={16} /></button></form></main>;
 }
 
 function SetupScreen() {
-  return <main className="login"><div className="login-orbit" /><div className="setup-card"><img className="setup-logo" src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><p className="eyebrow">CONFIGURAÇÃO NECESSÁRIA</p><h1>Conecte o Hub.</h1><p>Adicione a URL e a chave pública do Supabase em <code>.env.local</code>. O guia completo está no README.</p></div></main>;
+  const { t } = useI18n();
+  return <main className="login"><div className="login-orbit" /><div className="setup-card"><img className="setup-logo" src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><p className="eyebrow">{t("CONFIGURAÇÃO NECESSÁRIA")}</p><h1>{t("Conecte o Hub.")}</h1><p>{t("Adicione a URL e a chave pública do Supabase em ")}<code>.env.local</code>{t(". O guia completo está no README.")}</p></div></main>;
 }

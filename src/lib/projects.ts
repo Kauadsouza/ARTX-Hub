@@ -45,7 +45,7 @@ export const projects: Project[] = [
   {
     slug: "university",
     name: "University Path",
-    description: "Seu caminho pessoal para Computer Science em Oxford.",
+    description: "Quiz e roteiro de candidatura ao Reino Unido, adaptados à sua formação.",
     status: "Novo projeto",
     color: "green",
     icon: GraduationCap,

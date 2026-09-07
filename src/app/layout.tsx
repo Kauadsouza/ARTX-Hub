@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./condor.css";
+import { I18nProvider } from "@/components/I18n";
 
 const basePath = process.env.CONDOR_LOCAL_BUILD === "1" ? "/hub" : "";
 
@@ -16,5 +17,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#0b1020", width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="pt-BR"><body>{children}</body></html>;
+  return <html lang="pt-BR"><body><I18nProvider>{children}</I18nProvider></body></html>;
 }
