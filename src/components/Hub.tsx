@@ -11,6 +11,8 @@ import {
   Command,
   Compass,
   ExternalLink,
+  Eye,
+  EyeOff,
   GraduationCap,
   LayoutDashboard,
   LogOut,
@@ -329,7 +331,7 @@ export function Hub() {
     setLoginPending(true);
     setMessage("Entrando...");
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
       setPassword("");
       setMessage(error ? "Não foi possível entrar com essas credenciais." : "");
     } catch { setMessage("Falha de conexão. Tente novamente."); } finally {
@@ -339,7 +341,7 @@ export function Hub() {
 
   async function requestPasswordReset() {
     if (!supabase || recoveryPending) return;
-    const cleanEmail = email.trim();
+    const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail) {
       setMessage("Informe seu e-mail para recuperar o acesso.");
       return;
@@ -615,7 +617,7 @@ export function Hub() {
     ...notes.slice(0, 20).map(note => ({ id: `note-${note.id}`, group: "Notas", label: note.content.slice(0, 90), icon: Command, run: () => goTo("overview") })),
   ];
 
-  return <main className={`hub-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""}`}>
+  return <main className={`hub-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${activeWorkspace ? "workspace-active" : ""}`}>
     <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
       <div className="sidebar-top">
         <button className="brand" onClick={() => goTo("overview")} aria-label={t("Abrir visão geral do ARTX Hub")}>
@@ -682,6 +684,14 @@ export function Hub() {
         onRefresh={() => { setRefreshKey((key) => key + 1); notify("Preview atualizado"); }}
       />}
     </section>
+
+    <nav className="mobile-dock" aria-label={t("Acessos rápidos do Hub")}>
+      <button className={activeView === "overview" ? "active" : ""} onClick={() => goTo("overview")}><LayoutDashboard size={20} /><span>{t("Início")}</span></button>
+      <button className={activeView === "videos" ? "active" : ""} onClick={() => goTo("videos")}><Video size={20} /><span>{t("Vídeos")}</span></button>
+      <button className={activeView === "sat" ? "active" : ""} onClick={() => goTo("sat")}><GraduationCap size={20} /><span>{t("Inglês")}</span></button>
+      <button className={activeView === "university" ? "active" : ""} onClick={() => goTo("university")}><Compass size={20} /><span>{t("Universidade")}</span></button>
+      <button onClick={() => setSidebarOpen(true)}><Menu size={20} /><span>{t("Tudo")}</span></button>
+    </nav>
 
     <CommandPalette
       open={commandOpen}
@@ -821,7 +831,8 @@ function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boo
 
 function Login({ email, password, message, pending, recoveryPending, onEmail, onPassword, onSubmit, onRecover }: { email: string; password: string; message: string; pending: boolean; recoveryPending: boolean; onEmail: (value: string) => void; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onRecover: () => void }) {
   const { t } = useI18n();
-  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}><LanguageSwitch /></div><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>{t("Central pessoal")}</small></div></div><p className="eyebrow">{t("ESPAÇO PRIVADO")}</p><h1>{t("Seu espaço para construir.")}</h1><p>{t("Entre para acessar seus sistemas e continuar seus estudos e a produção do canal.")}</p><label>E-mail<input type="email" value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" inputMode="email" required /></label><label>{t("Senha")}<input type="password" value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="current-password" required /></label><button className="login-recovery" type="button" onClick={onRecover} disabled={pending || recoveryPending}>{recoveryPending ? t("Enviando link...") : t("Esqueci minha senha")}</button>{message && <span className="message" aria-live="polite">{t(message)}</span>}<button className="primary" type="submit" disabled={pending || recoveryPending}>{pending ? t("Verificando...") : t("Entrar no Hub")} {!pending && <ArrowUpRight size={16} />}</button><small className="login-footer"><span />{t(" Acesso particular e sincronizado")}</small></form></main>;
+  const [showPassword, setShowPassword] = useState(false);
+  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}><LanguageSwitch /></div><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>{t("Central pessoal")}</small></div></div><p className="eyebrow">{t("ESPAÇO PRIVADO")}</p><h1>{t("Seu espaço para construir.")}</h1><p>{t("Entre para acessar seus sistemas e continuar seus estudos e a produção do canal.")}</p><label>E-mail<input type="email" value={email} onChange={(event) => onEmail(event.target.value)} autoComplete="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} required /></label><label>{t("Senha")}<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go" required /><button type="button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? t("Ocultar senha") : t("Mostrar senha")}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label><button className="login-recovery" type="button" onClick={onRecover} disabled={pending || recoveryPending}>{recoveryPending ? t("Enviando link...") : t("Esqueci minha senha")}</button>{message && <span className="message" aria-live="polite">{t(message)}</span>}<button className="primary" type="submit" disabled={pending || recoveryPending}>{pending ? t("Verificando...") : t("Entrar no Hub")} {!pending && <ArrowUpRight size={16} />}</button><small className="login-footer"><span />{t(" Acesso particular e sincronizado")}</small></form></main>;
 }
 
 function ResetPassword({ password, message, onPassword, onSubmit }: { password: string; message: string; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void }) {
