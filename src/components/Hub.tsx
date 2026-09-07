@@ -48,7 +48,7 @@ type Task = {
   created_at?: string;
 };
 
-type View = "approvals" | "overview" | "site" | "videos" | "sat" | "university" | "career" | "condor";
+type View = "approvals" | "security" | "overview" | "site" | "videos" | "sat" | "university" | "career" | "condor";
 type ProjectKey = "site" | "videos" | "sat" | "university" | "condor" | "geral";
 type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
 
@@ -91,7 +91,7 @@ async function localHubRequest<T>(path: string, init?: RequestInit): Promise<T> 
   return payload as T;
 }
 
-const workspaces: Record<Exclude<View, "overview" | "career" | "approvals">, Workspace> = {
+const workspaces: Record<Exclude<View, "overview" | "career" | "approvals" | "security">, Workspace> = {
   site: {
     label: "Site KauaArtx",
     eyebrow: "PRESENÇA DIGITAL",
@@ -155,6 +155,7 @@ const workspaces: Record<Exclude<View, "overview" | "career" | "approvals">, Wor
 
 const pageMeta: Record<View, { eyebrow: string; title: string }> = {
   approvals: { eyebrow: "ADMINISTRAÇÃO", title: "Aprovação de contas" },
+  security: { eyebrow: "CONTA PROPRIETÁRIA", title: "Segurança" },
   overview: { eyebrow: "CENTRAL DE COMANDO", title: "Visão geral" },
   site: { eyebrow: workspaces.site.eyebrow, title: workspaces.site.label },
   videos: { eyebrow: workspaces.videos.eyebrow, title: workspaces.videos.label },
@@ -181,6 +182,10 @@ export function Hub() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [ownerPassword, setOwnerPassword] = useState("");
+  const [ownerPasswordConfirmation, setOwnerPasswordConfirmation] = useState("");
+  const [passwordUpdatePending, setPasswordUpdatePending] = useState(false);
+  const [passwordUpdateMessage, setPasswordUpdateMessage] = useState("");
   const [message, setMessage] = useState("");
   const [loginPending, setLoginPending] = useState(false);
   const [recoveryPending, setRecoveryPending] = useState(false);
@@ -378,6 +383,24 @@ export function Hub() {
     setMessage("");
     setNewPassword("");
     setRecoveryMode(false);
+  }
+
+  async function changeOwnerPassword(event: React.FormEvent) {
+    event.preventDefault();
+    if (!supabase || passwordUpdatePending) return;
+    if (ownerPassword.length < 8) { setPasswordUpdateMessage("Use pelo menos 8 caracteres."); return; }
+    if (ownerPassword !== ownerPasswordConfirmation) { setPasswordUpdateMessage("As senhas não coincidem."); return; }
+    setPasswordUpdatePending(true);
+    setPasswordUpdateMessage("Atualizando senha…");
+    try {
+      const { error } = await supabase.auth.updateUser({ password: ownerPassword });
+      if (error) throw error;
+      setOwnerPassword("");
+      setOwnerPasswordConfirmation("");
+      setPasswordUpdateMessage("Senha atualizada. O próximo login já usará a nova senha.");
+    } catch {
+      setPasswordUpdateMessage("Não foi possível atualizar a senha. Entre novamente ou use a recuperação por e-mail.");
+    } finally { setPasswordUpdatePending(false); }
   }
 
   async function createActivity(title: string, projectSlug: string | null) {
@@ -610,6 +633,7 @@ export function Hub() {
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
     { id: "career", group: "Estudos", label: "Abrir Currículo & Cursos", icon: Award, run: () => goTo("career") },
     { id: "approvals", group: "Segurança", label: "Aprovação de contas", icon: Award, run: () => goTo("approvals") },
+    { id: "security", group: "Segurança", label: "Alterar senha do Hub", icon: Settings2, run: () => goTo("security") },
 
     { id: "activity", group: "Pessoal", label: "Criar uma atividade", icon: Sparkles, run: () => goTo("overview") },
     { id: "backup", group: "Segurança", label: "Exportar backup do Hub", icon: Cloud, run: downloadHubBackup },
@@ -642,6 +666,7 @@ export function Hub() {
         <NavButton active={activeView === "university"} icon={GraduationCap} logo={workspaces.university.logo} label="University Path" onClick={() => goTo("university")} />
         <NavButton active={activeView === "career"} icon={Award} label={t("Currículo & Cursos")} onClick={() => goTo("career")} badge={courseProgress.filter((item) => courseCatalog.some((course) => course.id === item.course_id) && item.status === "in_progress").length} />
         <NavButton active={activeView === "approvals"} icon={Award} label="Aprovação de contas" onClick={() => goTo("approvals")} />
+        <NavButton active={activeView === "security"} icon={Settings2} label="Segurança" onClick={() => goTo("security")} />
       </SidebarGroup>
 
       <div className="sidebar-bottom">
@@ -668,6 +693,7 @@ export function Hub() {
       {activeView === "overview" && <PersonalDashboard tasks={tasks} notes={notes} systemSignals={systemSignals} syncing={syncing} syncError={syncError} onOpen={goTo} onCreate={createActivity} onToggle={toggleTask} onNote={createNote} onRetry={() => void loadWorkspace()} onBackup={downloadHubBackup} />}
       {activeView === "career" && <CoursesResume progress={courseProgress} savingCourseId={savingCourseId ?? certificateBusyId ?? (!localMode && (syncing || syncError) ? "sync" : null)} localOnly={localMode} onUpdate={updateCourseProgress} onAttach={attachCourseCertificate} onDownload={retrieveCourseCertificate} />}
       {activeView === "approvals" && <AccountApprovals token={hubAccessToken} />}
+      {activeView === "security" && <section className="security-settings"><p className="eyebrow">CONTA PROPRIETÁRIA</p><h1>Alterar senha do Hub</h1><p>Esta ação muda somente a senha da sua conta principal. Os dados e acessos aprovados continuam intactos.</p><form onSubmit={changeOwnerPassword}><label>Nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPassword} onChange={(event) => setOwnerPassword(event.target.value)} /></label><label>Confirmar nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPasswordConfirmation} onChange={(event) => setOwnerPasswordConfirmation(event.target.value)} /></label><button className="quick-create" type="submit" disabled={passwordUpdatePending}>{passwordUpdatePending ? "Atualizando…" : "Salvar nova senha"}</button><p role="status" aria-live="polite">{passwordUpdateMessage}</p></form></section>}
       {activeView === "condor" && <CondorWorkspace
         activities={tasks}
         onCreateActivity={createActivity}
