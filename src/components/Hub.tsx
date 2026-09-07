@@ -207,6 +207,7 @@ export function Hub() {
   const [syncError, setSyncError] = useState("");
   const [syncing, setSyncing] = useState(true);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [sessionEmail, setSessionEmail] = useState("");
   const [systemSignals, setSystemSignals] = useState<Partial<Record<ProjectKey, SystemSignal>>>({});
   const sessionIdentity = useRef<string | null>(null);
   const loadVersion = useRef(0);
@@ -265,6 +266,7 @@ export function Hub() {
       window.clearTimeout(authTimeout);
       sessionIdentity.current = data.session?.user.id ?? null;
       setSessionUserId(sessionIdentity.current);
+      setSessionEmail(data.session?.user.email ?? "");
       setSignedIn(Boolean(data.session));
       setHubAccessToken(data.session?.access_token ?? null);
       setSessionReady(true);
@@ -277,6 +279,7 @@ export function Hub() {
       }
       sessionIdentity.current = nextOwner;
       setSessionUserId(nextOwner);
+      setSessionEmail(session?.user.email ?? "");
       setSignedIn(Boolean(session));
       setHubAccessToken(session?.access_token ?? null);
       if (!session) { setTasks([]); setNotes([]); setCourseProgress([]); }
@@ -394,7 +397,7 @@ export function Hub() {
     setPasswordUpdateMessage("Atualizando senha…");
     try {
       const { error } = await supabase.auth.updateUser({ password: ownerPassword });
-      if (error) throw error;
+      if (error) { setPasswordUpdateMessage(`O provedor recusou a alteração: ${error.message}`); return; }
       setOwnerPassword("");
       setOwnerPasswordConfirmation("");
       setPasswordUpdateMessage("Senha atualizada. O próximo login já usará a nova senha.");
@@ -693,7 +696,7 @@ export function Hub() {
       {activeView === "overview" && <PersonalDashboard tasks={tasks} notes={notes} systemSignals={systemSignals} syncing={syncing} syncError={syncError} onOpen={goTo} onCreate={createActivity} onToggle={toggleTask} onNote={createNote} onRetry={() => void loadWorkspace()} onBackup={downloadHubBackup} />}
       {activeView === "career" && <CoursesResume progress={courseProgress} savingCourseId={savingCourseId ?? certificateBusyId ?? (!localMode && (syncing || syncError) ? "sync" : null)} localOnly={localMode} onUpdate={updateCourseProgress} onAttach={attachCourseCertificate} onDownload={retrieveCourseCertificate} />}
       {activeView === "approvals" && <AccountApprovals token={hubAccessToken} />}
-      {activeView === "security" && <section className="security-settings"><p className="eyebrow">CONTA PROPRIETÁRIA</p><h1>Alterar senha do Hub</h1><p>Esta ação muda somente a senha da sua conta principal. Os dados e acessos aprovados continuam intactos.</p><form onSubmit={changeOwnerPassword}><label>Nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPassword} onChange={(event) => setOwnerPassword(event.target.value)} /></label><label>Confirmar nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPasswordConfirmation} onChange={(event) => setOwnerPasswordConfirmation(event.target.value)} /></label><button className="quick-create" type="submit" disabled={passwordUpdatePending}>{passwordUpdatePending ? "Atualizando…" : "Salvar nova senha"}</button><p role="status" aria-live="polite">{passwordUpdateMessage}</p></form></section>}
+      {activeView === "security" && <section className="security-settings"><p className="eyebrow">CONTA PROPRIETÁRIA</p><h1>Alterar senha do Hub</h1><p>Conta conectada: <strong>{sessionEmail || "Sessão local"}</strong>. Esta ação muda somente a senha principal; dados e aprovações continuam intactos.</p><form onSubmit={changeOwnerPassword}><label>Nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPassword} onChange={(event) => setOwnerPassword(event.target.value)} /></label><label>Confirmar nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPasswordConfirmation} onChange={(event) => setOwnerPasswordConfirmation(event.target.value)} /></label><button className="quick-create" type="submit" disabled={passwordUpdatePending}>{passwordUpdatePending ? "Atualizando…" : "Salvar nova senha"}</button><p role="status" aria-live="polite">{passwordUpdateMessage}</p></form></section>}
       {activeView === "condor" && <CondorWorkspace
         activities={tasks}
         onCreateActivity={createActivity}
