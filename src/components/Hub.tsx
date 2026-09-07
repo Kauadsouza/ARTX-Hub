@@ -31,10 +31,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { certificateBucket, certificatePath, certificateReference, downloadCertificate, localCertificate, parseCertificateReference, isStoredCertificate, validateCertificate } from "@/lib/course-certificates";
 import { PersonalDashboard } from "@/components/PersonalDashboard";
 import { CondorWorkspace } from "@/components/CondorWorkspace";
-import { CoursesResume, courseCatalog, type CourseProgress, type CourseProgressPatch, type CourseProgressStatus } from "@/components/CoursesResume";
+import { AccountApprovals } from "./AccountApprovals";
 import { useI18n, LanguageSwitch } from "./I18n";
 
 type Task = {
@@ -45,7 +44,7 @@ type Task = {
   created_at?: string;
 };
 
-type View = "overview" | "site" | "videos" | "sat" | "university" | "career" | "condor";
+type View = "approvals" | "overview" | "site" | "videos" | "sat" | "university" | "condor";
 type ProjectKey = "site" | "videos" | "sat" | "university" | "condor" | "geral";
 type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
 
@@ -88,7 +87,7 @@ async function localHubRequest<T>(path: string, init?: RequestInit): Promise<T> 
   return payload as T;
 }
 
-const workspaces: Record<Exclude<View, "overview" | "career">, Workspace> = {
+const workspaces: Record<Exclude<View, "overview" | "approvals">, Workspace> = {
   site: {
     label: "Site KauaArtx",
     eyebrow: "PRESENÇA DIGITAL",
@@ -128,7 +127,7 @@ const workspaces: Record<Exclude<View, "overview" | "career">, Workspace> = {
   university: {
     label: "University Path",
     eyebrow: "PLANO UNIVERSITÁRIO",
-    description: "Quiz e roteiro de candidatura ao Reino Unido, adaptados à sua formação, com fontes oficiais.",
+    description: "Planejamento privado, pesquisa universitária e próximos passos com fontes oficiais.",
     url: "https://university-path-six.vercel.app",
     logo: assetPath("/brand/university.svg"),
     project: "university",
@@ -151,12 +150,12 @@ const workspaces: Record<Exclude<View, "overview" | "career">, Workspace> = {
 };
 
 const pageMeta: Record<View, { eyebrow: string; title: string }> = {
+  approvals: { eyebrow: "ADMINISTRAÇÃO", title: "Aprovação de contas" },
   overview: { eyebrow: "CENTRAL DE COMANDO", title: "Visão geral" },
   site: { eyebrow: workspaces.site.eyebrow, title: workspaces.site.label },
   videos: { eyebrow: workspaces.videos.eyebrow, title: workspaces.videos.label },
   sat: { eyebrow: workspaces.sat.eyebrow, title: workspaces.sat.label },
   university: { eyebrow: workspaces.university.eyebrow, title: workspaces.university.label },
-  career: { eyebrow: "DESENVOLVIMENTO PESSOAL", title: "Currículo & Cursos" },
   condor: { eyebrow: workspaces.condor.eyebrow, title: workspaces.condor.label },
 };
 
@@ -190,11 +189,6 @@ export function Hub() {
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [notes, setNotes] = useState<Array<{ id: string; content: string; created_at: string }>>([]);
-  const [courseProgress, setCourseProgress] = useState<CourseProgress[]>([]);
-  const [savingCourseId, setSavingCourseId] = useState<string | null>(null);
-  const [certificateBusyId, setCertificateBusyId] = useState<string | null>(null);
-  const certificateOperation = useRef(false);
-  const courseMutationPending = useRef(false);
   const [syncError, setSyncError] = useState("");
   const [syncing, setSyncing] = useState(true);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
@@ -203,7 +197,6 @@ export function Hub() {
   const loadVersion = useRef(0);
 
   const loadWorkspace = useCallback(async () => {
-    if (courseMutationPending.current || certificateOperation.current) return;
     const version = ++loadVersion.current;
     const owner = sessionUserId;
     const isCurrent = () => version === loadVersion.current && owner === sessionIdentity.current;
@@ -211,7 +204,6 @@ export function Hub() {
     setSyncError("");
     try {
     if (localMode) {
-      try { setCourseProgress(JSON.parse(window.localStorage.getItem("artx-course-progress") ?? "[]")); } catch { setCourseProgress([]); }
       await localHubRequest("/api/session", { method: "POST" });
       const snapshot = await localHubRequest<LocalHubSnapshot>("/api/hub");
       if (!isCurrent()) return;
@@ -225,16 +217,14 @@ export function Hub() {
       return;
     }
     if (!supabase) return;
-    const [taskResult, noteResult, courseResult] = await Promise.all([
+    const [taskResult, noteResult] = await Promise.all([
       supabase.from("hub_tasks").select("id,title,project_slug,completed,created_at").order("created_at", { ascending: false }).limit(1000),
       supabase.from("hub_notes").select("id,content,created_at").order("created_at", { ascending: false }).limit(100),
-      supabase.from("hub_course_progress").select("course_id,status,progress_percent,current_step,next_step,private_note,certificate_url,completed_at,updated_at").order("updated_at", { ascending: false }),
     ]);
     if (!isCurrent()) return;
-    if (taskResult.error || noteResult.error || courseResult.error) throw new Error("sync_failed");
+    if (taskResult.error || noteResult.error) throw new Error("sync_failed");
     setTasks((taskResult.data as Task[]) ?? []);
     setNotes(noteResult.data ?? []);
-    setCourseProgress((courseResult.data as CourseProgress[]) ?? []);
     } catch {
       if (isCurrent()) setSyncError("Não foi possível sincronizar. Confira a conexão e tente novamente; os dados exibidos podem estar desatualizados.");
     } finally { if (isCurrent()) setSyncing(false); }
@@ -264,13 +254,13 @@ export function Hub() {
       const nextOwner = session?.user.id ?? null;
       if (sessionIdentity.current !== nextOwner) {
         ++loadVersion.current;
-        setTasks([]); setNotes([]); setCourseProgress([]); setSyncError("");
+        setTasks([]); setNotes([]); setSyncError("");
       }
       sessionIdentity.current = nextOwner;
       setSessionUserId(nextOwner);
       setSignedIn(Boolean(session));
       setHubAccessToken(session?.access_token ?? null);
-      if (!session) { setTasks([]); setNotes([]); setCourseProgress([]); }
+      if (!session) { setTasks([]); setNotes([]); }
       if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
     });
     return () => { window.clearTimeout(authTimeout); listener.subscription.unsubscribe(); };
@@ -440,134 +430,6 @@ export function Hub() {
     notify(completed ? "Atividade concluída" : "Atividade reaberta");
   }
 
-  async function updateCourseProgress(courseId: string, patch: CourseProgressPatch) {
-    if (courseMutationPending.current || (!localMode && (syncing || syncError))) return false;
-    courseMutationPending.current = true;
-    ++loadVersion.current;
-    const owner = sessionUserId;
-    const previous = courseProgress.find((item) => item.course_id === courseId);
-    let status = (patch.status ?? previous?.status ?? "planned") as CourseProgressStatus;
-    const requestedPercent = Number.isFinite(patch.progress_percent)
-      ? Math.min(100, Math.max(0, Math.round(patch.progress_percent ?? 0)))
-      : Math.min(100, Math.max(0, previous?.progress_percent ?? 0));
-    const progressPercent = status === "completed" ? 100 : patch.status === "planned" || (patch.status === "in_progress" && requestedPercent === 100) ? 0 : requestedPercent;
-    if (patch.progress_percent !== undefined && progressPercent === 100) status = "completed";
-    if (patch.progress_percent !== undefined && progressPercent > 0 && status === "planned") status = "in_progress";
-    const next: CourseProgress = {
-      course_id: courseId,
-      status,
-      progress_percent: status === "completed" ? 100 : progressPercent,
-      current_step: patch.current_step !== undefined ? patch.current_step : previous?.current_step ?? null,
-      next_step: patch.next_step !== undefined ? patch.next_step : previous?.next_step ?? null,
-      private_note: patch.private_note !== undefined ? patch.private_note : previous?.private_note ?? null,
-      certificate_url: patch.certificate_url !== undefined ? patch.certificate_url : previous?.certificate_url ?? null,
-      completed_at: patch.completed_at !== undefined ? patch.completed_at : status === "completed" ? previous?.completed_at ?? new Date().toISOString().slice(0, 10) : null,
-      updated_at: new Date().toISOString(),
-    };
-    const optimistic = [...courseProgress.filter((item) => item.course_id !== courseId), next];
-    setCourseProgress(optimistic);
-    setSavingCourseId(courseId);
-    try {
-      if (localMode) {
-        window.localStorage.setItem("artx-course-progress", JSON.stringify(optimistic));
-      } else {
-        if (!supabase || !sessionUserId) throw new Error("missing_session");
-        const { error } = await supabase.from("hub_course_progress").upsert({
-          user_id: sessionUserId,
-          course_id: courseId,
-          status: next.status,
-          progress_percent: next.progress_percent,
-          current_step: next.current_step,
-          next_step: next.next_step,
-          private_note: next.private_note,
-          certificate_url: next.certificate_url,
-          completed_at: next.completed_at,
-          updated_at: next.updated_at,
-        }, { onConflict: "user_id,course_id" });
-        if (error) throw error;
-      }
-      if (!localMode && owner !== sessionIdentity.current) return false;
-      notify(patch.certificate_url !== undefined ? "Certificado anexado" : patch.status !== undefined ? "Status atualizado" : "Anotação salva");
-      return true;
-    } catch {
-      if (!localMode && owner !== sessionIdentity.current) return false;
-      setCourseProgress((current) => previous
-        ? [...current.filter((item) => item.course_id !== courseId), previous]
-        : current.filter((item) => item.course_id !== courseId));
-      notify("Não foi possível salvar a alteração. Tente novamente.");
-      return false;
-    } finally {
-      courseMutationPending.current = false;
-      setSavingCourseId(null);
-    }
-  }
-
-  async function attachCourseCertificate(courseId: string, file: File): Promise<boolean> {
-    if (certificateOperation.current || courseMutationPending.current) return false;
-    if (courseProgress.find((item) => item.course_id === courseId)?.status !== "completed") return false;
-    certificateOperation.current = true;
-    setCertificateBusyId(courseId);
-    const owner = localMode ? "local" : sessionUserId;
-    const origin = localMode ? null : process.env.NEXT_PUBLIC_SUPABASE_URL ?? null;
-    let uploadedPath: string | null = null;
-    let reference: string | null = null;
-    let committed = false;
-    try {
-      if (!owner || (!localMode && (!supabase || !origin))) throw new Error("Entre na sua conta para anexar o certificado.");
-      await validateCertificate(file);
-      const path = certificatePath(owner, courseId, file.name);
-      reference = certificateReference(origin, path);
-      if (localMode) await localCertificate("put", reference, file);
-      else {
-        const { error } = await supabase!.storage.from(certificateBucket).upload(path, file, { contentType: file.type, upsert: false });
-        if (error) throw new Error("Não foi possível enviar o certificado. Confira a conexão e o acesso ao cofre.");
-      }
-      uploadedPath = path;
-      if (!localMode && owner !== sessionIdentity.current) throw new Error("A sessão mudou. Entre novamente para anexar.");
-      committed = await updateCourseProgress(courseId, { certificate_url: reference });
-      return committed;
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Não foi possível anexar o certificado.");
-      return false;
-    } finally {
-      // Roll back only the newly uploaded file if saving its reference failed.
-      if (!committed && uploadedPath && reference) {
-        if (localMode) await localCertificate("delete", reference).catch(() => undefined);
-        else await supabase?.storage.from(certificateBucket).remove([uploadedPath]).catch(() => undefined);
-      }
-      certificateOperation.current = false;
-      setCertificateBusyId(null);
-    }
-  }
-
-  async function retrieveCourseCertificate(courseId: string, reference: string) {
-    if (certificateOperation.current) return;
-    certificateOperation.current = true;
-    setCertificateBusyId(courseId);
-    try {
-      const owner = localMode ? "local" : sessionUserId;
-      const origin = localMode ? null : process.env.NEXT_PUBLIC_SUPABASE_URL ?? null;
-      if (!owner || !isStoredCertificate(reference)) throw new Error("Certificado indisponível.");
-      const { path, name } = parseCertificateReference(reference, origin, owner, courseId);
-      let blob: Blob | undefined;
-      if (localMode) blob = await localCertificate("get", reference);
-      else {
-        if (!supabase || !origin) throw new Error("Entre novamente para baixar o certificado.");
-        const result = await supabase.storage.from(certificateBucket).download(path);
-        if (result.error) throw new Error("Não foi possível baixar o certificado. Tente novamente.");
-        if (owner !== sessionIdentity.current) throw new Error("A sessão mudou. Entre novamente.");
-        blob = result.data;
-      }
-      if (!blob) throw new Error("O arquivo não foi encontrado neste dispositivo.");
-      downloadCertificate(blob, name);
-    } catch (error) {
-      notify(error instanceof Error ? error.message : "Não foi possível baixar o certificado.");
-    } finally {
-      certificateOperation.current = false;
-      setCertificateBusyId(null);
-    }
-  }
-
   function goTo(view: View) {
     setActiveView(view);
     setSidebarOpen(false);
@@ -578,7 +440,7 @@ export function Hub() {
   }
 
   function downloadHubBackup() {
-    const blob = new Blob([JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), tasks, notes, courseProgress, systemSignals }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ version: 3, exportedAt: new Date().toISOString(), tasks, notes, systemSignals }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -604,7 +466,7 @@ export function Hub() {
     { id: "videos", group: "Sistemas", label: "Abrir KauaArtx Video Studio", icon: Video, run: () => goTo("videos") },
     { id: "sat", group: "Sistemas", label: "Abrir SAT & English Learning", icon: GraduationCap, run: () => goTo("sat") },
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
-    { id: "career", group: "Estudos", label: "Abrir Currículo & Cursos", icon: Award, run: () => goTo("career") },
+    { id: "approvals", group: "Segurança", label: "Aprovação de contas", icon: Award, run: () => goTo("approvals") },
 
     { id: "activity", group: "Pessoal", label: "Criar uma atividade", icon: Sparkles, run: () => goTo("overview") },
     { id: "backup", group: "Segurança", label: "Exportar backup do Hub", icon: Cloud, run: downloadHubBackup },
@@ -635,7 +497,7 @@ export function Hub() {
       <SidebarGroup label="Estudos">
         <NavButton active={activeView === "sat"} icon={GraduationCap} logo={workspaces.sat.logo} label="SAT & English Learning" onClick={() => goTo("sat")} />
         <NavButton active={activeView === "university"} icon={GraduationCap} logo={workspaces.university.logo} label="University Path" onClick={() => goTo("university")} />
-        <NavButton active={activeView === "career"} icon={Award} label={t("Currículo & Cursos")} onClick={() => goTo("career")} badge={courseProgress.filter((item) => courseCatalog.some((course) => course.id === item.course_id) && item.status === "in_progress").length} />
+        <NavButton active={activeView === "approvals"} icon={Award} label="Aprovação de contas" onClick={() => goTo("approvals")} />
       </SidebarGroup>
 
       <div className="sidebar-bottom">
@@ -660,7 +522,7 @@ export function Hub() {
       </header>
 
       {activeView === "overview" && <PersonalDashboard tasks={tasks} notes={notes} systemSignals={systemSignals} syncing={syncing} syncError={syncError} onOpen={goTo} onCreate={createActivity} onToggle={toggleTask} onNote={createNote} onRetry={() => void loadWorkspace()} onBackup={downloadHubBackup} />}
-      {activeView === "career" && <CoursesResume progress={courseProgress} savingCourseId={savingCourseId ?? certificateBusyId ?? (!localMode && (syncing || syncError) ? "sync" : null)} localOnly={localMode} onUpdate={updateCourseProgress} onAttach={attachCourseCertificate} onDownload={retrieveCourseCertificate} />}
+      {activeView === "approvals" && <AccountApprovals token={hubAccessToken} />}
       {activeView === "condor" && <CondorWorkspace
         activities={tasks}
         onCreateActivity={createActivity}
