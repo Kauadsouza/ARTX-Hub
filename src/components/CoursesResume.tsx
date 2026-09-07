@@ -28,6 +28,7 @@ import {
   Upload,
   WalletCards,
 } from "lucide-react";
+import { useI18n } from "./I18n";
 
 export type CourseProgressStatus = "planned" | "in_progress" | "completed";
 
@@ -272,6 +273,7 @@ export function CoursesResume({
   onAttach: (courseId: string, file: File) => Promise<boolean>;
   onDownload: (courseId: string, reference: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [tier, setTier] = useState<CourseTier>("free");
   const [level, setLevel] = useState<"Todos" | CourseLevel>("Todos");
   const [expandedCourse, setExpandedCourse] = useState<string>("");
@@ -301,18 +303,18 @@ export function CoursesResume({
     <section className="courses-page page-enter">
       <header className="courses-hero-v2">
         <div className="courses-hero-copy">
-          <p className="eyebrow"><Award size={13} /> TRILHA DE PROGRAMAÇÃO</p>
-          <h1>Do primeiro algoritmo ao sistema em produção.</h1>
-          <p>Uma rota focada em programação, com cursos oficiais, projetos para portfólio e uma anotação simples para lembrar onde você parou.</p>
+          <p className="eyebrow"><Award size={13} />{t(" TRILHA DE PROGRAMAÇÃO")}</p>
+          <h1>{t("Do primeiro algoritmo ao sistema em produção.")}</h1>
+          <p>{t("Uma rota focada em programação, com cursos oficiais, projetos para portfólio e uma anotação simples para lembrar onde você parou.")}</p>
           <div className="hero-course-actions">
-            <a href="#programming-roadmap">Ver rota recomendada <ArrowRight size={15} /></a>
-            <span><LockKeyhole size={13} /> {localOnly ? "Salvo neste dispositivo" : "Anotações privadas na sua conta"}</span>
+            <a href="#programming-roadmap">{t("Ver rota recomendada ")}<ArrowRight size={15} /></a>
+            <span><LockKeyhole size={13} /> {localOnly ? t("Salvo neste dispositivo") : t("Anotações privadas na sua conta")}</span>
           </div>
         </div>
         <Image
           className="courses-hero-art"
           src={courseAssetPath("/course-art/programming-roadmap.png")}
-          alt="Trilha visual de aprendizado em programação, de código e dados até nuvem"
+          alt={t("Trilha visual de aprendizado em programação, de código e dados até nuvem")}
           width={1536}
           height={864}
           priority
@@ -322,31 +324,31 @@ export function CoursesResume({
 
       <section className="programming-roadmap" id="programming-roadmap" aria-labelledby="roadmap-title">
         <div className="roadmap-heading">
-          <span><Sparkles size={15} /> ROTA RECOMENDADA</span>
-          <h2 id="roadmap-title">Quatro degraus. Um projeto público ao final de cada etapa.</h2>
-          <p>Complete a sequência gratuita primeiro. Depois escolha uma especialização paga em vez de tentar fazer todas ao mesmo tempo.</p>
+          <span><Sparkles size={15} />{t(" ROTA RECOMENDADA")}</span>
+          <h2 id="roadmap-title">{t("Quatro degraus. Um projeto público ao final de cada etapa.")}</h2>
+          <p>{t("Complete a sequência gratuita primeiro. Depois escolha uma especialização paga em vez de tentar fazer todas ao mesmo tempo.")}</p>
         </div>
         <ol>
-          <li><span>01</span><Terminal size={21} /><div><strong>Fundamentos</strong><small>CS50x · lógica, C e algoritmos</small></div></li>
-          <li><span>02</span><Braces size={21} /><div><strong>Linguagem</strong><small>CS50P · Python e testes</small></div></li>
-          <li><span>03</span><Database size={21} /><div><strong>Dados</strong><small>CS50 SQL · modelagem e escala</small></div></li>
-          <li><span>04</span><Layers3 size={21} /><div><strong>Produto web</strong><small>CS50W · aplicações e capstone</small></div></li>
+          <li><span>01</span><Terminal size={21} /><div><strong>{t("Fundamentos")}</strong><small>{t("CS50x · lógica, C e algoritmos")}</small></div></li>
+          <li><span>02</span><Braces size={21} /><div><strong>{t("Linguagem")}</strong><small>{t("CS50P · Python e testes")}</small></div></li>
+          <li><span>03</span><Database size={21} /><div><strong>{t("Dados")}</strong><small>{t("CS50 SQL · modelagem e escala")}</small></div></li>
+          <li><span>04</span><Layers3 size={21} /><div><strong>{t("Produto web")}</strong><small>{t("CS50W · aplicações e capstone")}</small></div></li>
         </ol>
       </section>
 
       <div className="course-controls">
         <div className="course-tabs" role="tablist" aria-label="Tipo de curso">
-          <button role="tab" aria-selected={tier === "free"} className={tier === "free" ? "active" : ""} onClick={() => setTier("free")}><GraduationCap size={16} /> Gratuitos <small>4</small></button>
-          <button role="tab" aria-selected={tier === "paid"} className={tier === "paid" ? "active" : ""} onClick={() => setTier("paid")}><WalletCards size={16} /> Pagos <small>4</small></button>
+          <button role="tab" aria-selected={tier === "free"} className={tier === "free" ? "active" : ""} onClick={() => setTier("free")}><GraduationCap size={16} />{t(" Gratuitos ")}<small>4</small></button>
+          <button role="tab" aria-selected={tier === "paid"} className={tier === "paid" ? "active" : ""} onClick={() => setTier("paid")}><WalletCards size={16} />{t(" Pagos ")}<small>4</small></button>
         </div>
-        <div className="course-level-filters" aria-label="Filtrar por nível">
-          {levels.map((item) => <button type="button" className={level === item ? "active" : ""} key={item} onClick={() => setLevel(item)}>{item}</button>)}
+        <div className="course-level-filters" aria-label={t("Filtrar por nível")}>
+          {levels.map((item) => <button type="button" className={level === item ? "active" : ""} key={item} onClick={() => setLevel(item)}>{t(item)}</button>)}
         </div>
       </div>
 
       <div className="course-tab-note">
-        <span>{tier === "free" ? "Acesso gratuito · certificado verificado do edX é pago." : "Certificados pagos; confirme o valor local antes de assinar."}</span>
-        <span><CheckCircle2 size={13} /> Links e requisitos conferidos em 04/09/2026</span>
+        <span>{tier === "free" ? t("Acesso gratuito · certificado verificado do edX é pago.") : "Certificados pagos; confirme o valor local antes de assinar."}</span>
+        <span><CheckCircle2 size={13} />{t(" Links e requisitos conferidos em 04/09/2026")}</span>
       </div>
 
       <div className="course-grid-v2">
@@ -361,56 +363,55 @@ export function CoursesResume({
             <article className={`course-card-v2 ${status}`} data-tone={course.tone} key={course.id}>
               <div className="course-visual">
                 <div className="course-visual-grid" aria-hidden="true" />
-                <span className="course-mark">{course.mark}</span>
+                <span className="course-mark">{t(course.mark)}</span>
                 <CourseIcon size={38} strokeWidth={1.45} />
                 <div className="course-visual-code" aria-hidden="true"><i /><i /><i /><i /></div>
-                <div className="course-level"><Gauge size={12} /> {course.level}</div>
+                <div className="course-level"><Gauge size={12} /> {t(course.level)}</div>
               </div>
 
               <div className="course-card-body">
                 <div className="course-card-top">
-                  <span className="course-area">{course.area}</span>
+                  <span className="course-area">{t(course.area)}</span>
                 </div>
-                <p className="course-provider">{course.provider}</p>
-                <h2>{course.name}</h2>
-                <p className="course-summary">{course.summary}</p>
+                <p className="course-provider">{t(course.provider)}</p>
+                <h2>{t(course.name)}</h2>
+                <p className="course-summary">{t(course.summary)}</p>
                 <div className="course-facts">
-                  <span><Clock3 size={14} /> {course.duration}</span>
-                  <span><BookOpen size={14} /> {course.prerequisite}</span>
-                  <span><Languages size={14} /> {course.language}</span>
+                  <span><Clock3 size={14} /> {t(course.duration)}</span>
+                  <span><BookOpen size={14} /> {t(course.prerequisite)}</span>
+                  <span><Languages size={14} /> {t(course.language)}</span>
                 </div>
 
                 <div className="course-actions course-entry-action">
-                  <a href={course.url} target="_blank" rel="noopener noreferrer" aria-label={`Ir para o curso ${course.shortName}`}>Ir para o curso <ExternalLink size={14} /></a>
+                  <a href={course.url} target="_blank" rel="noopener noreferrer" aria-label={`Ir para o curso ${course.shortName}`}>{t("Ir para o curso ")}<ExternalLink size={14} /></a>
                 </div>
 
-                <label className="course-status-select" htmlFor={`status-${course.id}`}>Status do curso
-                  <select id={`status-${course.id}`} value={status} disabled={saving} onChange={(event) => void onUpdate(course.id, { status: event.target.value as CourseProgressStatus })}>
-                    <option value="planned">Não iniciado</option>
-                    <option value="in_progress">Em andamento</option>
-                    <option value="completed">Finalizado</option>
+                <label className="course-status-select" htmlFor={`status-${course.id}`}>{t("Status do curso ")}<select id={`status-${course.id}`} value={status} disabled={saving} onChange={(event) => void onUpdate(course.id, { status: event.target.value as CourseProgressStatus })}>
+                    <option value="planned">{t("Não iniciado")}</option>
+                    <option value="in_progress">{t("Em andamento")}</option>
+                    <option value="completed">{t("Finalizado")}</option>
                   </select>
                 </label>
 
                 {status === "completed" && <CourseCertificate courseId={course.id} reference={saved?.certificate_url ?? null} disabled={saving} localOnly={localOnly} onAttach={onAttach} onDownload={onDownload} />}
 
                 <div className="study-log">
-                  <div className="study-log-title"><div><MapPin size={17} /><span><strong>Minha anotação</strong><small>{localOnly ? "Salva neste dispositivo" : "Privada · salva na sua conta"}</small></span></div></div>
-                  <label htmlFor={`note-${course.id}`}>Onde eu parei<textarea id={`note-${course.id}`} maxLength={3000} rows={3} placeholder="Ex.: parei na aula 3, minuto 28. Na próxima, continuar o exercício…" value={note} disabled={saving} onChange={(event) => setNoteDrafts((current) => ({ ...current, [course.id]: event.target.value }))} /></label>
-                  <div className="study-log-footer"><span aria-live="polite">{noteDrafts[course.id] !== undefined ? "Alterações não salvas" : saved?.private_note !== undefined && saved.private_note !== null ? "Anotação salva" : ""}</span><button type="button" disabled={saving} onClick={() => void saveNote(course, saved)}><Save size={14} /> {saving ? "Salvando…" : "Salvar anotação"}</button></div>
+                  <div className="study-log-title"><div><MapPin size={17} /><span><strong>{t("Minha anotação")}</strong><small>{localOnly ? t("Salva neste dispositivo") : t("Privada · salva na sua conta")}</small></span></div></div>
+                  <label htmlFor={`note-${course.id}`}>{t("Onde eu parei")}<textarea id={`note-${course.id}`} maxLength={3000} rows={3} placeholder={t("Ex.: parei na aula 3, minuto 28. Na próxima, continuar o exercício…")} value={note} disabled={saving} onChange={(event) => setNoteDrafts((current) => ({ ...current, [course.id]: event.target.value }))} /></label>
+                  <div className="study-log-footer"><span aria-live="polite">{noteDrafts[course.id] !== undefined ? t("Alterações não salvas") : saved?.private_note !== undefined && saved.private_note !== null ? t("Anotação salva") : ""}</span><button type="button" disabled={saving} onClick={() => void saveNote(course, saved)}><Save size={14} /> {saving ? t("Salvando…") : t("Salvar anotação")}</button></div>
                 </div>
 
                 {expanded ? (
                   <div className="course-details-v2">
-                    <div className="course-explanation"><strong>Por que entra no seu plano</strong><p>{course.cvValue}</p></div>
-                    <div className="course-skills">{course.skills.map((skill) => <span key={skill}>{skill}</span>)}</div>
-                    <div className="course-certificate"><Award size={16} /><span><strong>Como emitir o certificado</strong>{course.certificate}<a href={course.certificateUrl} target="_blank" rel="noreferrer">Ver requisitos oficiais <ExternalLink size={12} /></a></span></div>
+                    <div className="course-explanation"><strong>{t("Por que entra no seu plano")}</strong><p>{t(course.cvValue)}</p></div>
+                    <div className="course-skills">{course.skills.map((skill) => <span key={skill}>{t(skill)}</span>)}</div>
+                    <div className="course-certificate"><Award size={16} /><span><strong>{t("Como emitir o certificado")}</strong>{t(course.certificate)}<a href={course.certificateUrl} target="_blank" rel="noreferrer">{t("Ver requisitos oficiais ")}<ExternalLink size={12} /></a></span></div>
 
                   </div>
                 ) : null}
 
                 <button className="course-expand" type="button" aria-expanded={expanded} onClick={() => setExpandedCourse(expanded ? "" : course.id)}>
-                  {expanded ? "Fechar detalhes" : "Sobre o curso e certificado"} <ArrowRight size={14} />
+                  {expanded ? t("Fechar detalhes") : t("Sobre o curso e certificado")} <ArrowRight size={14} />
                 </button>
               </div>
             </article>
@@ -418,14 +419,14 @@ export function CoursesResume({
         })}
       </div>
 
-      {visibleCourses.length === 0 ? <div className="course-empty"><Code2 size={22} /><strong>Nenhum curso neste nível.</strong><button type="button" onClick={() => setLevel("Todos")}>Mostrar todos</button></div> : null}
+      {visibleCourses.length === 0 ? <div className="course-empty"><Code2 size={22} /><strong>{t("Nenhum curso neste nível.")}</strong><button type="button" onClick={() => setLevel("Todos")}>{t("Mostrar todos")}</button></div> : null}
 
       <aside className="cv-rules">
-        <div><Award size={19} /><strong>Transforme curso em prova</strong></div>
+        <div><Award size={19} /><strong>{t("Transforme curso em prova")}</strong></div>
         <ol>
-          <li>Conclua o projeto final e publique o código no GitHub.</li>
-          <li>Adicione a credencial ao CV somente quando conseguir comprová-la.</li>
-          <li>Descreva o projeto e as tecnologias; o certificado reforça a entrega.</li>
+          <li>{t("Conclua o projeto final e publique o código no GitHub.")}</li>
+          <li>{t("Adicione a credencial ao CV somente quando conseguir comprová-la.")}</li>
+          <li>{t("Descreva o projeto e as tecnologias; o certificado reforça a entrega.")}</li>
         </ol>
       </aside>
     </section>
@@ -440,6 +441,7 @@ function CourseCertificate({ courseId, reference, disabled, localOnly, onAttach,
   onAttach: (courseId: string, file: File) => Promise<boolean>;
   onDownload: (courseId: string, reference: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [file, setFile] = useState<File | null>(null);
   const [inputKey, setInputKey] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -455,14 +457,14 @@ function CourseCertificate({ courseId, reference, disabled, localOnly, onAttach,
   }
   const stored = reference && isStoredCertificate(reference);
   return <div className="course-certificate-upload">
-    <div className="certificate-upload-title"><Award size={18} /><strong>Certificado de conclusão</strong></div>
-    <p>{localOnly ? "Arquivo salvo neste dispositivo." : "Arquivo privado, salvo na sua conta."} PDF, JPG ou PNG · até 10 MB.</p>
+    <div className="certificate-upload-title"><Award size={18} /><strong>{t("Certificado de conclusão")}</strong></div>
+    <p>{localOnly ? "Arquivo salvo neste dispositivo." : t("Arquivo privado, salvo na sua conta.")}{t(" PDF, JPG ou PNG · até 10 MB.")}</p>
     {reference && (stored
-      ? <button className="certificate-download" type="button" disabled={disabled} onClick={() => void onDownload(courseId, reference)}><Download size={14} /> Baixar certificado anexado</button>
-      : reference.startsWith("https://") ? <a className="certificate-download" href={reference} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> Ver certificado</a> : null)}
+      ? <button className="certificate-download" type="button" disabled={disabled} onClick={() => void onDownload(courseId, reference)}><Download size={14} />{t(" Baixar certificado anexado")}</button>
+      : reference.startsWith("https://") ? <a className="certificate-download" href={reference} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} />{t(" Ver certificado")}</a> : null)}
     <label htmlFor={`certificate-${courseId}`}>{reference ? "Substituir certificado" : "Anexar certificado"}
       <input key={inputKey} id={`certificate-${courseId}`} type="file" accept="application/pdf,image/png,image/jpeg,.pdf,.png,.jpg,.jpeg" disabled={disabled || uploading} onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
     </label>
-    {file && <button className="certificate-send" type="button" disabled={disabled || uploading} onClick={() => void attach()}><Upload size={14} /> {uploading ? "Enviando…" : "Salvar certificado"}</button>}
+    {file && <button className="certificate-send" type="button" disabled={disabled || uploading} onClick={() => void attach()}><Upload size={14} /> {uploading ? "Enviando…" : t("Salvar certificado")}</button>}
   </div>;
 }
