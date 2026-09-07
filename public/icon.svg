@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs><linearGradient id="g" x1="8" y1="5" x2="56" y2="59" gradientUnits="userSpaceOnUse"><stop stop-color="#B49CFF"/><stop offset=".48" stop-color="#8064F4"/><stop offset="1" stop-color="#4D35C7"/></linearGradient></defs>
-  <rect x="1" y="1" width="62" height="62" rx="17" fill="url(#g)"/>
-  <path d="M16 45.5 28.4 17h7.2L48 45.5h-8.2l-2.5-6.2H26.6l-2.5 6.2H16Zm13.1-13h5.8L32 24.7l-2.9 7.8Z" fill="#fff"/>
-  <path d="m43.5 14.5 1.2 3.2 3.3 1.2-3.3 1.2-1.2 3.2-1.2-3.2-3.3-1.2 3.3-1.2 1.2-3.2Z" fill="#D8CCFF"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="7" y1="4" x2="57" y2="61" gradientUnits="userSpaceOnUse"><stop stop-color="#c7b7ff"/><stop offset=".45" stop-color="#8467ff"/><stop offset="1" stop-color="#4526bd"/></linearGradient></defs><rect width="64" height="64" rx="18" fill="url(#g)"/><path d="M18 16h9.1l5.2 8.7 5.3-8.7H47l-9.9 15.5L48 48h-9.4l-6.3-9.8L26 48h-9.5l11-16.5L18 16Z" fill="#fff"/><path d="M45.5 9.5 47 13l3.5 1.5L47 16l-1.5 3.5L44 16l-3.5-1.5L44 13l1.5-3.5Z" fill="#f4f0ff"/></svg>
