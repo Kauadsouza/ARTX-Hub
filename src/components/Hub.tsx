@@ -336,10 +336,12 @@ export function Hub() {
   async function login(event: React.FormEvent) {
     event.preventDefault();
     if (!supabase || loginPending) return;
+    const normalizedEmail = email.trim().toLowerCase().replace(/\\+(?=@)/g, "").replace(/\s+/g, "");
+    const normalizedPassword = password.trim();
     setLoginPending(true);
     setMessage("Entrando...");
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+      const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password: normalizedPassword });
       setPassword("");
       setMessage(error ? "Não foi possível entrar com essas credenciais." : "");
     } catch { setMessage("Falha de conexão. Tente novamente."); } finally {
