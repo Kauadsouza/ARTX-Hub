@@ -387,7 +387,8 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 
 /* Mobile app shell: quick access, safe areas and full working canvas. */
 @media(max-width:680px){
-  html,body{min-height:100dvh;overflow-x:hidden}
+  html,body{min-height:100dvh;overflow-x:hidden;touch-action:pan-x pan-y;-webkit-text-size-adjust:100%}
+  button,a,input,textarea,select{touch-action:manipulation}
   .hub-shell{min-height:100dvh;padding-bottom:calc(68px + env(safe-area-inset-bottom))}
   .hub-main{padding-right:14px;padding-bottom:20px;padding-left:14px}
   .hub-header{position:sticky;z-index:20;top:0;margin:0 -14px;padding:0 14px;background:rgba(7,8,13,.88);backdrop-filter:blur(18px)}
