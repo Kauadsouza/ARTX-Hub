@@ -51,6 +51,8 @@ type Task = {
 type View = "approvals" | "security" | "overview" | "site" | "videos" | "sat" | "university" | "career" | "condor";
 type ProjectKey = "site" | "videos" | "sat" | "university" | "condor" | "geral";
 type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
+type MemberWorkspace = "videos" | "study" | "university";
+type MemberHubSession = { token: string; principal: string; owner: false; username: string; appTokens: Partial<Record<MemberWorkspace, string>> };
 
 type LocalHubSnapshot = {
   tasks?: Array<{ id: string; titulo: string; projeto: string; status: string; criado: number }>;
@@ -79,6 +81,14 @@ type CommandItem = {
 };
 
 const assetPath = (path: string) => `${process.env.NEXT_PUBLIC_ARTX_BASE_PATH ?? ""}${path}`;
+const memberApi = "https://sistema-videos.vercel.app/api/members";
+
+async function memberRequest(action: string, data: Record<string, unknown> = {}, token = "", app: "hub" | MemberWorkspace = "hub") {
+  const response = await fetch(memberApi, { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ ...data, action, app }), signal: AbortSignal.timeout(20000) });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "Não foi possível concluir.");
+  return result;
+}
 
 async function localHubRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -175,6 +185,9 @@ export function Hub() {
   const { t } = useI18n();
   const supabase = useMemo(() => createClient(), []);
   const [sessionReady, setSessionReady] = useState(false);
+  const [memberReady, setMemberReady] = useState(false);
+  const [memberSession, setMemberSession] = useState<MemberHubSession | null>(null);
+  const [waitingApproval, setWaitingApproval] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
   const [localMode, setLocalMode] = useState(false);
   const [hubAccessToken, setHubAccessToken] = useState<string | null>(null);
@@ -289,6 +302,20 @@ export function Hub() {
   }, [supabase]);
 
   useEffect(() => {
+    let active = true;
+    let saved: MemberHubSession | null = null;
+    try { saved = JSON.parse(window.sessionStorage.getItem("artx-account:hub") ?? "null"); } catch { saved = null; }
+    if (!saved?.token) { setMemberReady(true); return () => { active = false; }; }
+    void memberRequest("session", {}, saved.token).then(result => {
+      if (!active || result.owner) return;
+      const verified = { ...saved, ...result } as MemberHubSession;
+      window.sessionStorage.setItem("artx-account:hub", JSON.stringify(verified));
+      setMemberSession(verified);
+    }).catch(() => window.sessionStorage.removeItem("artx-account:hub")).finally(() => { if (active) setMemberReady(true); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     const savedState = window.localStorage.getItem("artx-sidebar-collapsed");
     setSidebarCollapsed(savedState === "true");
     try { setSystemSignals(JSON.parse(window.localStorage.getItem("artx-system-signals") ?? "{}")); } catch { setSystemSignals({}); }
@@ -333,20 +360,47 @@ export function Hub() {
     setToast(text);
   }
 
-  async function login(event: React.FormEvent) {
+  async function login(event: React.FormEvent, creating = false) {
     event.preventDefault();
-    if (!supabase || loginPending) return;
-    const normalizedEmail = email.trim().toLowerCase().replace(/\\+(?=@)/g, "").replace(/\s+/g, "");
+    if (loginPending) return;
+    const identity = email.trim().toLowerCase().replace(/\\+(?=@)/g, "").replace(/\s+/g, "");
     const normalizedPassword = password.trim();
     setLoginPending(true);
-    setMessage("Entrando...");
+    setMessage(creating ? "Enviando pedido..." : "Entrando...");
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password: normalizedPassword });
+      if (creating) {
+        const result = await memberRequest("register", { username: identity, password: normalizedPassword });
+        setWaitingApproval(true);
+        setMessage(result.message || "Conta criada. Aguarde sua aprovação no Hub.");
+      } else if (identity.includes("@")) {
+        if (!supabase) throw new Error("Acesso do proprietário indisponível.");
+        window.sessionStorage.removeItem("artx-account:hub");
+        setMemberSession(null);
+        const { error } = await supabase.auth.signInWithPassword({ email: identity, password: normalizedPassword });
+        if (error) throw new Error("Não foi possível entrar com essas credenciais.");
+        setMessage("");
+      } else {
+        const result = await memberRequest("login", { username: identity, password: normalizedPassword });
+        if (result.pending) { setWaitingApproval(true); setMessage(result.message); }
+        else {
+          const session = result as MemberHubSession;
+          window.sessionStorage.setItem("artx-account:hub", JSON.stringify(session));
+          setMemberSession(session);
+          setMessage("");
+        }
+      }
       setPassword("");
-      setMessage(error ? "Não foi possível entrar com essas credenciais." : "");
-    } catch { setMessage("Falha de conexão. Tente novamente."); } finally {
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Falha de conexão. Tente novamente."); } finally {
       setLoginPending(false);
     }
+  }
+
+  async function logoutMember() {
+    if (!memberSession) return;
+    const sessions: Array<["hub" | MemberWorkspace, string]> = [["hub", memberSession.token], ...Object.entries(memberSession.appTokens ?? {}) as Array<[MemberWorkspace, string]>];
+    await Promise.allSettled(sessions.map(([app, token]) => memberRequest("logout", {}, token, app)));
+    window.sessionStorage.removeItem("artx-account:hub");
+    setMemberSession(null);
   }
 
   async function requestPasswordReset() {
@@ -620,12 +674,13 @@ export function Hub() {
     notify("Backup do Hub exportado");
   }
 
-  if (!sessionReady) {
+  if (!sessionReady || !memberReady) {
     return <main className="loading"><img className="loading-logo" src={assetPath("/brand/artx-hub.svg")} alt="ARTX Hub" /><p>{t("Abrindo sua central...")}</p></main>;
   }
   if (!supabase && !localMode) return <SetupScreen />;
   if (recoveryMode) return <ResetPassword password={newPassword} message={message} onPassword={setNewPassword} onSubmit={resetPassword} />;
-  if (!signedIn) return <Login email={email} password={password} message={message} pending={loginPending} recoveryPending={recoveryPending} onEmail={setEmail} onPassword={setPassword} onSubmit={login} onRecover={requestPasswordReset} />;
+  if (!signedIn && memberSession) return <MemberHub session={memberSession} onLogout={logoutMember} />;
+  if (!signedIn) return <Login identity={email} password={password} message={message} pending={loginPending} recoveryPending={recoveryPending} waitingApproval={waitingApproval} onIdentity={setEmail} onPassword={setPassword} onSubmit={login} onRecover={requestPasswordReset} onBack={() => { setWaitingApproval(false); setMessage(""); }} />;
 
   const activeWorkspace = isWorkspaceView(activeView) ? workspaces[activeView] : null;
   const page = pageMeta[activeView];
@@ -806,7 +861,7 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
   </div>;
 }
 
-function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey, onStatus }: { workspace: Workspace; accessToken: string | null; refreshKey: number; onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void }) {
+function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, refreshKey, onStatus }: { workspace: Workspace; accessToken: string | null; memberAccessToken?: string; refreshKey: number; onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void }) {
   const { t, language } = useI18n();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const usesHubSession = workspace.project === "videos" || workspace.project === "university" || workspace.project === "sat";
@@ -815,9 +870,10 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, refreshKey, onStatus }
 
   const sendHubSession = useCallback(() => {
     if (usesHubSession) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_LANGUAGE", language }, appOrigin);
-    if (!usesHubSession || !accessToken) return;
-    frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_AUTH", accessToken }, appOrigin);
-  }, [accessToken, appOrigin, usesHubSession, language]);
+    if (!usesHubSession) return;
+    if (memberAccessToken) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_MEMBER_AUTH", token: memberAccessToken }, appOrigin);
+    else if (accessToken) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_AUTH", accessToken }, appOrigin);
+  }, [accessToken, appOrigin, usesHubSession, language, memberAccessToken]);
 
   useEffect(() => {
     function onWorkspaceReady(event: MessageEvent) {
@@ -860,10 +916,27 @@ function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boo
   }} placeholder={t("Buscar páginas e ações...")} /><kbd>ESC</kbd></div><div className="command-results">{filtered.map((command, index) => { const Icon = command.icon; return <button key={command.id} className={index === activeIndex ? "active" : ""} onMouseEnter={() => setActiveIndex(index)} onClick={() => select(command)}><span className="command-icon"><Icon size={16} /></span><div><small>{t(command.group)}</small><strong>{t(command.label)}</strong></div>{command.shortcut ? <kbd>{t(command.shortcut)}</kbd> : <ChevronRight size={15} />}</button>; })}{!filtered.length && <EmptyState label={t("Nenhum comando encontrado.")} />}</div><footer><Command size={14} />{t(" Use ↑ ↓ para navegar e Enter para abrir")}</footer></section></div>;
 }
 
-function Login({ email, password, message, pending, recoveryPending, onEmail, onPassword, onSubmit, onRecover }: { email: string; password: string; message: string; pending: boolean; recoveryPending: boolean; onEmail: (value: string) => void; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void; onRecover: () => void }) {
+function MemberHub({ session, onLogout }: { session: MemberHubSession; onLogout: () => Promise<void> }) {
+  const [active, setActive] = useState<"videos" | "sat" | "university" | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const workspace = active ? workspaces[active] : null;
+  const tokenKey: MemberWorkspace | null = active === "sat" ? "study" : active;
+  const token = tokenKey ? session.appTokens?.[tokenKey] : undefined;
+  return <main className="member-hub">
+    <header className="member-header"><button className="brand" onClick={() => setActive(null)}><img className="brand-logo" src={assetPath("/brand/artx-hub.svg")} alt="" /><span className="brand-copy"><strong>ARTX Hub</strong><small>Espaço de {session.username}</small></span></button><button className="command-trigger" onClick={() => void onLogout()}><LogOut size={16} /> Sair</button></header>
+    {!workspace && <section className="member-home"><p className="eyebrow">SEU ESPAÇO</p><h1>Olá, {session.username}.</h1><p>Escolha um sistema. Seu conteúdo começa vazio e fica separado de todas as outras contas.</p><div className="member-app-grid">
+      {(["videos", "sat", "university"] as const).map(key => { const item = workspaces[key]; const Icon = item.icon; const accessKey: MemberWorkspace = key === "sat" ? "study" : key; const enabled = Boolean(session.appTokens?.[accessKey]); return <button key={key} disabled={!enabled} onClick={() => setActive(key)}><img src={item.logo} alt="" /><span><small>{item.eyebrow}</small><strong>{item.label}</strong><em>{enabled ? "Abrir meu espaço" : "Aguardando liberação"}</em></span><Icon size={20} /></button>; })}
+    </div></section>}
+    {workspace && token && <section className="member-workspace"><div className="member-workspace-bar"><button className="command-trigger" onClick={() => setActive(null)}><ChevronRight className="member-back" size={16} /> Voltar</button><div><img src={workspace.logo} alt="" /><strong>{workspace.label}</strong></div><button className="command-trigger" onClick={() => setRefreshKey(value => value + 1)}><RefreshCw size={15} /> Atualizar</button></div><div className="member-frame"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={null} memberAccessToken={token} refreshKey={refreshKey} onStatus={() => undefined} /></div></section>}
+  </main>;
+}
+
+function Login({ identity, password, message, pending, recoveryPending, waitingApproval, onIdentity, onPassword, onSubmit, onRecover, onBack }: { identity: string; password: string; message: string; pending: boolean; recoveryPending: boolean; waitingApproval: boolean; onIdentity: (value: string) => void; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent, creating?: boolean) => void; onRecover: () => void; onBack: () => void }) {
   const { t } = useI18n();
   const [showPassword, setShowPassword] = useState(false);
-  return <main className="login"><div className="login-orbit" /><form onSubmit={onSubmit}><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}><LanguageSwitch /></div><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>{t("Central pessoal")}</small></div></div><p className="eyebrow">{t("ESPAÇO PRIVADO")}</p><h1>{t("Seu espaço para construir.")}</h1><p>{t("Entre para acessar seus sistemas e continuar seus estudos e a produção do canal.")}</p><label>E-mail<input type="email" value={email} onChange={(event) => onEmail(event.target.value.replace(/\\+(?=@)/g, "").replace(/\s+/g, ""))} autoComplete="email" inputMode="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} required /></label><label>{t("Senha")}<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => onPassword(event.target.value)} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go" required /><button type="button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? t("Ocultar senha") : t("Mostrar senha")}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label><button className="login-recovery" type="button" onClick={onRecover} disabled={pending || recoveryPending}>{recoveryPending ? t("Enviando link...") : t("Esqueci minha senha")}</button>{message && <span className="message" aria-live="polite">{t(message)}</span>}<button className="primary" type="submit" disabled={pending || recoveryPending}>{pending ? t("Verificando...") : t("Entrar no Hub")} {!pending && <ArrowUpRight size={16} />}</button><small className="login-footer"><span />{t(" Acesso particular e sincronizado")}</small></form></main>;
+  const [creating, setCreating] = useState(false);
+  if (waitingApproval) return <main className="login"><div className="login-orbit" /><section className="login-pending" role="status"><div className="pending-check"><Check size={25} /></div><p className="eyebrow">PEDIDO RECEBIDO</p><h1>Aguardando aprovação.</h1><p>{message}</p><div><strong>O que acontece agora?</strong><span>O proprietário verá sua conta na aba Aprovação de contas. Depois de aprovada, volte e entre com o mesmo nome e senha.</span></div><button className="primary" type="button" onClick={onBack}>Voltar para entrar</button></section></main>;
+  return <main className="login"><div className="login-orbit" /><form onSubmit={(event) => onSubmit(event, creating)}><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}><LanguageSwitch /></div><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>{creating ? "Nova conta" : t("Central pessoal")}</small></div></div><p className="eyebrow">{creating ? "SOLICITAR ACESSO" : t("ESPAÇO PRIVADO")}</p><h1>{creating ? "Crie seu espaço." : t("Seu espaço para construir.")}</h1><p>{creating ? "Escolha um nome e uma senha. Você só entra depois que o proprietário aprovar." : t("Entre para acessar seus sistemas e continuar seus estudos e a produção do canal.")}</p><label>{creating ? "Nome de usuário" : "E-mail ou nome de usuário"}<input type="text" value={identity} onChange={(event) => onIdentity(event.target.value.replace(/\\+(?=@)/g, "").replace(/\s+/g, ""))} autoComplete={creating ? "username" : "username"} autoCapitalize="none" autoCorrect="off" spellCheck={false} minLength={creating ? 3 : undefined} maxLength={creating ? 32 : undefined} pattern={creating ? "[a-zA-Z0-9][a-zA-Z0-9_.-]{2,31}" : undefined} required /></label><label>{t("Senha")}<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => onPassword(event.target.value)} autoComplete={creating ? "new-password" : "current-password"} autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go" minLength={creating ? 10 : undefined} maxLength={128} required /><button type="button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? t("Ocultar senha") : t("Mostrar senha")}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>{!creating && identity.includes("@") && <button className="login-recovery" type="button" onClick={onRecover} disabled={pending || recoveryPending}>{recoveryPending ? t("Enviando link...") : t("Esqueci minha senha")}</button>}{message && <span className="message" aria-live="polite">{t(message)}</span>}<button className="primary" type="submit" disabled={pending || recoveryPending}>{pending ? "Aguarde…" : creating ? "Pedir aprovação" : t("Entrar no Hub")} {!pending && <ArrowUpRight size={16} />}</button><button className="login-switch" type="button" disabled={pending} onClick={() => { setCreating(value => !value); onBack(); onIdentity(""); onPassword(""); }}>{creating ? "Já tenho uma conta" : "Criar conta"}</button><small className="login-footer"><span />{creating ? "Seus dados ficam separados dos outros usuários" : t(" Acesso particular e sincronizado")}</small></form></main>;
 }
 
 function ResetPassword({ password, message, onPassword, onSubmit }: { password: string; message: string; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void }) {
