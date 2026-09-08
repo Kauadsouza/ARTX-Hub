@@ -14,7 +14,13 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "ARTX Hub", statusBarStyle: "black-translucent" },
 };
 
-export const viewport: Viewport = { themeColor: "#0b1020", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = {
+  themeColor: "#0b1020",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="pt-BR"><body><I18nProvider>{children}</I18nProvider></body></html>;
