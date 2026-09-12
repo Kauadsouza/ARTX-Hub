@@ -1,182 +1,54 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  ArrowRight,
-  Bot,
-  Check,
-  Circle,
-  Compass,
-  GraduationCap,
-  LayoutDashboard,
-  Send,
-  Sparkles,
-  Video,
-  WandSparkles,
-  Zap,
-} from "lucide-react";
+import { ArrowUpRight, Bot, Check, Circle, Monitor, Plus, ShieldCheck, Mic, Smartphone } from "lucide-react";
 import { useI18n } from "./I18n";
 
-export type CondorActivity = {
-  id: string;
-  title: string;
-  project_slug: string | null;
-  completed: boolean;
-};
-
-type Destination = "overview" | "site" | "videos" | "sat" | "university";
-
-type CondorWorkspaceProps = {
+export type CondorActivity = { id: string; title: string; project_slug: string | null; completed: boolean };
+type Props = {
+  localMode: boolean;
   activities: CondorActivity[];
   onCreateActivity: (title: string, project: string | null) => Promise<boolean>;
   onToggleActivity: (activity: CondorActivity) => void;
-  onNavigate: (destination: Destination) => void;
 };
 
-type Message = {
-  id: number;
-  role: "condor" | "user";
-  text: string;
-};
+export function CondorWorkspace({ localMode, activities, onCreateActivity, onToggleActivity }: Props) {
+  const { locale } = useI18n();
+  const en = locale === "en";
+  const [title, setTitle] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const open = useMemo(() => activities.filter(item => !item.completed), [activities]);
 
-const destinations: Array<{ key: Destination; label: string; icon: typeof Compass }> = [
-  { key: "site", label: "Site KauaArtx", icon: Compass },
-  { key: "videos", label: "KauaArtx Video Studio", icon: Video },
-  { key: "sat", label: "SAT & English Learning", icon: GraduationCap },
-  { key: "university", label: "University Path", icon: GraduationCap },
-];
-
-const labels: Record<string, string> = {
-  geral: "Geral",
-  site: "Site KauaArtx",
-  videos: "KauaArtx Video Studio",
-  sat: "SAT & English Learning",
-  university: "University Path",
-  condor: "Condor AI",
-};
-
-function classify(text: string) {
-  const value = text.toLocaleLowerCase("pt-BR");
-  if (/vídeo|video|youtube|roteiro|thumbnail|gravar|edição|editar/.test(value)) return "videos";
-  if (/oxford|faculdade|universidade|university|college|curso/.test(value)) return "university";
-  if (/sat|inglês|ingles|prova|simulado|estudar/.test(value)) return "sat";
-  if (/site|portfólio|portfolio|blog|página|pagina/.test(value)) return "site";
-  return "geral";
-}
-
-function navigationCommand(text: string): Destination | null {
-  const value = text.toLocaleLowerCase("pt-BR");
-  if (!/abrir|abra|ir para|entrar/.test(value)) return null;
-  if (/vídeo|video|youtube/.test(value)) return "videos";
-  if (/university|universidade|oxford|faculdade/.test(value)) return "university";
-  if (/sat|inglês|ingles/.test(value)) return "sat";
-  if (/site|portfólio|portfolio|blog/.test(value)) return "site";
-  if (/hub|visão geral|inicio|início/.test(value)) return "overview";
-  return null;
-}
-
-export function CondorWorkspace({ activities, onCreateActivity, onToggleActivity, onNavigate }: CondorWorkspaceProps) {
-  const { t, locale } = useI18n();
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    { id: 1, role: "condor", text: "Estou pronto para organizar o Hub. Diga o que você precisa fazer ou qual sistema quer abrir." },
-  ]);
-  const openActivities = useMemo(() => activities.filter((activity) => !activity.completed), [activities]);
-
-  async function submit(rawText?: string) {
-    const text = (rawText ?? input).trim();
-    if (!text || sending) return;
-    setInput("");
-    setMessages((current) => [...current, { id: Date.now(), role: "user", text }]);
-
-    const destination = navigationCommand(text);
-    if (destination) {
-      const name = destination === "overview" ? "Visão geral" : destinations.find((item) => item.key === destination)?.label;
-      setMessages((current) => [...current, { id: Date.now() + 1, role: "condor", text: `Certo. Abrindo ${name}.` }]);
-      window.setTimeout(() => onNavigate(destination), 420);
-      return;
-    }
-
-    if (/organizar|prepare|preparar|prioridade|meu dia|meu hub/.test(text.toLocaleLowerCase(locale))) {
-      const summary = openActivities.length
-        ? `Seu Hub tem ${openActivities.length} atividade${openActivities.length === 1 ? "" : "s"} em aberto. A próxima é: “${openActivities[0].title}”.`
-        : "Seu Hub está livre. Diga o próximo objetivo e eu transformo em atividade.";
-      setMessages((current) => [...current, { id: Date.now() + 1, role: "condor", text: summary }]);
-      return;
-    }
-
-    setSending(true);
-    const project = classify(text);
-    const created = await onCreateActivity(text, project === "geral" ? null : project);
-    setSending(false);
-    setMessages((current) => [...current, {
-      id: Date.now() + 1,
-      role: "condor",
-      text: created
-        ? `Atividade criada em ${labels[project]}. Ela já está no foco do Hub.`
-        : "Não consegui registrar agora. Tente novamente em alguns segundos.",
-    }]);
+  async function create() {
+    if (saving || !title.trim()) return;
+    setSaving(true);
+    try {
+      if (await onCreateActivity(title.trim(), null)) { setTitle(""); setFeedback(en ? "Task created." : "Atividade criada."); }
+      else setFeedback(en ? "Could not save. Try again." : "Não foi possível salvar. Tente novamente.");
+    } catch { setFeedback(en ? "Connection failed. Your text is preserved." : "Falha de conexão. Seu texto foi preservado."); }
+    finally { setSaving(false); }
   }
 
   return <section className="condor-workspace page-enter">
-    <header className="condor-workspace-header">
-      <div className="condor-identity">
-        <span><Bot size={20} /></span>
-        <div><small>{t("INTELIGÊNCIA DO HUB")}</small><strong>Condor AI</strong></div>
-      </div>
-      <div className="condor-presence online"><i />{t("Ativo no Hub")}</div>
-    </header>
-
-    <section className="condor-assistant-hero">
-      <div>
-        <p><Sparkles size={13} />{t(" CENTRAL INTELIGENTE")}</p>
-        <h1>{t("Fale. O Condor organiza.")}</h1>
-        <span>{t("Crie atividades, prepare seu foco e abra qualquer sistema do ARTX Hub em uma só conversa.")}</span>
-      </div>
-      <div className="condor-hero-core" aria-hidden="true"><span>C</span><i /><i /></div>
-    </section>
-
+    <header className="condor-workspace-header"><div className="condor-identity"><span><Bot size={20} /></span><div><small>{en ? "YOUR PERSONAL ASSISTANT" : "SEU ASSISTENTE PESSOAL"}</small><strong>Condor</strong></div></div><span className="condor-origin"><Monitor size={14} />{localMode ? (en ? "Local app" : "Aplicativo local") : (en ? "Runs on your PC" : "Roda no seu PC")}</span></header>
     <div className="condor-assistant-grid">
-      <section className="condor-chat-panel">
-        <header><div><WandSparkles size={17} /><span><strong>{t("Conversa com o Condor")}</strong><small>{t("Comandos do Hub")}</small></span></div><span className="condor-live"><i />ONLINE</span></header>
-        <div className="condor-messages" aria-live="polite">
-          {messages.map((message) => <div className={`condor-message ${message.role}`} key={message.id}>
-            {message.role === "condor" && <span className="condor-avatar">C</span>}
-            <p>{t(message.text)}</p>
-          </div>)}
-          {sending && <div className="condor-message condor"><span className="condor-avatar">C</span><p className="condor-thinking"><i /><i /><i /></p></div>}
-        </div>
-        <div className="condor-suggestions">
-          <button onClick={() => void submit("Preparar meu Hub")}>{t("Preparar meu Hub")}</button>
-          <button onClick={() => void submit("Criar roteiro para o próximo vídeo")}>{t("Criar atividade de vídeo")}</button>
-          <button onClick={() => void submit("Abrir University Path")}>{t("Abrir University Path")}</button>
-        </div>
-        <form className="condor-composer" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-          <input value={input} onChange={(event) => setInput(event.target.value)} placeholder={t("Ex.: preparar o roteiro do próximo vídeo")} aria-label={t("Falar com o Condor")} />
-          <button type="submit" disabled={!input.trim() || sending} aria-label="Enviar ao Condor"><Send size={17} /></button>
-        </form>
+      <section className="condor-chat-panel condor-real-chat">
+        {localMode ? <iframe src="/ui/index.html" title={en ? "Condor local conversation" : "Conversa local com o Condor"} allow="microphone 'self'" /> : <div className="condor-connect-panel">
+          <span className="condor-connect-mark"><Bot size={34} /></span><small>CONDOR + ARTX HUB</small>
+          <h1>{en ? "Think it through. Make it happen." : "Pense junto. Coloque em prática."}</h1>
+          <p>{en ? "Chat, use voice and work with your computer through your local Condor. Choose a local model or connect your own provider key." : "Converse, use voz e trabalhe com seu computador pelo Condor local. Escolha um modelo no PC ou conecte a chave do seu provedor."}</p>
+          <a className="condor-launch" href="condor://open"><ArrowUpRight size={17} />{en ? "Open Condor on this PC" : "Abrir Condor neste PC"}</a>
+          <p className="condor-launch-help">{en ? "Requires the Condor desktop integration. If it does not open, launch Condor from the Windows Start menu. This web Hub cannot verify whether your PC is online." : "Requer a integração do Condor com o Windows. Se não abrir, inicie o Condor pelo menu Iniciar. Este Hub web não verifica se o seu PC está ligado."}</p>
+          <div className="condor-capabilities"><span><Mic size={17} />{en ? "Voice on your PC" : "Voz no PC"}</span><span><ShieldCheck size={17} />{en ? "Local permissions" : "Permissões locais"}</span><span><Smartphone size={17} />{en ? "iPhone: setup required" : "iPhone: configurar acesso"}</span></div>
+        </div>}
       </section>
-
-      <aside className="condor-ready-panel">
-        <header><div><Zap size={17} /><span><strong>{t("Hub preparado")}</strong><small>{t(openActivities.length)}{t(" atividade")}{openActivities.length === 1 ? "" : "s"}{t(" em aberto")}</small></span></div></header>
-        <div className="condor-next-action">
-          <small>{t("PRÓXIMA AÇÃO")}</small>
-          <strong>{t(openActivities[0]?.title) ?? t("Seu foco está livre")}</strong>
-          <span>{openActivities[0] ? t(labels[openActivities[0].project_slug ?? "geral"]) : t("Converse com o Condor para começar")}</span>
-        </div>
-        <div className="condor-activity-list">
-          {openActivities.slice(0, 5).map((activity) => <button key={activity.id} onClick={() => onToggleActivity(activity)}>
-            <Circle size={15} /><span><strong>{t(activity.title)}</strong><small>{t(labels[activity.project_slug ?? "geral"])}</small></span><Check size={14} />
-          </button>)}
-          {!openActivities.length && <div className="condor-empty"><Check size={18} /><span>{t("Nenhuma atividade pendente.")}</span></div>}
-        </div>
-        <div className="condor-destinations">
-          <small>{t("ABRIR SISTEMA")}</small>
-          <div>{destinations.map(({ key, label, icon: Icon }) => <button key={key} onClick={() => onNavigate(key)}><Icon size={15} /><span>{t(label)}</span><ArrowRight size={13} /></button>)}</div>
-        </div>
-        <button className="condor-overview-button" onClick={() => onNavigate("overview")}><LayoutDashboard size={15} />{t(" Voltar à visão geral")}</button>
+      <aside className="condor-ready-panel"><header><strong>{en ? "Your next steps" : "Seus próximos passos"}</strong><small>{open.length} {en ? "open tasks" : "atividades em aberto"}</small></header>
+        <div className="condor-activity-list">{open.slice(0,6).map(item=><button key={item.id} onClick={()=>onToggleActivity(item)}><Circle size={15}/><span><strong>{item.title}</strong></span><Check size={14}/></button>)}{!open.length&&<p className="condor-empty">{en ? "No outstanding tasks." : "Nenhuma atividade pendente."}</p>}</div>
+        <form className="condor-task-form" onSubmit={e=>{e.preventDefault();void create();}}><label htmlFor="condorTask">{en ? "Add a task to the Hub" : "Adicionar atividade ao Hub"}</label><input id="condorTask" value={title} onChange={e=>setTitle(e.target.value)} maxLength={500} required placeholder={en ? "Your next step…" : "Seu próximo passo…"}/><button disabled={saving||!title.trim()}><Plus size={15}/>{saving ? (en?"Saving…":"Salvando…") : (en?"Add task":"Adicionar atividade")}</button><p role="status">{feedback}</p></form>
+        <div className="condor-boundary-note"><ShieldCheck size={18}/><p>{en ? "The Hub and Condor keep their own permissions. Device actions run through the authenticated local app." : "O Hub e o Condor mantêm suas próprias permissões. As ações nos aparelhos passam pelo aplicativo local autenticado."}</p></div>
       </aside>
     </div>
   </section>;
 }
+

@@ -210,3 +210,25 @@
   .condor-suggestions { padding-inline: 14px; }
   .condor-destinations > div { grid-template-columns: 1fr; }
 }
+.condor-header-trigger { display:flex;align-items:center;gap:7px;border:1px solid #405941;background:#1c2d21;color:#c4e9aa;padding:8px 12px;border-radius:9px;font-size:12px;cursor:pointer; }
+.condor-header-trigger.active { background:#304a32;border-color:#98bc7f; }
+.condor-origin { display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted); }
+.condor-real-chat { min-width:0;overflow:hidden; }
+.condor-real-chat iframe { display:block;width:100%;height:760px;border:0;background:#111514; }
+.condor-connect-panel { padding:46px 38px;background:radial-gradient(ellipse at 80% 0,rgba(158,201,125,.10),transparent 65%); }
+.condor-connect-mark { display:grid;place-items:center;width:68px;height:68px;border:1px solid #567447;background:#263627;color:#c4e9aa;border-radius:22px;margin-bottom:30px; }
+.condor-connect-panel>small { font-size:10px;letter-spacing:2px;color:#a7b8a3; }
+.condor-connect-panel h1 { font-size:clamp(30px,3vw,46px);font-weight:500;line-height:1.12;letter-spacing:-1.8px;max-width:450px;margin:18px 0; }
+.condor-connect-panel>p { font-size:14px;line-height:1.8;color:var(--muted);max-width:560px; }
+.condor-launch { display:inline-flex;align-items:center;gap:9px;background:#c4e9aa;color:#183020!important;padding:13px 19px;border-radius:10px;margin:17px 0;text-decoration:none;font-weight:600;font-size:13px; }
+.condor-connect-panel .condor-launch-help { font-size:11px;max-width:450px; }
+.condor-capabilities { display:grid;gap:16px;margin-top:32px;padding-top:25px;border-top:1px solid var(--border); }
+.condor-capabilities span { display:flex;gap:11px;align-items:center;font-size:12px;color:#b7c9b3; }
+.condor-task-form { padding:20px;border-top:1px solid var(--border); }
+.condor-task-form label { display:block;font-size:12px;color:var(--muted);margin-bottom:10px; }
+.condor-task-form input { width:100%;padding:11px;background:rgba(0,0,0,.15);border:1px solid var(--border);border-radius:9px;color:inherit; }
+.condor-task-form button { display:flex;gap:8px;align-items:center;margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:transparent;color:inherit;cursor:pointer; }
+.condor-task-form p { font-size:12px;color:var(--muted); }
+.condor-boundary-note { padding:20px;color:var(--muted);font-size:12px;line-height:1.7; }
+.condor-ready-panel>header { display:grid;gap:8px; }
+@media(max-width:760px){.condor-header-trigger{padding:8px}.condor-header-trigger span{display:none}.condor-connect-panel{padding:26px 21px}.condor-real-chat iframe{height:720px}.condor-origin{font-size:10px}}
