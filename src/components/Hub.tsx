@@ -743,6 +743,7 @@ export function Hub() {
         <button className="icon-button menu-button" onClick={() => setSidebarOpen(true)} aria-label={t("Abrir menu")}><Menu size={19} /></button>
         <div className="breadcrumb"><span>ARTX</span><ChevronRight size={13} /><strong>{t(page.title)}</strong></div>
         <div className="header-actions"><LanguageSwitch />
+          <button className={`condor-header-trigger${activeView === "condor" ? " active" : ""}`} onClick={() => goTo("condor")} title="Condor" aria-label="Condor" aria-pressed={activeView === "condor"}><Sparkles size={16} /><span>Condor</span></button>
           <button className="command-trigger" onClick={() => setCommandOpen(true)}><Search size={16} /><span>{t("Buscar")}</span><kbd>⌘ K</kbd></button>
           <button className="quick-create" onClick={() => goTo("overview")}><Sparkles size={16} /><span>{t("Meu foco")}</span></button>
           <button className="synced sync-status" onClick={() => void loadWorkspace()} title={t("Atualizar dados")} aria-live="polite"><Cloud size={15} /><span>{syncing ? t("Sincronizando…") : syncError ? t("Verificar conexão") : localMode ? "Local" : t("Sincronizado")}</span></button>
@@ -755,10 +756,10 @@ export function Hub() {
       {activeView === "approvals" && <AccountApprovals token={hubAccessToken} />}
       {activeView === "security" && <section className="security-settings"><p className="eyebrow">CONTA PROPRIETÁRIA</p><h1>Alterar senha do Hub</h1><p>Conta conectada: <strong>{sessionEmail || "Sessão local"}</strong>. Esta ação muda somente a senha principal; dados e aprovações continuam intactos.</p><form onSubmit={changeOwnerPassword}><label>Nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPassword} onChange={(event) => setOwnerPassword(event.target.value)} /></label><label>Confirmar nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPasswordConfirmation} onChange={(event) => setOwnerPasswordConfirmation(event.target.value)} /></label><button className="quick-create" type="submit" disabled={passwordUpdatePending}>{passwordUpdatePending ? "Atualizando…" : "Salvar nova senha"}</button><p role="status" aria-live="polite">{passwordUpdateMessage}</p></form></section>}
       {activeView === "condor" && <CondorWorkspace
+        localMode={localMode}
         activities={tasks}
         onCreateActivity={createActivity}
         onToggleActivity={toggleTask}
-        onNavigate={goTo}
       />}
       {activeWorkspace && activeView !== "condor" && <WorkspaceView
         workspace={activeWorkspace}
