@@ -23,6 +23,8 @@ O site continua disponível se você não puder instalar o aplicativo. Ele reque
 
 **O login recupera o que foi sincronizado. Arquivos que ficaram apenas no PC não aparecem automaticamente em outro dispositivo.** Este instalador não cria um backup da memória local do Condor nem transforma o GitHub em banco de dados pessoal.
 
+Para cobrir esse ponto, o repositório do [Condor](https://github.com/Kauadsouza/Condor-Ai) tem `scripts/backup_condor_data.ps1` e `scripts/restore_condor_data.ps1`: eles copiam apenas os dados privados e únicos (`config.yaml`, memória, segurança, auditoria e logs — não os modelos, que são grandes e podem ser baixados de novo) e geram um arquivo `.enc` criptografado com AES-256 a partir de uma frase secreta escolhida na hora. Guarde esse arquivo fora deste PC (pendrive, nuvem pessoal) e a frase secreta em um cofre de senhas separado; sem a frase, nem o próprio dono recupera o backup.
+
 ## Contas e privacidade
 
 Mantenha acesso ao e-mail de recuperação do Hub e à sua conta GitHub. Ative autenticação em dois fatores e guarde os códigos de recuperação em local seguro. Para a conta proprietária por e-mail, use “Esqueci minha senha” no Hub quando necessário. Contas de membros dependem da aprovação e recuperação pelo proprietário.
