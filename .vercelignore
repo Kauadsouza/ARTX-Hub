@@ -1,4 +1,3 @@
-
 .claude
 .env
 .env.*
@@ -6,3 +5,8 @@ node_modules
 .next
 out
 dist
+desktop/
+docs/
+tests/
+*.artxbackup
+*.recovery-key

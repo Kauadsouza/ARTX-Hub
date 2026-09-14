@@ -22,5 +22,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm audit --audit-level=moderate
+      - run: node --test desktop/tests/*.test.cjs
+      - run: node --experimental-strip-types --test tests/*.test.mjs
       - run: npm run lint
       - run: npm run build
