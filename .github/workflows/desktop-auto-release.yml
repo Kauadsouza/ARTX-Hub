@@ -1,0 +1,94 @@
+name: Auto-release Windows desktop app
+
+# Builds and publishes a new ARTX-Hub-Setup-*.exe automatically whenever the
+# desktop shell (desktop/**) changes on main. The web content the app shows
+# is the live Hub site, so this never needs to run for ordinary Hub changes
+# only for changes to the Electron shell itself.
+
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**']
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  auto-release:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute next version
+        id: version
+        shell: pwsh
+        run: |
+          $current = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $existing = git tag -l "desktop-v$current"
+          if ($existing) {
+            $parts = $current -split '\.'
+            $next = "$($parts[0]).$($parts[1]).$([int]$parts[2] + 1)"
+          } else {
+            $next = $current
+          }
+          "version=$next" >> $env:GITHUB_OUTPUT
+
+      - name: Bump package.json and tag
+        shell: pwsh
+        run: |
+          $next = "${{ steps.version.outputs.version }}"
+          $json = Get-Content package.json -Raw | ConvertFrom-Json
+          $json.version = $next
+          ($json | ConvertTo-Json -Depth 10) | Set-Content package.json -Encoding utf8
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore(desktop): bump version to $next"
+          git tag "desktop-v$next"
+          git push origin HEAD:main
+          git push origin "desktop-v$next"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - run: npm ci
+      - run: npm audit --audit-level=moderate
+      - run: npm test
+      - run: npm run dist
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem release/ARTX-Hub-Setup-*.exe | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          } | Set-Content release/SHA256SUMS.txt -Encoding ascii
+
+      - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: desktop/release/ARTX-Hub-Setup-*.exe
+
+      - name: Publish verified installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          @"
+          Download the ARTX-Hub-Setup EXE below for Windows 10/11 x64. Install it and sign in with your existing Hub account to use the same online workspace as the website. Internet is required. New accounts still need owner approval.
+
+          The installer contains no account credentials or private data. Condor requires a separate installation and backup for its local memory. This release is not Authenticode-signed; verify the official repository, SHA256SUMS.txt and GitHub build attestation. Do not disable system protection; the website remains available at https://artx-hub.vercel.app.
+          "@ | Set-Content release-notes.md -Encoding utf8
+          gh release create "desktop-v$version" --verify-tag --title "ARTX Hub for Windows $version" --notes-file release-notes.md release/ARTX-Hub-Setup-*.exe release/SHA256SUMS.txt
