@@ -38,6 +38,25 @@ body {
 button, input, textarea, select { font: inherit; }
 input, textarea, select { font-size: 16px; }
 button { cursor: pointer; }
+.download-page { max-width: 1120px; margin: auto; padding: 32px 24px 48px; }
+.download-page nav, .download-page footer { display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+.download-page a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
+.download-hero { max-width: 750px; padding: 100px 0 64px; }
+.download-hero h1 { font-size: clamp(40px, 7vw, 78px); letter-spacing: -.055em; line-height: 1.05; margin: 20px 0 28px; }
+.download-hero > p:not(.eyebrow) { max-width: 560px; font-size: 19px; line-height: 1.65; color: var(--muted); }
+.download-hero .download-action { padding: 16px 24px; margin: 18px 0 16px; color: white; }
+.download-hero small { display: block; color: var(--muted); }
+.download-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.download-grid article, .download-note { border: 1px solid var(--line); background: var(--surface); border-radius: 18px; padding: 28px; }
+.download-grid article > span { color: var(--violet-bright); font-size: 13px; font-weight: 700; }
+.download-page h2 { font-size: 19px; letter-spacing: -.02em; }
+.download-grid p, .download-note p { color: var(--muted); line-height: 1.7; }
+.download-note { display: flex; align-items: flex-start; gap: 20px; margin: 24px 0 40px; }
+.download-note > svg { flex-shrink: 0; margin-top: 15px; color: var(--violet-bright); }
+.download-page footer { color: var(--muted); font-size: 13px; }
+.desktop-download { display: flex; align-items: center; gap: 10px; color: var(--muted); padding: 12px; text-decoration: none; font-size: 12px; }
+.sidebar-is-collapsed .desktop-download span { display: none; }
+@media (max-width: 720px) { .download-hero { padding-top: 64px; } .download-grid { grid-template-columns: 1fr; } .download-page footer { align-items: flex-start; flex-direction: column; } }
 button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 2px solid var(--violet-bright);

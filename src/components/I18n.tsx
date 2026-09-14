@@ -12,7 +12,8 @@ function translate(text: string, language: Language) {
   if (!translated) return text;
   return `${text.match(/^\s*/)?.[0] ?? ""}${translated}${text.match(/\s*$/)?.[0] ?? ""}`;
 }
-const I18nContext = createContext({ language: "pt" as Language, locale: "pt-BR", t: <T,>(text: T, _values?: unknown[]) => text, setLanguage: (_value: Language) => {} });
+type I18nValue = { language: Language; locale: string; t: <T>(text: T, values?: unknown[]) => T; setLanguage: (value: Language) => void };
+const I18nContext = createContext<I18nValue>({ language: "pt", locale: "pt-BR", t: text => text, setLanguage: () => {} });
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>("pt");

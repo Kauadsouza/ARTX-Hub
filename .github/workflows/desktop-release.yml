@@ -1,0 +1,77 @@
+name: Windows desktop release
+
+on:
+  push:
+    tags: ['desktop-v*']
+  pull_request:
+    paths: ['desktop/**', '.github/workflows/desktop-release.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Verify tag version
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_NAME -ne "desktop-v$version") { throw 'Tag and application version differ' }
+      - run: npm ci
+      - run: npm audit --audit-level=moderate
+      - run: npm test
+      - run: npm run dist
+      - name: Checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem release/ARTX-Hub-Setup-*.exe | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          } | Set-Content release/SHA256SUMS.txt -Encoding ascii
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: artx-hub-windows
+          path: |
+            desktop/release/ARTX-Hub-Setup-*.exe
+            desktop/release/SHA256SUMS.txt
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: artx-hub-windows
+          path: release
+      - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: release/ARTX-Hub-Setup-*.exe
+      - name: Publish verified installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cat > release-notes.md <<'NOTES'
+          Download the ARTX-Hub-Setup EXE below for Windows 10/11 x64. Install it and sign in with your existing Hub account to use the same online workspace as the website. Internet is required. New accounts still need owner approval.
+
+          The installer contains no account credentials or private data. Condor requires a separate installation and backup for its local memory. This release is not Authenticode-signed; verify the official repository, SHA256SUMS.txt and GitHub build attestation. Do not disable system protection; the website remains available at https://artx-hub.vercel.app.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "ARTX Hub for Windows ${GITHUB_REF_NAME#desktop-v}" --notes-file release-notes.md release/*

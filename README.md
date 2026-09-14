@@ -2,7 +2,13 @@
 
 ARTX Hub is a private command centre for Kaua's independent products, studies and creator workflow. It brings every system into one focused interface without merging their codebases, databases or security boundaries.
 
-[Open the live Hub](https://artx-hub.vercel.app) · Authentication required
+[Open the live Hub](https://artx-hub.vercel.app) · [Download for Windows](https://github.com/Kauadsouza/ARTX-Hub/releases/latest) · Authentication required
+
+## Windows application
+
+Download the EXE installer from the official releases and sign in with your existing Hub account. The desktop app and website use the same hosted workspace. Windows 10/11 x64 and internet are required. The app contains no private data or credentials; Condor remains a separate local installation.
+
+See [desktop setup and security](desktop/README.md) and [recovering access on another PC](docs/RECOVERY.md).
 
 ## What it connects
 
