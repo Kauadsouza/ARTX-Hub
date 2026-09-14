@@ -157,6 +157,7 @@
 .condor-composer input:focus { border-color: rgba(97, 218, 247, .42); box-shadow: 0 0 0 3px rgba(76, 201, 231, .06); }
 .condor-composer button { display: grid; width: 43px; place-items: center; border: 1px solid rgba(107, 224, 255, .42); border-radius: 10px; background: linear-gradient(135deg, #237d9f, #7256d7); color: #fff; }
 .condor-composer button:disabled { cursor: not-allowed; opacity: .42; }
+.condor-assistant-error { margin: 0; padding: 0 20px 13px; color: #e9ad61; font-size: 11px; }
 
 .condor-next-action { display: grid; gap: 5px; margin: 14px; padding: 15px; border: 1px solid rgba(107, 224, 255, .16); border-radius: 12px; background: radial-gradient(circle at 100% 0, rgba(77, 215, 247, .09), transparent 40%), rgba(255, 255, 255, .025); }
 .condor-next-action small,
@@ -222,12 +223,12 @@
 .condor-connect-panel>p { font-size:14px;line-height:1.8;color:var(--muted);max-width:560px; }
 .condor-launch { display:inline-flex;align-items:center;gap:9px;background:#c4e9aa;color:#183020!important;padding:13px 19px;border-radius:10px;margin:17px 0;text-decoration:none;font-weight:600;font-size:13px; }
 .condor-connect-panel .condor-launch-help { font-size:11px;max-width:450px; }
-.condor-capabilities { display:grid;gap:16px;margin-top:32px;padding-top:25px;border-top:1px solid var(--border); }
+.condor-capabilities { display:grid;gap:16px;margin-top:32px;padding-top:25px;border-top:1px solid var(--line); }
 .condor-capabilities span { display:flex;gap:11px;align-items:center;font-size:12px;color:#b7c9b3; }
-.condor-task-form { padding:20px;border-top:1px solid var(--border); }
+.condor-task-form { padding:20px;border-top:1px solid var(--line); }
 .condor-task-form label { display:block;font-size:12px;color:var(--muted);margin-bottom:10px; }
-.condor-task-form input { width:100%;padding:11px;background:rgba(0,0,0,.15);border:1px solid var(--border);border-radius:9px;color:inherit; }
-.condor-task-form button { display:flex;gap:8px;align-items:center;margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:transparent;color:inherit;cursor:pointer; }
+.condor-task-form input { width:100%;padding:11px;background:rgba(0,0,0,.15);border:1px solid var(--line);border-radius:9px;color:inherit; }
+.condor-task-form button { display:flex;gap:8px;align-items:center;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;cursor:pointer; }
 .condor-task-form p { font-size:12px;color:var(--muted); }
 .condor-boundary-note { padding:20px;color:var(--muted);font-size:12px;line-height:1.7; }
 .condor-ready-panel>header { display:grid;gap:8px; }

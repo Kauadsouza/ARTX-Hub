@@ -757,6 +757,7 @@ export function Hub() {
       {activeView === "security" && <section className="security-settings"><p className="eyebrow">CONTA PROPRIETÁRIA</p><h1>Alterar senha do Hub</h1><p>Conta conectada: <strong>{sessionEmail || "Sessão local"}</strong>. Esta ação muda somente a senha principal; dados e aprovações continuam intactos.</p><form onSubmit={changeOwnerPassword}><label>Nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPassword} onChange={(event) => setOwnerPassword(event.target.value)} /></label><label>Confirmar nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPasswordConfirmation} onChange={(event) => setOwnerPasswordConfirmation(event.target.value)} /></label><button className="quick-create" type="submit" disabled={passwordUpdatePending}>{passwordUpdatePending ? "Atualizando…" : "Salvar nova senha"}</button><p role="status" aria-live="polite">{passwordUpdateMessage}</p></form></section>}
       {activeView === "condor" && <CondorWorkspace
         localMode={localMode}
+        accessToken={hubAccessToken}
         activities={tasks}
         onCreateActivity={createActivity}
         onToggleActivity={toggleTask}
