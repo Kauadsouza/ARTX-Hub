@@ -127,9 +127,9 @@ const workspaces: Record<Exclude<View, "overview" | "career" | "approvals" | "se
     statusTone: "violet",
   },
   sat: {
-    label: "SAT & English Learning",
+    label: "Idiomas",
     eyebrow: "ÁREA DE ESTUDOS",
-    description: "Cursos gratuitos, conversação e seu plano de inglês, com abas SAT, ACT e TOEFL.",
+    description: "Inglês e espanhol, cada um com estudo diário e provas: SAT, ACT, TOEFL e o simulado de espanhol.",
     url: "https://sat-simulado.vercel.app",
     logo: assetPath("/brand/sat.svg"),
     project: "sat",
@@ -689,7 +689,7 @@ export function Hub() {
     { id: "overview", group: "Navegar", label: "Abrir visão geral", icon: LayoutDashboard, run: () => goTo("overview") },
     { id: "site", group: "Sistemas", label: "Abrir Site KauaArtx", icon: Compass, run: () => goTo("site") },
     { id: "videos", group: "Sistemas", label: "Abrir KauaArtx Video Studio", icon: Video, run: () => goTo("videos") },
-    { id: "sat", group: "Sistemas", label: "Abrir SAT & English Learning", icon: GraduationCap, run: () => goTo("sat") },
+    { id: "sat", group: "Sistemas", label: "Abrir Idiomas", icon: GraduationCap, run: () => goTo("sat") },
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
     { id: "career", group: "Estudos", label: "Abrir Currículo & Cursos", icon: Award, run: () => goTo("career") },
     { id: "approvals", group: "Segurança", label: "Aprovação de contas", icon: Award, run: () => goTo("approvals") },
@@ -722,7 +722,7 @@ export function Hub() {
         <NavButton active={activeView === "videos"} icon={Video} logo={workspaces.videos.logo} label="KauaArtx Video Studio" onClick={() => goTo("videos")} />
       </SidebarGroup>
       <SidebarGroup label="Estudos">
-        <NavButton active={activeView === "sat"} icon={GraduationCap} logo={workspaces.sat.logo} label="SAT & English Learning" onClick={() => goTo("sat")} />
+        <NavButton active={activeView === "sat"} icon={GraduationCap} logo={workspaces.sat.logo} label="Idiomas" onClick={() => goTo("sat")} />
         <NavButton active={activeView === "university"} icon={GraduationCap} logo={workspaces.university.logo} label="University Path" onClick={() => goTo("university")} />
         <NavButton active={activeView === "career"} icon={Award} label={t("Currículo & Cursos")} onClick={() => goTo("career")} badge={courseProgress.filter((item) => courseCatalog.some((course) => course.id === item.course_id) && item.status === "in_progress").length} />
         <NavButton active={activeView === "approvals"} icon={Award} label="Aprovação de contas" onClick={() => goTo("approvals")} />

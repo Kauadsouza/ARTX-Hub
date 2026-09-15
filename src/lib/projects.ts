@@ -34,8 +34,8 @@ export const projects: Project[] = [
   },
   {
     slug: "sat",
-    name: "SAT & English Learning",
-    description: "Cursos gratuitos, conversação e preparação SAT, ACT e TOEFL.",
+    name: "Idiomas",
+    description: "Inglês e espanhol: estudo diário, conversação e provas.",
     status: "Em estudo",
     color: "blue",
     icon: GraduationCap,
