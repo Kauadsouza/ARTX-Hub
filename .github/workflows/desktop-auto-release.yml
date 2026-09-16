@@ -91,4 +91,4 @@ jobs:
 
           The installer contains no account credentials or private data. Condor requires a separate installation and backup for its local memory. This release is not Authenticode-signed; verify the official repository, SHA256SUMS.txt and GitHub build attestation. Do not disable system protection; the website remains available at https://artx-hub.vercel.app.
           "@ | Set-Content release-notes.md -Encoding utf8
-          gh release create "desktop-v$version" --verify-tag --title "ARTX Hub for Windows $version" --notes-file release-notes.md release/ARTX-Hub-Setup-*.exe release/SHA256SUMS.txt
+          gh release create "desktop-v$version" --verify-tag --title "ARTX Hub for Windows $version" --notes-file release-notes.md release/ARTX-Hub-Setup-*.exe release/SHA256SUMS.txt release/latest.yml release/*.blockmap

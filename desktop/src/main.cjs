@@ -3,6 +3,7 @@
 const { app, BrowserWindow, Menu, dialog, shell, session } = require('electron');
 const path = require('node:path');
 const policy = require('./policy.cjs');
+const { startUpdates } = require('./updater.cjs');
 const RELEASE_URL = 'https://github.com/Kauadsouza/ARTX-Hub/releases/latest';
 let window;
 let externalPromptOpen = false;
@@ -17,7 +18,10 @@ else {
     if (window.isMinimized()) window.restore();
     window.show(); window.focus();
   });
-  app.whenReady().then(createWindow);
+  app.whenReady().then(() => {
+    createWindow();
+    startUpdates(() => window);
+  });
 }
 
 async function openExternal(value) {
