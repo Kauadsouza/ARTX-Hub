@@ -19,3 +19,7 @@ test-results/
 playwright-report/
 
 .vercel
+
+# Arquivos de agente gerados pelo next dev
+CLAUDE.md
+AGENTS.md
