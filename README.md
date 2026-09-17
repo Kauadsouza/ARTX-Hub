@@ -1,41 +1,53 @@
 # ARTX Hub
 
-ARTX Hub is a private command centre for Kaua's independent products, studies and creator workflow. It brings every system into one focused interface without merging their codebases, databases or security boundaries.
+**English** · [Português](README.pt-BR.md) · [Español](README.es.md)
 
-[Open the live Hub](https://artx-hub.vercel.app) · [Download for Windows](https://github.com/Kauadsouza/ARTX-Hub/releases/latest) · Authentication required
+A private command centre that brings Kauã's systems — video production, language study, university planning, the public site and the local assistant — into one interface, **without merging their codebases, databases or security boundaries**.
 
-## Windows application
+[Open the Hub](https://artx-hub.vercel.app) · [Download for Windows](https://github.com/Kauadsouza/ARTX-Hub/releases/latest) · Authentication required
 
-Download the EXE installer from the official releases and sign in with your existing Hub account. The desktop app and website use the same hosted workspace. Windows 10/11 x64 and internet are required. The app contains no private data or credentials; Condor remains a separate local installation.
+---
 
-See [desktop setup and security](desktop/README.md) and [recovering access on another PC](docs/RECOVERY.md).
+## Why it exists
+
+Five separate systems become five forgotten tabs, five logins and five places where a task can go missing. Merging them into one monolith would fix that and create a worse problem: a bug in the video studio would take the study app down with it.
+
+The Hub is an **orchestration layer**. Each product keeps its own deployment, its own database and its own lifecycle; the Hub gives them a common door and a common session.
 
 ## What it connects
 
 | System | Purpose | Integration |
 | --- | --- | --- |
-| Site KauaArtx | Public bilingual content platform and personal brand | External application |
-| KauaArtx Video Studio | YouTube ideas, scripts and publishing workflow | Authenticated embedded application |
-| SAT & English Learning | English learning and SAT, ACT and TOEFL practice | Authenticated embedded application |
-| University Path | UK Computer Science application planning | Authenticated embedded application |
-| Condor AI | Local-first personal AI system | Local overview and organisation layer |
+| [Site KauaArtx](https://github.com/Kauadsouza/Site-KauaArtx) | Public bilingual presence and personal brand | External application |
+| [Video Studio](https://github.com/Kauadsouza/KauaArtx-Video-Studio) | YouTube ideas, scripts and publishing | Embedded, with the Hub session |
+| [Idiomas](https://github.com/Kauadsouza/SAT-simulado) | English and Spanish: daily study and exams | Embedded, with the Hub session |
+| [University Path](https://github.com/Kauadsouza/University-Path) | UK undergraduate application planning | Embedded, with the Hub session |
+| [Condor](https://github.com/Kauadsouza/Condor-Ai) | Local-first personal assistant | Overview and local shortcut only |
 
-## Core capabilities
+## Windows application
 
-- One private dashboard for systems, notes, tasks and current priorities.
-- Supabase authentication with owner-scoped data and Row Level Security.
-- Shared Hub session for compatible embedded applications.
-- Responsive PWA experience for desktop and mobile.
-- Local export and recovery paths for important planning data.
-- Security headers, no public sign-up flow and no service-role credentials in the client.
+The installer comes from the official releases and uses the **same account** as the website — there is no second password. It carries no private data and no credentials: it is an Electron shell that opens the hosted Hub, so any change to the site appears without reinstalling.
 
-## Architecture
+From version 1.0.1 it **updates itself**: it checks the GitHub release, downloads in the background and asks before restarting — it never interrupts someone mid-task. This matters because the Hub's content refreshes on its own but the Electron runtime around it does not; without that channel, a security fix would only arrive if someone reinstalled by hand.
 
-The Hub is an orchestration layer, not a monolith. Each connected product remains independently deployable and keeps its own source code, data model and runtime. Condor's operational interface and computer permissions remain local to the owner's PC; the Hub never receives Condor memory, files or device-control access.
+See [desktop setup and security](desktop/README.md) and [recovering access on another PC](docs/RECOVERY.md).
+
+## Access control
+
+The owner signs in with a Supabase account. Everyone else creates an account and stays **pending until approved** — and approval is per system: you can grant only Videos, only Idiomas, or whatever fits. Nothing is granted by default, and each account's data stays separate.
+
+## Engineering decisions worth noting
+
+- **Orchestration, not a monolith.** Each embedded system receives the session over `postMessage` with a verified origin, instead of sharing a database.
+- **Owner-scoped Row Level Security**, covering Storage objects as well as tables — not only the rows.
+- **No service credential in the browser.** Only the Supabase URL and publishable key reach the client.
+- **Hardened Electron:** sandbox, context isolation, and fuses disabling `runAsNode`, CLI inspection and loading outside the asar.
+- **Releases with provenance.** The build verifies that the tag matches the version, generates SHA256SUMS and emits a GitHub build-provenance attestation. The installer is not yet Authenticode-signed — that is stated in the release itself rather than hidden.
+- **Recovery documented honestly**, including what signing in does *not* bring back (Condor's local memory).
 
 ## Tech stack
 
-Next.js 16, React 19, TypeScript, Supabase Auth/PostgreSQL, CSS and Vercel.
+Next.js 16, React 19, TypeScript, Supabase Auth/PostgreSQL, Electron and Vercel.
 
 ## Local development
 
@@ -45,7 +57,7 @@ Copy-Item .env.example .env.local
 npm.cmd run dev
 ```
 
-Required public client configuration:
+Required public configuration:
 
 ```text
 NEXT_PUBLIC_SUPABASE_URL
@@ -55,7 +67,9 @@ NEXT_PUBLIC_VIDEOS_URL
 NEXT_PUBLIC_SAT_URL
 ```
 
-Only Supabase public/publishable client values belong in browser variables. Never use a `service_role` key in this application.
+Only public Supabase values belong in browser variables. Never use a `service_role` key in this application.
+
+Optional: `ANTHROPIC_API_KEY` enables the Hub assistant in the Condor tab. Without it, the tab explains that it is not configured yet and everything else keeps working.
 
 ## Verification
 
@@ -68,15 +82,17 @@ npm.cmd audit --omit=dev
 ## Repository map
 
 ```text
-src/app/          Next.js application shell and global styles
+desktop/          Electron application and its release chain
+docs/             Access recovery and procedures
+src/app/          Application shell, routes and global styles
 src/components/   Hub, dashboards and system workspaces
 src/lib/          Project registry, Supabase client and shared data
 supabase/         Owner-scoped database and storage policies
-tests/            Behaviour and integration-focused checks
+tests/            Behaviour and integration checks
 ```
 
 ## Status
 
-Active personal infrastructure. The source is public for portfolio review, while the deployed Hub and its data remain private by design.
+Personal infrastructure in active use. The source is public for anyone who wants to review it; the deployed Hub and its data are private by design.
 
 Built and maintained by [Kauã Diniz Souza](https://github.com/Kauadsouza).
