@@ -3,7 +3,7 @@
 const { app, BrowserWindow, Menu, dialog, shell, session } = require('electron');
 const path = require('node:path');
 const policy = require('./policy.cjs');
-const { startUpdates } = require('./updater.cjs');
+const { startUpdates, checkNow } = require('./updater.cjs');
 const RELEASE_URL = 'https://github.com/Kauadsouza/ARTX-Hub/releases/latest';
 let window;
 let externalPromptOpen = false;
@@ -114,14 +114,20 @@ function createWindow() {
     { label: 'Hub', submenu: [
       { label: 'Início', click: () => void loadHub() },
       { label: 'Recarregar', accelerator: 'CmdOrCtrl+R', click: () => contents.reload() },
+      // Recarga suave reaproveita o cache. Quando o site publica uma versão nova
+      // e o Electron continua servindo a antiga, é esta que resolve.
+      { label: 'Recarregar ignorando o cache', accelerator: 'CmdOrCtrl+Shift+R', click: () => contents.reloadIgnoringCache() },
       { type: 'separator' }, { role: 'quit', label: 'Sair' },
     ] },
     { label: 'Editar', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] },
     { label: 'Visualizar', submenu: [{ role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'togglefullscreen' }] },
     { label: 'Ajuda', submenu: [
-      { label: 'Versões e atualizações', click: () => void shell.openExternal(RELEASE_URL) },
+      { label: 'Verificar atualizações agora', click: () => void checkNow(window) },
+      { label: 'Todas as versões publicadas', click: () => void shell.openExternal(RELEASE_URL) },
       { label: 'Abrir o site', click: () => void shell.openExternal(policy.HUB_URL) },
-      { label: 'Sobre', click: () => void dialog.showMessageBox(window, { title: 'ARTX Hub', message: `ARTX Hub ${app.getVersion()}`, detail: 'Aplicativo para Windows. Use sua conta do Hub para acessar os mesmos dados do site. O Condor requer instalação separada.' }) },
+      { label: 'Sobre', click: () => void dialog.showMessageBox(window, { title: 'ARTX Hub', message: `ARTX Hub ${app.getVersion()}`, detail: `Aplicativo para Windows. Use sua conta do Hub para acessar os mesmos dados do site. O Condor requer instalação separada.
+
+O conteúdo vem do site ao vivo, então ele se atualiza sozinho: se algo parecer antigo, use Recarregar ignorando o cache (Ctrl+Shift+R). Atualizar o aplicativo só é necessário quando muda o programa em volta.` }) },
     ] },
   ]));
   window.on('closed', () => { window = null; });

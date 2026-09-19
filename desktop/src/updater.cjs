@@ -53,6 +53,64 @@ function startUpdates(getWindow) {
   const check = () => autoUpdater.checkForUpdates().catch(() => undefined);
   setTimeout(check, 10_000);
   setInterval(check, SIX_HOURS);
+  manualCheck = async (window) => {
+    try {
+      const result = await autoUpdater.checkForUpdates();
+      const remote = result?.updateInfo?.version;
+      if (remote && remote !== app.getVersion()) {
+        // O download já começou sozinho; o aviso de "pronta para instalar" vem depois.
+        return { state: 'baixando', version: remote };
+      }
+      return { state: 'atual', version: app.getVersion() };
+    } catch {
+      return { state: 'falhou', version: app.getVersion() };
+    }
+  };
 }
 
-module.exports = { startUpdates };
+/**
+ * Verificação sob demanda.
+ *
+ * A checagem automática já roda sozinha, mas sem um jeito de pedir agora não há
+ * como saber se ela está funcionando — só esperar. Este caminho existe para a
+ * pessoa conferir quando quiser.
+ */
+let manualCheck = null;
+
+async function checkNow(window) {
+  if (!app.isPackaged) {
+    await dialog.showMessageBox(window, {
+      type: 'info',
+      title: 'ARTX Hub',
+      message: 'Atualização não se aplica aqui.',
+      detail: 'Você está rodando a versão de desenvolvimento, que não tem pacote instalado para substituir.',
+      noLink: true,
+    });
+    return;
+  }
+  if (!manualCheck) return;
+
+  const result = await manualCheck(window);
+  const messages = {
+    baixando: {
+      message: `Versão ${result.version} encontrada.`,
+      detail: 'O download já começou em segundo plano. Quando terminar, você decide se instala na hora ou ao fechar o aplicativo.',
+    },
+    atual: {
+      message: `Você já está na versão ${result.version}.`,
+      detail: 'Não há atualização disponível. O aplicativo verifica sozinho ao abrir e a cada seis horas.',
+    },
+    falhou: {
+      message: 'Não foi possível verificar agora.',
+      detail: 'Pode ser a conexão. O aplicativo continua funcionando e tentará de novo sozinho.',
+    },
+  };
+  await dialog.showMessageBox(window, {
+    type: result.state === 'falhou' ? 'warning' : 'info',
+    title: 'ARTX Hub',
+    ...messages[result.state],
+    noLink: true,
+  });
+}
+
+module.exports = { startUpdates, checkNow };
