@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Activity, ArrowUpRight, BookOpen, Check, Circle, Cloud, Download, Plus, RefreshCw, ShieldCheck, Video } from "lucide-react";
 import { PersonalFocus } from "./PersonalFocus";
+import { WeekAhead } from "./WeekAhead";
+import type { RouteSignals } from "@/lib/week-ahead";
 import { useI18n } from "./I18n";
 
 type Task = { id: string; title: string; project_slug: string | null; completed: boolean };
@@ -11,8 +13,8 @@ type View = "overview" | "site" | "videos" | "sat" | "university" | "condor";
 type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
 const labels: Record<string, string> = { geral: "Pessoal", sat: "Idiomas", videos: "KauaArtx Video Studio", site: "Site KauaArtx", university: "University Path", condor: "Condor AI" };
 
-export function PersonalDashboard({ tasks, notes, systemSignals, syncError, syncing, onOpen, onCreate, onToggle, onNote, onRetry, onBackup }: {
-  tasks: Task[]; notes: Note[]; systemSignals: Partial<Record<string, SystemSignal>>; syncError: string; syncing: boolean;
+export function PersonalDashboard({ tasks, notes, systemSignals, routeSignals, syncError, syncing, onOpen, onCreate, onToggle, onNote, onRetry, onBackup }: {
+  tasks: Task[]; notes: Note[]; systemSignals: Partial<Record<string, SystemSignal>>; routeSignals: RouteSignals | null; syncError: string; syncing: boolean;
   onOpen: (view: View) => void; onCreate: (title: string, project: string) => Promise<boolean>;
   onToggle: (task: Task) => Promise<void>; onNote: (content: string) => Promise<boolean>; onRetry: () => void; onBackup: () => void;
 }) {
@@ -32,6 +34,7 @@ export function PersonalDashboard({ tasks, notes, systemSignals, syncError, sync
 
   return <div className="overview-page personal-dashboard page-enter">
     <section className="personal-intro"><div><p className="eyebrow">{t("KAUÃ · SEU ESPAÇO PESSOAL")}</p><h1>{t("Crie. Aprenda.")}<br /><span>{t("Continue de onde parou.")}</span></h1><p>{t("Seu canal, suas ideias e um espaço para organizar o dia.")}</p></div><span className="day-label">{new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", timeZone: "Europe/London" }).format(new Date())}</span></section>
+    <WeekAhead routes={routeSignals} tasks={tasks} onOpen={onOpen} />
     {syncError && <div className="sync-alert" role="alert"><span>{t(syncError)}</span><button onClick={onRetry}><RefreshCw size={15} />{t(" Tentar novamente")}</button></div>}
     <section className="priority-grid">
       <button className="priority-card creator" onClick={() => onOpen("videos")}><div><Video size={23} /><span>{t("01 / CRIAR")}</span><ArrowUpRight size={22} /></div><h2>{t("O próximo vídeo")}<br />{t("começa aqui.")}</h2><p>{t("Ideias, roteiro, gravação e publicação.")}</p><strong>{t("Abrir meu estúdio ")}<ArrowUpRight size={17} /></strong></button>

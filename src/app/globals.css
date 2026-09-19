@@ -439,3 +439,18 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
   .member-app-grid{grid-template-columns:1fr}.member-home{padding-top:42px}.member-header{min-height:68px}.member-workspace{height:calc(100dvh - 68px);padding:8px}.member-workspace-bar>div strong{display:none}.member-workspace-bar .command-trigger{min-height:44px}.login-pending{padding:26px 20px}
   .approval-grid .approval-account{grid-template-columns:1fr;padding:17px}.approval-account .approval-actions{justify-content:stretch}.approval-account .approval-actions button{flex:1 1 140px;min-height:46px}.approval-apps label{min-height:68px}
 }
+
+/* O que está próximo. Cada cartão vem de um dado real e some com ele. */
+.week-ahead{margin:0 0 26px}
+.week-ahead header{display:flex;align-items:center;gap:8px;margin-bottom:12px;color:var(--muted);font-size:10px;font-weight:700;letter-spacing:1.6px}
+.week-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px}
+.week-card{display:grid;grid-template-columns:1fr auto;align-items:start;gap:4px 12px;padding:18px 20px;border:1px solid var(--line);border-left:3px solid var(--line-strong);border-radius:15px;background:var(--surface);color:var(--text);text-align:left;transition:transform .18s,border-color .18s}
+.week-card:hover{transform:translateY(-2px);border-color:var(--mint)}
+.week-card.agora{border-left-color:#ee8581}
+.week-card.semana{border-left-color:#f1ba66}
+.week-card.mes{border-left-color:var(--mint)}
+.week-card strong{grid-column:1;font-size:29px;line-height:1.05;letter-spacing:-1.2px}
+.week-card>svg{grid-column:2;grid-row:1;color:var(--muted)}
+.week-card span{grid-column:1/-1;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.week-card small{grid-column:1/-1;color:var(--muted);font-size:11px}
+@media(max-width:780px){.week-grid{grid-template-columns:1fr}.week-card{padding:16px 18px}}

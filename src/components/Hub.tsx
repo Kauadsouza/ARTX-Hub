@@ -33,6 +33,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { parseRouteSignals, type RouteSignals } from "@/lib/week-ahead";
 import { certificateBucket, certificatePath, certificateReference, downloadCertificate, localCertificate, parseCertificateReference, isStoredCertificate, validateCertificate } from "@/lib/course-certificates";
 import { PersonalDashboard } from "@/components/PersonalDashboard";
 import { CondorWorkspace } from "@/components/CondorWorkspace";
@@ -222,6 +223,9 @@ export function Hub() {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [sessionEmail, setSessionEmail] = useState("");
   const [systemSignals, setSystemSignals] = useState<Partial<Record<ProjectKey, SystemSignal>>>({});
+  // O University Path publica o proprio resumo de prazos. O Hub so consome:
+  // duplicar o calendario de cada pais aqui criaria dois que divergem sozinhos.
+  const [routeSignals, setRouteSignals] = useState<RouteSignals | null>(null);
   const sessionIdentity = useRef<string | null>(null);
   const loadVersion = useRef(0);
 
@@ -248,16 +252,20 @@ export function Hub() {
       return;
     }
     if (!supabase) return;
-    const [taskResult, noteResult, courseResult] = await Promise.all([
+    const [taskResult, noteResult, courseResult, routeResult] = await Promise.all([
       supabase.from("hub_tasks").select("id,title,project_slug,completed,created_at").order("created_at", { ascending: false }).limit(1000),
       supabase.from("hub_notes").select("id,content,created_at").order("created_at", { ascending: false }).limit(100),
       supabase.from("hub_course_progress").select("course_id,status,progress_percent,current_step,next_step,private_note,certificate_url,completed_at,updated_at").order("updated_at", { ascending: false }),
+      supabase.from("hub_app_state").select("payload").eq("app", "university").maybeSingle(),
     ]);
     if (!isCurrent()) return;
     if (taskResult.error || noteResult.error || courseResult.error) throw new Error("sync_failed");
     setTasks((taskResult.data as Task[]) ?? []);
     setNotes(noteResult.data ?? []);
     setCourseProgress((courseResult.data as CourseProgress[]) ?? []);
+    // O resumo de rotas e complementar: se a tabela falhar, o painel some sem
+    // derrubar o carregamento do resto.
+    setRouteSignals(routeResult.error ? null : parseRouteSignals(routeResult.data?.payload));
     } catch {
       if (isCurrent()) setSyncError("Não foi possível sincronizar. Confira a conexão e tente novamente; os dados exibidos podem estar desatualizados.");
     } finally { if (isCurrent()) setSyncing(false); }
@@ -751,7 +759,7 @@ export function Hub() {
         </div>
       </header>
 
-      {activeView === "overview" && <PersonalDashboard tasks={tasks} notes={notes} systemSignals={systemSignals} syncing={syncing} syncError={syncError} onOpen={goTo} onCreate={createActivity} onToggle={toggleTask} onNote={createNote} onRetry={() => void loadWorkspace()} onBackup={downloadHubBackup} />}
+      {activeView === "overview" && <PersonalDashboard tasks={tasks} notes={notes} systemSignals={systemSignals} routeSignals={routeSignals} syncing={syncing} syncError={syncError} onOpen={goTo} onCreate={createActivity} onToggle={toggleTask} onNote={createNote} onRetry={() => void loadWorkspace()} onBackup={downloadHubBackup} />}
       {activeView === "career" && <CoursesResume progress={courseProgress} savingCourseId={savingCourseId ?? certificateBusyId ?? (!localMode && (syncing || syncError) ? "sync" : null)} localOnly={localMode} onUpdate={updateCourseProgress} onAttach={attachCourseCertificate} onDownload={retrieveCourseCertificate} />}
       {activeView === "approvals" && <AccountApprovals token={hubAccessToken} />}
       {activeView === "security" && <section className="security-settings"><p className="eyebrow">CONTA PROPRIETÁRIA</p><h1>Alterar senha do Hub</h1><p>Conta conectada: <strong>{sessionEmail || "Sessão local"}</strong>. Esta ação muda somente a senha principal; dados e aprovações continuam intactos.</p><form onSubmit={changeOwnerPassword}><label>Nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPassword} onChange={(event) => setOwnerPassword(event.target.value)} /></label><label>Confirmar nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPasswordConfirmation} onChange={(event) => setOwnerPasswordConfirmation(event.target.value)} /></label><button className="quick-create" type="submit" disabled={passwordUpdatePending}>{passwordUpdatePending ? "Atualizando…" : "Salvar nova senha"}</button><p role="status" aria-live="polite">{passwordUpdateMessage}</p></form></section>}
