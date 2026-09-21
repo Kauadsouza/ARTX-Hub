@@ -336,3 +336,39 @@ test('cada grupo declara se dá para adiantar hoje, e do que depende', async () 
     if (!grupo.agora) assert.ok(grupo.depende.length > 0, `${grupo.id} não diz do que depende`);
   }
 });
+
+// ══════════════ Anexos ══════════════
+
+test('tamanho do arquivo aparece em unidade legível', async () => {
+  const { formatarTamanho } = await import('../src/lib/anexos.ts');
+  assert.equal(formatarTamanho(512), '512 B');
+  assert.equal(formatarTamanho(2048), '2 KB');
+  assert.equal(formatarTamanho(5 * 1024 * 1024), '5.0 MB');
+  assert.equal(formatarTamanho(0), '0 B');
+});
+
+test('anexos são agrupados pelo documento a que pertencem', async () => {
+  const { porDocumento, espacoUsado } = await import('../src/lib/anexos.ts');
+  const fichas = [
+    { id: 'a1', documentoId: 'base:passaporte', nome: 'p.pdf', tipo: 'application/pdf', tamanho: 1000, adicionadoEm: '2026-09-21T10:00:00Z' },
+    { id: 'a2', documentoId: 'base:passaporte', nome: 'p2.pdf', tipo: 'application/pdf', tamanho: 2000, adicionadoEm: '2026-09-21T11:00:00Z' },
+    { id: 'a3', documentoId: 'base:cpf', nome: 'c.jpg', tipo: 'image/jpeg', tamanho: 500, adicionadoEm: '2026-09-21T12:00:00Z' },
+  ];
+  const mapa = porDocumento(fichas);
+  assert.equal(mapa.get('base:passaporte').length, 2);
+  assert.equal(mapa.get('base:cpf').length, 1);
+  assert.equal(mapa.get('nao-existe'), undefined);
+  assert.equal(espacoUsado(fichas), 3500);
+});
+
+test('espaço usado de lista vazia é zero, não NaN', async () => {
+  const { espacoUsado } = await import('../src/lib/anexos.ts');
+  assert.equal(espacoUsado([]), 0);
+});
+
+test('o limite por arquivo é declarado e é razoável para documento', async () => {
+  const { TAMANHO_MAXIMO, formatarTamanho } = await import('../src/lib/anexos.ts');
+  assert.ok(TAMANHO_MAXIMO >= 10 * 1024 * 1024, 'um PDF escaneado pode passar de 10 MB');
+  assert.ok(TAMANHO_MAXIMO <= 50 * 1024 * 1024, 'acima disso não é documento, é vídeo');
+  assert.equal(formatarTamanho(TAMANHO_MAXIMO), '25.0 MB');
+});

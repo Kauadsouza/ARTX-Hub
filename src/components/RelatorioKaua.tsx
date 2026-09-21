@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Check, Circle, Download, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
+import { AlertTriangle, Check, Circle, Download, Paperclip, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
 
 import {
   CHAVE,
@@ -36,6 +36,17 @@ import {
   type Relatorio,
 } from "@/lib/relatorio";
 import { grupos } from "@/lib/espanha";
+import {
+  baixar,
+  espacoUsado,
+  formatarTamanho,
+  listarFichas,
+  porDocumento,
+  removerAnexo,
+  removerDoDocumento,
+  salvarAnexo,
+  type FichaAnexo,
+} from "@/lib/anexos";
 
 function guardar(relatorio: Relatorio) {
   try {
@@ -62,6 +73,7 @@ export function RelatorioKaua() {
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
   const [novoDoc, setNovoDoc] = useState("");
+  const [fichas, setFichas] = useState<FichaAnexo[]>([]);
 
   // Lê e já limpa o que passou do prazo, guardando o que saiu para contar.
   useEffect(() => {
@@ -74,6 +86,8 @@ export function RelatorioKaua() {
     setSaiu(removidas);
     if (removidas.length > 0 || adicionados > 0) guardar(completo);
     setPronto(true);
+    // Os arquivos vivem em outro cofre (IndexedDB) e são lidos à parte.
+    listarFichas().then(setFichas).catch(() => setFichas([]));
   }, []);
 
   function aplicar(proximo: Relatorio) {
@@ -83,6 +97,7 @@ export function RelatorioKaua() {
 
   const anotacoes = useMemo(() => porUrgencia(relatorio.anotacoes), [relatorio.anotacoes]);
   const progresso = progressoDocumentos(relatorio.documentos);
+  const anexosDe = useMemo(() => porDocumento(fichas), [fichas]);
 
   function adicionarAnotacao(evento: React.FormEvent) {
     evento.preventDefault();
@@ -99,6 +114,33 @@ export function RelatorioKaua() {
     if (!doc) return;
     aplicar({ ...relatorio, documentos: [...relatorio.documentos, doc] });
     setNovoDoc("");
+  }
+
+  async function anexar(documentoId: string, arquivo: File) {
+    try {
+      await salvarAnexo(documentoId, arquivo);
+      setFichas(await listarFichas());
+      setAviso("");
+    } catch (erro) {
+      setAviso(erro instanceof Error ? erro.message : "Não consegui guardar esse arquivo.");
+    }
+  }
+
+  async function tirarAnexo(id: string) {
+    await removerAnexo(id);
+    setFichas(await listarFichas());
+  }
+
+  /**
+   * Apagar o documento leva os arquivos dele junto.
+   *
+   * Sem isto, os bytes ficariam no navegador para sempre, sem nenhuma tela por
+   * onde alcançá-los — ocupando espaço que ninguém consegue liberar.
+   */
+  async function apagarDocumento(id: string) {
+    aplicar(removerDocumento(relatorio, id));
+    await removerDoDocumento(id);
+    setFichas(await listarFichas());
   }
 
   function exportar() {
@@ -297,30 +339,82 @@ export function RelatorioKaua() {
                 )}
 
                 <ul className="relatorio-docs">
-                  {doGrupo.map((doc) => (
-                    <li key={doc.id} className={doc.feito ? "feito" : ""}>
-                      <button
-                        className="relatorio-marcar"
-                        onClick={() =>
-                          aplicar({
-                            ...relatorio,
-                            documentos: relatorio.documentos.map((d) => (d.id === doc.id ? alternarDocumento(d) : d)),
-                          })
-                        }
-                        aria-pressed={doc.feito}
-                      >
-                        {doc.feito ? <Check size={16} /> : <Circle size={16} />}
-                        <span>{doc.nome}</span>
-                      </button>
-                      <button
-                        className="relatorio-apagar"
-                        onClick={() => aplicar(removerDocumento(relatorio, doc.id))}
-                        aria-label={`Remover ${doc.nome}`}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </li>
-                  ))}
+                  {doGrupo.map((doc) => {
+                    const anexos = anexosDe.get(doc.id) ?? [];
+                    return (
+                      <li key={doc.id} className={doc.feito ? "feito" : ""}>
+                        <div className="relatorio-doc-linha">
+                          <button
+                            className="relatorio-marcar"
+                            onClick={() =>
+                              aplicar({
+                                ...relatorio,
+                                documentos: relatorio.documentos.map((d) =>
+                                  d.id === doc.id ? alternarDocumento(d) : d,
+                                ),
+                              })
+                            }
+                            aria-pressed={doc.feito}
+                          >
+                            {doc.feito ? <Check size={16} /> : <Circle size={16} />}
+                            <span>{doc.nome}</span>
+                          </button>
+
+                          {anexos.length > 0 && <span className="relatorio-conta-anexo">{anexos.length}</span>}
+
+                          <label className="relatorio-anexar" title={`Anexar arquivo a "${doc.nome}"`}>
+                            <Paperclip size={14} />
+                            <span className="sr-only">Anexar arquivo a {doc.nome}</span>
+                            <input
+                              type="file"
+                              hidden
+                              onChange={(evento) => {
+                                const escolhido = evento.target.files?.[0];
+                                if (escolhido) void anexar(doc.id, escolhido);
+                                evento.target.value = "";
+                              }}
+                            />
+                          </label>
+
+                          <button
+                            className="relatorio-apagar"
+                            onClick={() => void apagarDocumento(doc.id)}
+                            aria-label={`Remover ${doc.nome}`}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+
+                        {anexos.length > 0 && (
+                          <ul className="relatorio-anexos">
+                            {anexos.map((ficha) => (
+                              <li key={ficha.id}>
+                                <button
+                                  className="relatorio-baixar"
+                                  onClick={() =>
+                                    void baixar(ficha.id).then((achou) => {
+                                      if (!achou) setAviso("Esse arquivo não está mais guardado aqui.");
+                                    })
+                                  }
+                                >
+                                  <Download size={12} />
+                                  <span>{ficha.nome}</span>
+                                  <small>{formatarTamanho(ficha.tamanho)}</small>
+                                </button>
+                                <button
+                                  className="relatorio-apagar"
+                                  onClick={() => void tirarAnexo(ficha.id)}
+                                  aria-label={`Remover o arquivo ${ficha.nome}`}
+                                >
+                                  <X size={12} />
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             );
@@ -328,10 +422,20 @@ export function RelatorioKaua() {
         </section>
       </div>
 
-      <p className="relatorio-rodape">
-        Isto vive só neste navegador — sem conta e sem servidor, como você pediu. Limpar os dados do site apaga tudo,
-        então exporte de vez em quando.
-      </p>
+      <footer className="relatorio-rodape">
+        <p>
+          Isto vive só neste navegador — sem conta e sem servidor, como você pediu. Limpar os dados do site apaga
+          tudo, inclusive os arquivos anexados.
+        </p>
+        {fichas.length > 0 && (
+          <p className="relatorio-espaco">
+            <Paperclip size={12} /> {fichas.length} arquivo{fichas.length > 1 ? "s" : ""} guardado
+            {fichas.length > 1 ? "s" : ""} · {formatarTamanho(espacoUsado(fichas))}.{" "}
+            <strong>O exportar leva a checklist e as anotações, não os arquivos</strong> — para esses, use o botão de
+            baixar em cada um e guarde a cópia onde você quiser.
+          </p>
+        )}
+      </footer>
 
       {aviso && (
         <p className="relatorio-aviso" role="status">

@@ -581,3 +581,21 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 .relatorio-depende{list-style:none;margin:0 0 4px;padding:0;display:grid;gap:5px}
 .relatorio-depende li{position:relative;padding-left:16px;color:var(--muted);font-size:11.5px;line-height:1.6}
 .relatorio-depende li::before{content:"";position:absolute;left:4px;top:8px;width:4px;height:4px;border-radius:50%;background:#dfb87c}
+
+/* Anexos por documento. */
+.relatorio-doc-linha{display:flex;align-items:center;gap:6px;width:100%}
+.relatorio-conta-anexo{flex-shrink:0;display:grid;place-items:center;min-width:19px;height:19px;padding:0 6px;border-radius:30px;background:#1c3327;color:#8fd9b0;font-size:10.5px;font-weight:700}
+.relatorio-anexar{flex-shrink:0;display:grid;place-items:center;width:30px;height:30px;border:1px solid transparent;border-radius:8px;color:var(--subtle);cursor:pointer}
+.relatorio-anexar:hover{border-color:var(--line-strong);color:var(--text)}
+.relatorio-anexos{list-style:none;margin:2px 0 10px;padding:0 0 0 27px;display:grid;gap:4px}
+.relatorio-anexos>li{display:flex;align-items:center;gap:5px}
+.relatorio-baixar{display:flex;align-items:center;gap:8px;flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--muted);font-size:11.5px;text-align:left;cursor:pointer}
+.relatorio-baixar:hover{border-color:var(--mint);color:var(--text)}
+.relatorio-baixar>svg{flex-shrink:0}
+.relatorio-baixar>span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.relatorio-baixar>small{flex-shrink:0;color:var(--subtle);font-size:10px}
+.relatorio-rodape{margin-top:22px;display:grid;gap:9px}
+.relatorio-rodape p{margin:0;color:var(--subtle);font-size:11.5px;line-height:1.7;max-width:84ch}
+.relatorio-espaco{display:flex;align-items:flex-start;gap:7px}
+.relatorio-espaco>svg{flex-shrink:0;margin-top:3px}
+.relatorio-espaco strong{color:var(--muted)}
