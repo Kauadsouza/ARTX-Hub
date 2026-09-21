@@ -93,7 +93,23 @@ export function grupoPorId(id: GrupoId): Grupo {
  * Sobe a versão quando itens novos entram. Subir não ressuscita o que o Kauã
  * apagou: os dispensados ficam guardados no relatório dele.
  */
-export const SEMENTE_VERSAO = 1;
+export const SEMENTE_VERSAO = 2;
+
+/**
+ * Itens renomeados entre versões da semente.
+ *
+ * O id nasce do nome, e o id é a chave dos anexos. Se um item mudasse de nome
+ * e ganhasse id novo, os arquivos que já estivessem presos a ele ficariam
+ * órfãos — guardados no navegador, sem nenhuma tela por onde alcançá-los. Por
+ * isso o nome muda no lugar, e o id continua o mesmo.
+ */
+export const renomeados: Array<{ id: string; nome: string; nota?: string }> = [
+  {
+    id: "estudante:comprovacao-de-recursos-financeiros-suficientes",
+    nome: "Comprovante de recursos financeiros",
+    nota: "Pelos meses que o consulado exigir. Confirme lá o período e o valor.",
+  },
+];
 
 export const semente: Array<{ grupo: GrupoId; nome: string }> = [
   // ── Pessoais, válidos para qualquer caminho ──────────────────────────
@@ -120,7 +136,7 @@ export const semente: Array<{ grupo: GrupoId; nome: string }> = [
   { grupo: "estudante", nome: "Fotografia recente no padrão exigido" },
   { grupo: "estudante", nome: "Carta de admissão de instituição ou curso elegível" },
   { grupo: "estudante", nome: "Comprovante de matrícula ou pagamento, quando exigido" },
-  { grupo: "estudante", nome: "Comprovação de recursos financeiros suficientes" },
+  { grupo: "estudante", nome: "Comprovante de recursos financeiros" },
   { grupo: "estudante", nome: "Seguro de saúde válido na Espanha" },
   { grupo: "estudante", nome: "Comprovante de alojamento, se solicitado" },
   { grupo: "estudante", nome: "Atestado médico, quando exigido" },

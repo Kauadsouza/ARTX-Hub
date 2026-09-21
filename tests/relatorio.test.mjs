@@ -372,3 +372,90 @@ test('o limite por arquivo é declarado e é razoável para documento', async ()
   assert.ok(TAMANHO_MAXIMO <= 50 * 1024 * 1024, 'acima disso não é documento, é vídeo');
   assert.equal(formatarTamanho(TAMANHO_MAXIMO), '25.0 MB');
 });
+
+// ══════════════ Validade dos documentos ══════════════
+
+test('documento sem prazo não inventa vencimento', async () => {
+  const { criarDocumento, estadoValidade, diasParaVencer } = await import('../src/lib/relatorio.ts');
+  const d = criarDocumento('Passaporte');
+  assert.equal(d.validade, null);
+  assert.equal(diasParaVencer(d), null);
+  assert.equal(estadoValidade(d), 'sem-prazo');
+});
+
+test('a validade conta dias de calendário, como o resto', async () => {
+  const { criarDocumento, definirValidade, diasParaVencer } = await import('../src/lib/relatorio.ts');
+  const d = definirValidade(criarDocumento('Antecedentes'), '2026-12-25');
+  assert.equal(diasParaVencer(d, meioDia('2026-12-25')), 0, 'vence hoje é zero');
+  assert.equal(diasParaVencer(d, new Date('2026-12-25T23:00:00')), 0, 'a hora não muda o dia');
+  assert.equal(diasParaVencer(d, meioDia('2026-12-24')), 1);
+  assert.equal(diasParaVencer(d, meioDia('2026-12-26')), -1);
+});
+
+test('os três estados aparecem na hora certa', async () => {
+  const { criarDocumento, definirValidade, estadoValidade, AVISO_DE_VENCIMENTO } = await import('../src/lib/relatorio.ts');
+  const d = definirValidade(criarDocumento('Certidão'), '2026-12-25');
+  assert.equal(estadoValidade(d, meioDia('2026-06-01')), 'em-dia');
+  assert.equal(estadoValidade(d, meioDia('2026-12-25')), 'vencendo', 'o dia do vencimento ainda é aviso, não vencido');
+  assert.equal(estadoValidade(d, meioDia('2026-12-26')), 'vencido');
+
+  // Um dia antes da janela de aviso ainda é "em dia".
+  const limite = new Date(2026, 11, 25);
+  limite.setDate(limite.getDate() - AVISO_DE_VENCIMENTO - 1);
+  assert.equal(estadoValidade(d, limite), 'em-dia');
+});
+
+test('limpar o campo de data volta a ser sem prazo', async () => {
+  const { criarDocumento, definirValidade, estadoValidade } = await import('../src/lib/relatorio.ts');
+  const d = definirValidade(criarDocumento('x'), '2026-12-25');
+  assert.equal(definirValidade(d, '').validade, null);
+  assert.equal(definirValidade(d, null).validade, null);
+  assert.equal(estadoValidade(definirValidade(d, '')), 'sem-prazo');
+});
+
+test('documento vencido continua marcado: desmarcar sozinho seria reescrever o que ele registrou', async () => {
+  const { criarDocumento, definirValidade, alternarDocumento, estadoValidade } = await import('../src/lib/relatorio.ts');
+  const d = definirValidade(alternarDocumento(criarDocumento('Antecedentes')), '2026-01-01');
+  assert.equal(d.feito, true);
+  assert.equal(estadoValidade(d, meioDia('2026-09-21')), 'vencido');
+  assert.equal(d.feito, true, 'o estado de validade não pode mexer no que foi marcado');
+});
+
+test('os que precisam de atenção vêm dos mais urgentes para os menos', async () => {
+  const { criarDocumento, definirValidade, precisamAtencao } = await import('../src/lib/relatorio.ts');
+  const agora = meioDia('2026-09-21');
+  const lista = [
+    definirValidade(criarDocumento('tranquilo'), '2027-06-01'),
+    definirValidade(criarDocumento('vencendo'), '2026-10-05'),
+    definirValidade(criarDocumento('vencido'), '2026-08-01'),
+    criarDocumento('sem prazo'),
+  ];
+  assert.deepEqual(
+    precisamAtencao(lista, agora).map((d) => d.nome),
+    ['vencido', 'vencendo'],
+  );
+});
+
+// ══════════════ Renomear sem orfanar anexo ══════════════
+
+test('item renomeado mantém o id, porque o id é a chave dos anexos', async () => {
+  const { semear, relatorioVazio, alternarDocumento } = await import('../src/lib/relatorio.ts');
+  const { renomeados } = await import('../src/lib/espanha.ts');
+  assert.ok(renomeados.length > 0);
+
+  // Semeia na versão antiga, com o nome antigo.
+  const antigo = {
+    ...relatorioVazio(),
+    documentos: [{ id: renomeados[0].id, nome: 'Nome antigo', nota: '', feito: false, feitoEm: null, grupo: 'estudante', validade: null }],
+    sementeVersao: 1,
+  };
+  // Marca como feito, como se ele já tivesse resolvido e anexado algo.
+  antigo.documentos[0] = alternarDocumento(antigo.documentos[0]);
+
+  const { relatorio } = semear(antigo);
+  const item = relatorio.documentos.find((d) => d.id === renomeados[0].id);
+  assert.ok(item, 'o id tem que sobreviver, senão os anexos ficam órfãos');
+  assert.equal(item.nome, renomeados[0].nome);
+  assert.equal(item.feito, true, 'renomear não desmarca');
+  assert.equal(relatorio.documentos.filter((d) => d.nome === renomeados[0].nome).length, 1, 'não pode duplicar');
+});

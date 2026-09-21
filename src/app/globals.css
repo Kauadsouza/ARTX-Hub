@@ -599,3 +599,15 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 .relatorio-espaco{display:flex;align-items:flex-start;gap:7px}
 .relatorio-espaco>svg{flex-shrink:0;margin-top:3px}
 .relatorio-espaco strong{color:var(--muted)}
+
+/* Validade por documento. Quem preenche é o Kauã: eu não sei o prazo de cada um. */
+.relatorio-atencao{display:flex;align-items:flex-start;gap:11px;margin-bottom:14px;padding:13px 16px;border:1px solid #936b37;border-radius:12px;background:#302419;color:#f3d8b3}
+.relatorio-atencao>svg{flex-shrink:0;margin-top:2px}
+.relatorio-atencao strong{display:block;font-size:13px}
+.relatorio-atencao small{display:block;margin-top:5px;color:#c8a878;font-size:11.5px;line-height:1.55;overflow-wrap:anywhere}
+.relatorio-validade{position:relative;flex-shrink:0;display:grid;place-items:center;width:30px;height:30px;border:1px solid transparent;border-radius:8px;color:var(--subtle);cursor:pointer}
+.relatorio-validade:hover{border-color:var(--line-strong);color:var(--text)}
+.relatorio-validade input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.relatorio-validade.em-dia{color:#8fd9b0}
+.relatorio-validade.vencendo{color:#dfb87c;border-color:#5a4426}
+.relatorio-validade.vencido{color:#ef8c80;border-color:#5a2f2b;background:#2a1a18}

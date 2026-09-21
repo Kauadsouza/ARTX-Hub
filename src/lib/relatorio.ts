@@ -22,7 +22,7 @@
  *      anotação ainda importa no sexto dia, um clique devolve a semana.
  */
 
-import { SEMENTE_VERSAO, grupos, idDaSemente, semente, type GrupoId } from "./espanha.ts";
+import { SEMENTE_VERSAO, grupos, idDaSemente, renomeados, semente, type GrupoId } from "./espanha.ts";
 
 export const DIAS_DE_VIDA = 7;
 
@@ -46,7 +46,60 @@ export type Documento = {
   /** Quando foi marcado como feito, para você saber desde quando está pronto. */
   feitoEm: string | null;
   grupo: GrupoId;
+  /**
+   * Até quando este documento vale (AAAA-MM-DD), quando tiver prazo.
+   *
+   * Quem preenche é você. Antecedentes criminais e certidões costumam precisar
+   * ser recentes, mas o prazo varia por consulado e por documento — eu não sei
+   * qual é, e chutar aqui seria pior que deixar em branco.
+   */
+  validade: string | null;
 };
+
+/** Aviso a partir daqui. Um mês dá tempo de tirar segunda via. */
+export const AVISO_DE_VENCIMENTO = 30;
+
+export type EstadoValidade = "sem-prazo" | "em-dia" | "vencendo" | "vencido";
+
+/** Dias de calendário até vencer. Null quando o documento não tem prazo. */
+export function diasParaVencer(documento: Documento, agora = new Date()): number | null {
+  if (!documento.validade) return null;
+  const [ano, mes, dia] = documento.validade.split("-").map(Number);
+  if (!ano || !mes || !dia) return null;
+  const fim = Date.UTC(ano, mes - 1, dia);
+  const hoje = Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  return Math.round((fim - hoje) / 86_400_000);
+}
+
+/**
+ * Em que pé está a validade.
+ *
+ * Um documento vencido continua marcado como feito: você realmente o tirou, e
+ * desmarcar sozinho seria reescrever o que você registrou. O que muda é o
+ * alerta na tela — a decisão de renovar é sua.
+ */
+export function estadoValidade(documento: Documento, agora = new Date()): EstadoValidade {
+  const dias = diasParaVencer(documento, agora);
+  if (dias === null) return "sem-prazo";
+  if (dias < 0) return "vencido";
+  if (dias <= AVISO_DE_VENCIMENTO) return "vencendo";
+  return "em-dia";
+}
+
+export function definirValidade(documento: Documento, validade: string | null): Documento {
+  // String vazia vinda de um campo de data limpo significa "sem prazo".
+  return { ...documento, validade: validade && validade.trim() ? validade : null };
+}
+
+/** Os que precisam de atenção, dos mais urgentes para os menos. */
+export function precisamAtencao(documentos: Documento[], agora = new Date()): Documento[] {
+  return documentos
+    .filter((item) => {
+      const estado = estadoValidade(item, agora);
+      return estado === "vencido" || estado === "vencendo";
+    })
+    .sort((a, b) => (diasParaVencer(a, agora) ?? 0) - (diasParaVencer(b, agora) ?? 0));
+}
 
 export type Relatorio = {
   version: 1;
@@ -149,7 +202,7 @@ export function porUrgencia(anotacoes: Anotacao[], agora = new Date()): Anotacao
 export function criarDocumento(nome: string, nota = "", grupo: GrupoId = "meus"): Documento | null {
   const texto = nome.trim();
   if (!texto) return null;
-  return { id: novoId(), nome: texto.slice(0, 200), nota: nota.trim().slice(0, 1000), feito: false, feitoEm: null, grupo };
+  return { id: novoId(), nome: texto.slice(0, 200), nota: nota.trim().slice(0, 1000), feito: false, feitoEm: null, grupo, validade: null };
 }
 
 export function alternarDocumento(documento: Documento, agora = new Date()): Documento {
@@ -177,18 +230,28 @@ export function progressoDocumentos(documentos: Documento[]): { feitos: number; 
 export function semear(relatorio: Relatorio): { relatorio: Relatorio; adicionados: number } {
   if (relatorio.sementeVersao >= SEMENTE_VERSAO) return { relatorio, adicionados: 0 };
 
-  const existentes = new Set(relatorio.documentos.map((item) => item.id));
+  // Renomear vem antes de acrescentar: o item renomeado já existe, e se o novo
+  // nome fosse tratado como item novo a lista ficaria com os dois.
+  const atuais = relatorio.documentos.map((item) => {
+    const troca = renomeados.find((r) => r.id === item.id);
+    if (!troca) return item;
+    return { ...item, nome: troca.nome, nota: troca.nota ?? item.nota };
+  });
+
+  const existentes = new Set(atuais.map((item) => item.id));
   const dispensados = new Set(relatorio.dispensados);
   const novos: Documento[] = [];
 
   for (const item of semente) {
     const id = idDaSemente(item.grupo, item.nome);
     if (existentes.has(id) || dispensados.has(id)) continue;
-    novos.push({ id, nome: item.nome, nota: "", feito: false, feitoEm: null, grupo: item.grupo });
+    // Um item que só mudou de nome já foi tratado acima e não entra de novo.
+    if (renomeados.some((r) => r.nome === item.nome && existentes.has(r.id))) continue;
+    novos.push({ id, nome: item.nome, nota: "", feito: false, feitoEm: null, grupo: item.grupo, validade: null });
   }
 
   return {
-    relatorio: { ...relatorio, documentos: [...relatorio.documentos, ...novos], sementeVersao: SEMENTE_VERSAO },
+    relatorio: { ...relatorio, documentos: [...atuais, ...novos], sementeVersao: SEMENTE_VERSAO },
     adicionados: novos.length,
   };
 }
@@ -258,6 +321,7 @@ function ehDocumento(valor: unknown): valor is Documento {
   // Documento guardado antes dos grupos existirem cai em "meus" em vez de
   // sumir da tela por não ter um campo que ainda não havia.
   if (typeof d.grupo !== "string") d.grupo = "meus";
+  if (typeof d.validade !== "string") d.validade = null;
   return true;
 }
 

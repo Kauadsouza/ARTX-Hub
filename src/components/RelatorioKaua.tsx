@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Check, Circle, Download, Paperclip, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, Circle, Download, Paperclip, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
 
 import {
   CHAVE,
@@ -27,6 +27,10 @@ import {
   ler,
   porUrgencia,
   progressoDocumentos,
+  definirValidade,
+  diasParaVencer,
+  estadoValidade,
+  precisamAtencao,
   relatorioVazio,
   removerDocumento,
   renovar,
@@ -98,6 +102,7 @@ export function RelatorioKaua() {
   const anotacoes = useMemo(() => porUrgencia(relatorio.anotacoes), [relatorio.anotacoes]);
   const progresso = progressoDocumentos(relatorio.documentos);
   const anexosDe = useMemo(() => porDocumento(fichas), [fichas]);
+  const atencao = useMemo(() => precisamAtencao(relatorio.documentos), [relatorio.documentos]);
 
   function adicionarAnotacao(evento: React.FormEvent) {
     evento.preventDefault();
@@ -290,6 +295,26 @@ export function RelatorioKaua() {
             </span>
           </div>
 
+          {atencao.length > 0 && (
+            <div className="relatorio-atencao" role="status">
+              <CalendarClock size={15} />
+              <div>
+                <strong>
+                  {atencao.length} documento{atencao.length > 1 ? "s" : ""} pedindo atenção
+                </strong>
+                <small>
+                  {atencao
+                    .map((doc) => {
+                      const dias = diasParaVencer(doc);
+                      if (dias === null) return doc.nome;
+                      return `${doc.nome} — ${dias < 0 ? `venceu há ${Math.abs(dias)} dia${Math.abs(dias) > 1 ? "s" : ""}` : dias === 0 ? "vence hoje" : `${dias} dia${dias > 1 ? "s" : ""}`}`;
+                    })
+                    .join(" · ")}
+                </small>
+              </div>
+            </div>
+          )}
+
           <p className="relatorio-origem">
             Lista trazida por você, não conferida por mim. Os requisitos mudam por consulado, por curso e por
             categoria de vaga — confirme a lista vigente no Consulado-Geral da Espanha antes de pagar tradução,
@@ -361,6 +386,26 @@ export function RelatorioKaua() {
                           </button>
 
                           {anexos.length > 0 && <span className="relatorio-conta-anexo">{anexos.length}</span>}
+
+                          <label
+                            className={`relatorio-validade ${estadoValidade(doc)}`}
+                            title={doc.validade ? `Vale até ${doc.validade}` : "Definir até quando este documento vale"}
+                          >
+                            <CalendarClock size={14} />
+                            <span className="sr-only">Validade de {doc.nome}</span>
+                            <input
+                              type="date"
+                              value={doc.validade ?? ""}
+                              onChange={(evento) =>
+                                aplicar({
+                                  ...relatorio,
+                                  documentos: relatorio.documentos.map((d) =>
+                                    d.id === doc.id ? definirValidade(d, evento.target.value) : d,
+                                  ),
+                                })
+                              }
+                            />
+                          </label>
 
                           <label className="relatorio-anexar" title={`Anexar arquivo a "${doc.nome}"`}>
                             <Paperclip size={14} />
