@@ -22,6 +22,8 @@
  *      anotação ainda importa no sexto dia, um clique devolve a semana.
  */
 
+import { SEMENTE_VERSAO, grupos, idDaSemente, semente, type GrupoId } from "./espanha.ts";
+
 export const DIAS_DE_VIDA = 7;
 
 export type Anotacao = {
@@ -43,16 +45,21 @@ export type Documento = {
   feito: boolean;
   /** Quando foi marcado como feito, para você saber desde quando está pronto. */
   feitoEm: string | null;
+  grupo: GrupoId;
 };
 
 export type Relatorio = {
   version: 1;
   anotacoes: Anotacao[];
   documentos: Documento[];
+  /** Até que versão da lista da Espanha já foi semeada aqui. */
+  sementeVersao: number;
+  /** Itens da semente que o Kauã apagou. Semear de novo não os traz de volta. */
+  dispensados: string[];
 };
 
 export function relatorioVazio(): Relatorio {
-  return { version: 1, anotacoes: [], documentos: [] };
+  return { version: 1, anotacoes: [], documentos: [], sementeVersao: 0, dispensados: [] };
 }
 
 /** Data local em AAAA-MM-DD. Não usa ISO/UTC: o dia é o do relógio daqui. */
@@ -139,10 +146,10 @@ export function porUrgencia(anotacoes: Anotacao[], agora = new Date()): Anotacao
 
 /* ── Documentos ────────────────────────────────────────────────────────── */
 
-export function criarDocumento(nome: string, nota = ""): Documento | null {
+export function criarDocumento(nome: string, nota = "", grupo: GrupoId = "meus"): Documento | null {
   const texto = nome.trim();
   if (!texto) return null;
-  return { id: novoId(), nome: texto.slice(0, 200), nota: nota.trim().slice(0, 1000), feito: false, feitoEm: null };
+  return { id: novoId(), nome: texto.slice(0, 200), nota: nota.trim().slice(0, 1000), feito: false, feitoEm: null, grupo };
 }
 
 export function alternarDocumento(documento: Documento, agora = new Date()): Documento {
@@ -153,6 +160,65 @@ export function alternarDocumento(documento: Documento, agora = new Date()): Doc
 export function progressoDocumentos(documentos: Documento[]): { feitos: number; total: number; fracao: number } {
   const feitos = documentos.filter((item) => item.feito).length;
   return { feitos, total: documentos.length, fracao: documentos.length ? feitos / documentos.length : 0 };
+}
+
+/**
+ * Põe a lista da Espanha no relatório, sem atropelar nada.
+ *
+ * Três regras, todas pela mesma razão — o que o Kauã fez aqui vale mais que a
+ * lista de origem:
+ *
+ *   1. Item que já existe não é duplicado nem reescrito. O id vem do grupo e do
+ *      nome, então ele é o mesmo em qualquer aparelho e em qualquer execução.
+ *   2. Item que ele apagou não volta. Fica registrado em `dispensados`, e nem
+ *      uma versão nova da semente o traz de novo.
+ *   3. Semear duas vezes não muda nada na segunda.
+ */
+export function semear(relatorio: Relatorio): { relatorio: Relatorio; adicionados: number } {
+  if (relatorio.sementeVersao >= SEMENTE_VERSAO) return { relatorio, adicionados: 0 };
+
+  const existentes = new Set(relatorio.documentos.map((item) => item.id));
+  const dispensados = new Set(relatorio.dispensados);
+  const novos: Documento[] = [];
+
+  for (const item of semente) {
+    const id = idDaSemente(item.grupo, item.nome);
+    if (existentes.has(id) || dispensados.has(id)) continue;
+    novos.push({ id, nome: item.nome, nota: "", feito: false, feitoEm: null, grupo: item.grupo });
+  }
+
+  return {
+    relatorio: { ...relatorio, documentos: [...relatorio.documentos, ...novos], sementeVersao: SEMENTE_VERSAO },
+    adicionados: novos.length,
+  };
+}
+
+/**
+ * Remove um documento. Se veio da semente, anota para não voltar.
+ *
+ * Sem isto, apagar um item seria inútil: a próxima versão da lista o traria de
+ * volta, e a pessoa teria que apagar de novo.
+ */
+export function removerDocumento(relatorio: Relatorio, id: string): Relatorio {
+  const daSemente = id.includes(":");
+  return {
+    ...relatorio,
+    documentos: relatorio.documentos.filter((item) => item.id !== id),
+    dispensados: daSemente && !relatorio.dispensados.includes(id) ? [...relatorio.dispensados, id] : relatorio.dispensados,
+  };
+}
+
+/** Os documentos de um grupo, na ordem em que entraram. */
+export function documentosDoGrupo(relatorio: Relatorio, grupo: GrupoId): Documento[] {
+  return relatorio.documentos.filter((item) => item.grupo === grupo);
+}
+
+/** Quais grupos têm ao menos um documento, na ordem definida em espanha.ts. */
+export function gruposComDocumentos(relatorio: Relatorio): GrupoId[] {
+  const presentes = new Set(relatorio.documentos.map((item) => item.grupo));
+  return [...presentes].sort(
+    (a, b) => grupos.findIndex((g) => g.id === a) - grupos.findIndex((g) => g.id === b),
+  );
 }
 
 /* ── Guardar e ler ─────────────────────────────────────────────────────── */
@@ -166,10 +232,13 @@ export function ler(bruto: string | null): Relatorio {
     const dados = JSON.parse(bruto) as unknown;
     if (!dados || typeof dados !== "object") return relatorioVazio();
     const { anotacoes, documentos } = dados as { anotacoes?: unknown; documentos?: unknown };
+    const { sementeVersao, dispensados } = dados as { sementeVersao?: unknown; dispensados?: unknown };
     return {
       version: 1,
       anotacoes: Array.isArray(anotacoes) ? anotacoes.filter(ehAnotacao) : [],
       documentos: Array.isArray(documentos) ? documentos.filter(ehDocumento) : [],
+      sementeVersao: typeof sementeVersao === "number" ? sementeVersao : 0,
+      dispensados: Array.isArray(dispensados) ? dispensados.filter((item): item is string => typeof item === "string") : [],
     };
   } catch {
     return relatorioVazio();
@@ -185,7 +254,11 @@ function ehAnotacao(valor: unknown): valor is Anotacao {
 function ehDocumento(valor: unknown): valor is Documento {
   if (!valor || typeof valor !== "object") return false;
   const d = valor as Partial<Documento>;
-  return typeof d.id === "string" && typeof d.nome === "string" && typeof d.feito === "boolean";
+  if (typeof d.id !== "string" || typeof d.nome !== "string" || typeof d.feito !== "boolean") return false;
+  // Documento guardado antes dos grupos existirem cai em "meus" em vez de
+  // sumir da tela por não ter um campo que ainda não havia.
+  if (typeof d.grupo !== "string") d.grupo = "meus";
+  return true;
 }
 
 /**
@@ -215,5 +288,17 @@ export function unir(atual: Relatorio, importado: Relatorio): { relatorio: Relat
     }
   }
 
-  return { relatorio: { version: 1, anotacoes: [...anotacoes.values()], documentos: [...documentos.values()] }, novas };
+  return {
+    relatorio: {
+      version: 1,
+      anotacoes: [...anotacoes.values()],
+      documentos: [...documentos.values()],
+      // Fica a maior das duas versões: semear de novo o que o arquivo já tinha
+      // não acrescentaria nada, e os dispensados dos dois lados se somam para
+      // que nenhum item apagado volte por causa de um import.
+      sementeVersao: Math.max(atual.sementeVersao, importado.sementeVersao),
+      dispensados: [...new Set([...atual.dispensados, ...importado.dispensados])],
+    },
+    novas,
+  };
 }

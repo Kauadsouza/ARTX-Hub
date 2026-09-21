@@ -567,3 +567,17 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 
 @media(max-width:900px){.relatorio-grade{grid-template-columns:1fr}}
 @media(max-width:560px){.relatorio-bloco{padding:17px}.relatorio-acoes{width:100%}.relatorio-acoes>button,.relatorio-importar{flex:1;justify-content:center}}
+
+/* Documentos agrupados por caminho de visto. */
+.relatorio-origem{margin:0 0 16px;padding:12px 15px;border-radius:11px;background:var(--bg);color:var(--muted);font-size:11.5px;line-height:1.65}
+.relatorio-grupo{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+.relatorio-grupo:first-of-type{margin-top:18px}
+.relatorio-grupo>header{display:flex;align-items:flex-start;justify-content:space-between;gap:13px;margin-bottom:12px}
+.relatorio-grupo h3{font-size:15px;letter-spacing:-.3px}
+.relatorio-grupo>header p{margin:5px 0 0;color:var(--muted);font-size:11.5px;line-height:1.6;max-width:62ch}
+.relatorio-quando{flex-shrink:0;padding:4px 10px;border-radius:30px;font-size:10px;font-weight:600;white-space:nowrap}
+.relatorio-quando.ja{background:#1c3327;color:#8fd9b0}
+.relatorio-quando.depois{background:#332a1a;color:#dfb87c}
+.relatorio-depende{list-style:none;margin:0 0 4px;padding:0;display:grid;gap:5px}
+.relatorio-depende li{position:relative;padding-left:16px;color:var(--muted);font-size:11.5px;line-height:1.6}
+.relatorio-depende li::before{content:"";position:absolute;left:4px;top:8px;width:4px;height:4px;border-radius:50%;background:#dfb87c}

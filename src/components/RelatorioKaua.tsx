@@ -28,11 +28,14 @@ import {
   porUrgencia,
   progressoDocumentos,
   relatorioVazio,
+  removerDocumento,
   renovar,
+  semear,
   unir,
   type Anotacao,
   type Relatorio,
 } from "@/lib/relatorio";
+import { grupos } from "@/lib/espanha";
 
 function guardar(relatorio: Relatorio) {
   try {
@@ -64,9 +67,12 @@ export function RelatorioKaua() {
   useEffect(() => {
     const lido = ler(typeof window === "undefined" ? null : localStorage.getItem(CHAVE));
     const { relatorio: limpo, removidas } = expurgar(lido);
-    setRelatorio(limpo);
+    // A lista da Espanha entra aqui na primeira abertura. Semear não toca no
+    // que já existe nem traz de volta o que foi apagado.
+    const { relatorio: completo, adicionados } = semear(limpo);
+    setRelatorio(completo);
     setSaiu(removidas);
-    if (removidas.length > 0) guardar(limpo);
+    if (removidas.length > 0 || adicionados > 0) guardar(completo);
     setPronto(true);
   }, []);
 
@@ -237,25 +243,23 @@ export function RelatorioKaua() {
         <section className="relatorio-bloco">
           <div className="relatorio-cabeca">
             <h2>Documentos · Espanha</h2>
-            {progresso.total > 0 && (
-              <span className="relatorio-regra">
-                {progresso.feitos} de {progresso.total}
-              </span>
-            )}
+            <span className="relatorio-regra">
+              {progresso.feitos} de {progresso.total}
+            </span>
           </div>
 
-          {progresso.total > 0 && (
-            <div className="relatorio-barra" role="img" aria-label={`${Math.round(progresso.fracao * 100)}% pronto`}>
-              <span style={{ width: `${progresso.fracao * 100}%` }} />
-            </div>
-          )}
+          <p className="relatorio-origem">
+            Lista trazida por você, não conferida por mim. Os requisitos mudam por consulado, por curso e por
+            categoria de vaga — confirme a lista vigente no Consulado-Geral da Espanha antes de pagar tradução,
+            apostila ou taxa.
+          </p>
 
           <form className="relatorio-form linha" onSubmit={adicionarDocumento}>
             <input
               value={novoDoc}
               onChange={(evento) => setNovoDoc(evento.target.value)}
               maxLength={200}
-              placeholder="Qual documento?"
+              placeholder="Acrescentar um documento"
               aria-label="Nome do documento"
             />
             <button type="submit" disabled={!novoDoc.trim()}>
@@ -263,41 +267,64 @@ export function RelatorioKaua() {
             </button>
           </form>
 
-          {relatorio.documentos.length === 0 ? (
-            <p className="relatorio-vazio">
-              A lista está vazia. Vá acrescentando conforme descobrir o que precisa — ou me mande a lista que eu
-              coloco de uma vez.
-            </p>
-          ) : (
-            <ul className="relatorio-docs">
-              {relatorio.documentos.map((doc) => (
-                <li key={doc.id} className={doc.feito ? "feito" : ""}>
-                  <button
-                    className="relatorio-marcar"
-                    onClick={() =>
-                      aplicar({
-                        ...relatorio,
-                        documentos: relatorio.documentos.map((d) => (d.id === doc.id ? alternarDocumento(d) : d)),
-                      })
-                    }
-                    aria-pressed={doc.feito}
-                  >
-                    {doc.feito ? <Check size={16} /> : <Circle size={16} />}
-                    <span>{doc.nome}</span>
-                  </button>
-                  <button
-                    className="relatorio-apagar"
-                    onClick={() =>
-                      aplicar({ ...relatorio, documentos: relatorio.documentos.filter((d) => d.id !== doc.id) })
-                    }
-                    aria-label={`Remover ${doc.nome}`}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          {grupos.map((grupo) => {
+            const doGrupo = relatorio.documentos.filter((item) => item.grupo === grupo.id);
+            if (doGrupo.length === 0) return null;
+            const p = progressoDocumentos(doGrupo);
+
+            return (
+              <section key={grupo.id} className="relatorio-grupo">
+                <header>
+                  <div>
+                    <h3>{grupo.titulo}</h3>
+                    <p>{grupo.resumo}</p>
+                  </div>
+                  <span className={`relatorio-quando ${grupo.agora ? "ja" : "depois"}`}>
+                    {grupo.agora ? "dá para fazer agora" : "depende de uma oportunidade"}
+                  </span>
+                </header>
+
+                <div className="relatorio-barra" role="img" aria-label={`${p.feitos} de ${p.total}`}>
+                  <span style={{ width: `${p.fracao * 100}%` }} />
+                </div>
+
+                {grupo.depende.length > 0 && (
+                  <ul className="relatorio-depende">
+                    {grupo.depende.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                )}
+
+                <ul className="relatorio-docs">
+                  {doGrupo.map((doc) => (
+                    <li key={doc.id} className={doc.feito ? "feito" : ""}>
+                      <button
+                        className="relatorio-marcar"
+                        onClick={() =>
+                          aplicar({
+                            ...relatorio,
+                            documentos: relatorio.documentos.map((d) => (d.id === doc.id ? alternarDocumento(d) : d)),
+                          })
+                        }
+                        aria-pressed={doc.feito}
+                      >
+                        {doc.feito ? <Check size={16} /> : <Circle size={16} />}
+                        <span>{doc.nome}</span>
+                      </button>
+                      <button
+                        className="relatorio-apagar"
+                        onClick={() => aplicar(removerDocumento(relatorio, doc.id))}
+                        aria-label={`Remover ${doc.nome}`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
         </section>
       </div>
 

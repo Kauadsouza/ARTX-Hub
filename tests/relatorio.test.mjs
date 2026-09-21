@@ -185,7 +185,7 @@ test('progresso conta certo, e lista vazia não divide por zero', () => {
 
 test('o relatório sobrevive à ida e volta pelo JSON', () => {
   const r = {
-    version: 1,
+    ...relatorioVazio(),
     anotacoes: [criarAnotacao('nota', 'corpo')],
     documentos: [criarDocumento('doc', 'obs')],
   };
@@ -212,10 +212,10 @@ test('item malformado é descartado sem levar os bons junto', () => {
 test('importar soma sem sobrescrever o que já existe', () => {
   const doc = criarDocumento('Visto');
   const feitoAqui = alternarDocumento(doc);
-  const atual = { version: 1, anotacoes: [], documentos: [feitoAqui] };
+  const atual = { ...relatorioVazio(), documentos: [feitoAqui] };
 
   // O arquivo tem o mesmo documento, ainda pendente, mais um novo.
-  const importado = { version: 1, anotacoes: [criarAnotacao('do arquivo', '')], documentos: [doc, criarDocumento('NIE')] };
+  const importado = { ...relatorioVazio(), anotacoes: [criarAnotacao('do arquivo', '')], documentos: [doc, criarDocumento('NIE')] };
 
   const { relatorio, novas } = unir(atual, importado);
   assert.equal(novas, 2, 'entram a anotação e o documento novo');
@@ -225,8 +225,8 @@ test('importar soma sem sobrescrever o que já existe', () => {
 
 test('importar preenche um documento que aqui ainda estava pendente', () => {
   const doc = criarDocumento('Seguro saúde');
-  const atual = { version: 1, anotacoes: [], documentos: [doc] };
-  const importado = { version: 1, anotacoes: [], documentos: [alternarDocumento(doc)] };
+  const atual = { ...relatorioVazio(), documentos: [doc] };
+  const importado = { ...relatorioVazio(), documentos: [alternarDocumento(doc)] };
 
   const { relatorio } = unir(atual, importado);
   assert.equal(relatorio.documentos.length, 1);
@@ -238,4 +238,101 @@ test('diaLocal usa o relógio daqui, não UTC', () => {
   // que a pessoa vê no relógio dela.
   const d = new Date(2026, 8, 21, 23, 30);
   assert.equal(diaLocal(d), '2026-09-21');
+});
+
+// ══════════════ A lista da Espanha ══════════════
+
+test('semear enche a lista uma vez e não repete na segunda', async () => {
+  const { semear, relatorioVazio } = await import('../src/lib/relatorio.ts');
+  const { semente } = await import('../src/lib/espanha.ts');
+
+  const primeira = semear(relatorioVazio());
+  assert.equal(primeira.adicionados, semente.length);
+  assert.equal(primeira.relatorio.documentos.length, semente.length);
+
+  const segunda = semear(primeira.relatorio);
+  assert.equal(segunda.adicionados, 0);
+  assert.equal(segunda.relatorio, primeira.relatorio, 'nada a fazer devia devolver o mesmo objeto');
+});
+
+test('todo visto tem documentação própria, e cada grupo tem itens', async () => {
+  const { semear, relatorioVazio, documentosDoGrupo } = await import('../src/lib/relatorio.ts');
+  const { relatorio } = semear(relatorioVazio());
+  for (const grupo of ['base', 'apostila', 'estudante', 'trabalho', 'nomade']) {
+    assert.ok(documentosDoGrupo(relatorio, grupo).length > 0, `${grupo} ficou sem documento`);
+  }
+});
+
+test('o mesmo documento em vistos diferentes são itens separados', async () => {
+  const { semear, relatorioVazio, documentosDoGrupo } = await import('../src/lib/relatorio.ts');
+  const { relatorio } = semear(relatorioVazio());
+  // "Passaporte válido" aparece nos três vistos. Marcar no de trabalho não
+  // pode marcar no de estudante: são pedidos diferentes, em momentos diferentes.
+  const nos = ['estudante', 'trabalho', 'nomade'].map(
+    (g) => documentosDoGrupo(relatorio, g).find((d) => d.nome === 'Passaporte válido'),
+  );
+  assert.ok(nos.every(Boolean));
+  assert.equal(new Set(nos.map((d) => d.id)).size, 3, 'os ids têm que ser distintos');
+});
+
+test('o id de um item da semente é estável e não depende de acento', async () => {
+  const { idDaSemente } = await import('../src/lib/espanha.ts');
+  assert.equal(idDaSemente('base', 'Certidão de nascimento atualizada'), idDaSemente('base', 'Certidao de nascimento atualizada'));
+  assert.notEqual(idDaSemente('base', 'Passaporte válido'), idDaSemente('nomade', 'Passaporte válido'));
+  assert.match(idDaSemente('base', 'CPF regularizado'), /^base:/);
+});
+
+test('apagar um item da semente o mantém apagado', async () => {
+  const { semear, relatorioVazio, removerDocumento } = await import('../src/lib/relatorio.ts');
+  const { relatorio: cheio } = semear(relatorioVazio());
+  const alvo = cheio.documentos[0];
+
+  const sem = removerDocumento(cheio, alvo.id);
+  assert.equal(sem.documentos.find((d) => d.id === alvo.id), undefined);
+  assert.ok(sem.dispensados.includes(alvo.id));
+
+  // Mesmo forçando uma semeadura nova, ele não volta.
+  const forcado = semear({ ...sem, sementeVersao: 0 });
+  assert.equal(forcado.relatorio.documentos.find((d) => d.id === alvo.id), undefined, 'item apagado não pode ressuscitar');
+});
+
+test('semear preserva o que já estava marcado', async () => {
+  const { semear, relatorioVazio, alternarDocumento } = await import('../src/lib/relatorio.ts');
+  const { relatorio: cheio } = semear(relatorioVazio());
+  const marcado = { ...cheio, documentos: cheio.documentos.map((d, i) => (i === 0 ? alternarDocumento(d) : d)) };
+
+  const denovo = semear({ ...marcado, sementeVersao: 0 });
+  assert.equal(denovo.relatorio.documentos[0].feito, true, 'semear não pode desmarcar');
+  assert.equal(denovo.adicionados, 0);
+});
+
+test('documento guardado antes dos grupos cai em "meus" em vez de sumir', async () => {
+  const { ler } = await import('../src/lib/relatorio.ts');
+  const antigo = JSON.stringify({ documentos: [{ id: 'x1', nome: 'Doc antigo', feito: false }] });
+  const r = ler(antigo);
+  assert.equal(r.documentos.length, 1);
+  assert.equal(r.documentos[0].grupo, 'meus');
+});
+
+test('importar não ressuscita item dispensado nem baixa a versão da semente', async () => {
+  const { semear, relatorioVazio, removerDocumento, unir } = await import('../src/lib/relatorio.ts');
+  const { relatorio: cheio } = semear(relatorioVazio());
+  const alvo = cheio.documentos[0];
+  const atual = removerDocumento(cheio, alvo.id);
+
+  // O arquivo é de antes de ele apagar: ainda tem o item.
+  const { relatorio } = unir(atual, cheio);
+  assert.ok(relatorio.dispensados.includes(alvo.id));
+  assert.equal(relatorio.sementeVersao, cheio.sementeVersao);
+});
+
+test('cada grupo declara se dá para adiantar hoje, e do que depende', async () => {
+  const { grupos } = await import('../src/lib/espanha.ts');
+  for (const grupo of grupos) {
+    assert.ok(grupo.titulo.length > 3, `${grupo.id} sem título`);
+    assert.ok(grupo.resumo.length > 20, `${grupo.id} sem resumo`);
+    assert.equal(typeof grupo.agora, 'boolean');
+    // Um caminho que depende de terceiros precisa dizer de quê.
+    if (!grupo.agora) assert.ok(grupo.depende.length > 0, `${grupo.id} não diz do que depende`);
+  }
 });
