@@ -25,6 +25,7 @@ import {
   PanelLeftClose,
   RefreshCw,
   Search,
+  NotebookPen,
   Settings2,
   Smartphone,
   Sparkles,
@@ -36,6 +37,7 @@ import { createClient } from "@/lib/supabase/client";
 import { parseRouteSignals, type RouteSignals } from "@/lib/week-ahead";
 import { certificateBucket, certificatePath, certificateReference, downloadCertificate, localCertificate, parseCertificateReference, isStoredCertificate, validateCertificate } from "@/lib/course-certificates";
 import { PersonalDashboard } from "@/components/PersonalDashboard";
+import { RelatorioKaua } from "@/components/RelatorioKaua";
 import { CondorWorkspace } from "@/components/CondorWorkspace";
 import { CoursesResume, courseCatalog, type CourseProgress, type CourseProgressPatch, type CourseProgressStatus } from "@/components/CoursesResume";
 import { AccountApprovals } from "./AccountApprovals";
@@ -49,7 +51,7 @@ type Task = {
   created_at?: string;
 };
 
-type View = "approvals" | "security" | "overview" | "site" | "videos" | "sat" | "university" | "career" | "condor";
+type View = "approvals" | "security" | "overview" | "relatorio" | "site" | "videos" | "sat" | "university" | "career" | "condor";
 type ProjectKey = "site" | "videos" | "sat" | "university" | "condor" | "geral";
 type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
 type MemberWorkspace = "videos" | "study" | "university";
@@ -102,7 +104,7 @@ async function localHubRequest<T>(path: string, init?: RequestInit): Promise<T> 
   return payload as T;
 }
 
-const workspaces: Record<Exclude<View, "overview" | "career" | "approvals" | "security">, Workspace> = {
+const workspaces: Record<Exclude<View, "overview" | "career" | "approvals" | "security" | "relatorio">, Workspace> = {
   site: {
     label: "Site KauaArtx",
     eyebrow: "PRESENÇA DIGITAL",
@@ -168,6 +170,7 @@ const pageMeta: Record<View, { eyebrow: string; title: string }> = {
   approvals: { eyebrow: "ADMINISTRAÇÃO", title: "Aprovação de contas" },
   security: { eyebrow: "CONTA PROPRIETÁRIA", title: "Segurança" },
   overview: { eyebrow: "CENTRAL DE COMANDO", title: "Visão geral" },
+  relatorio: { eyebrow: "SÓ SEU", title: "Relatório do Kauã" },
   site: { eyebrow: workspaces.site.eyebrow, title: workspaces.site.label },
   videos: { eyebrow: workspaces.videos.eyebrow, title: workspaces.videos.label },
   sat: { eyebrow: workspaces.sat.eyebrow, title: workspaces.sat.label },
@@ -724,6 +727,7 @@ export function Hub() {
 
       <SidebarGroup label="Central">
         <NavButton active={activeView === "overview"} icon={LayoutDashboard} label={t("Visão geral")} onClick={() => goTo("overview")} />
+        <NavButton active={activeView === "relatorio"} icon={NotebookPen} label={t("Relatório do Kauã")} onClick={() => goTo("relatorio")} />
       </SidebarGroup>
       <SidebarGroup label="Canal">
         <NavButton active={activeView === "site"} icon={Compass} logo={workspaces.site.logo} label="Site KauaArtx" onClick={() => goTo("site")} />
@@ -759,6 +763,7 @@ export function Hub() {
         </div>
       </header>
 
+      {activeView === "relatorio" && <RelatorioKaua />}
       {activeView === "overview" && <PersonalDashboard tasks={tasks} notes={notes} systemSignals={systemSignals} routeSignals={routeSignals} syncing={syncing} syncError={syncError} onOpen={goTo} onCreate={createActivity} onToggle={toggleTask} onNote={createNote} onRetry={() => void loadWorkspace()} onBackup={downloadHubBackup} />}
       {activeView === "career" && <CoursesResume progress={courseProgress} savingCourseId={savingCourseId ?? certificateBusyId ?? (!localMode && (syncing || syncError) ? "sync" : null)} localOnly={localMode} onUpdate={updateCourseProgress} onAttach={attachCourseCertificate} onDownload={retrieveCourseCertificate} />}
       {activeView === "approvals" && <AccountApprovals token={hubAccessToken} />}
