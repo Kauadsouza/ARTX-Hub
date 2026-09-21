@@ -454,3 +454,50 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 .week-card span{grid-column:1/-1;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
 .week-card small{grid-column:1/-1;color:var(--muted);font-size:11px}
 @media(max-width:780px){.week-grid{grid-template-columns:1fr}.week-card{padding:16px 18px}}
+
+/* ── Visão geral do Hub: o dado sobe, o texto encolhe ──────────────────────
+ * O herói ocupava um terço da tela com três linhas que não informavam nada, e
+ * o que o Hub realmente sabia ficava abaixo da dobra. Aqui ele vira uma linha,
+ * e logo abaixo entram os números de verdade.
+ */
+.personal-intro.compacto{margin:6px 0 20px;align-items:center}
+.personal-intro.compacto h1{margin:8px 0 0;font-size:clamp(23px,2.6vw,34px);line-height:1.2;letter-spacing:-1px}
+.personal-intro.compacto h1 span{color:var(--muted);font-weight:500}
+.personal-dashboard .personal-intro.compacto{padding:0}
+.personal-dashboard .personal-intro.compacto h1{font-size:clamp(23px,2.6vw,34px);letter-spacing:-1px}
+
+.hub-pulso{display:flex;flex-wrap:wrap;align-items:stretch;gap:12px;margin-bottom:22px}
+.pulso-numeros{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;flex:2;min-width:290px}
+.pulso-numeros>button{min-width:0;padding:16px 18px;border:1px solid var(--line);border-radius:15px;background:var(--surface);color:var(--text);text-align:left;transition:border-color .16s,transform .16s}
+.pulso-numeros>button:hover{border-color:var(--mint);transform:translateY(-2px)}
+.pulso-numeros strong{display:block;font-size:30px;line-height:1;letter-spacing:-1.4px}
+.pulso-numeros small{display:block;margin-top:7px;color:var(--muted);font-size:11px;line-height:1.35}
+.pulso-numeros>button.urgente strong{color:#e8b473}
+
+/* Um ponto por sistema, com a cor do estado que ele mesmo reportou. */
+.pulso-sistemas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;gap:8px;flex:1;min-width:220px}
+.pulso-sistemas>button{display:flex;align-items:center;gap:9px;min-width:0;padding:11px 14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);font-size:12px;text-align:left;transition:border-color .16s}
+.pulso-sistemas>button:hover{border-color:var(--mint)}
+.pulso-sistemas span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pulso-sistemas i{width:8px;height:8px;flex-shrink:0;border-radius:50%;background:#6e7481}
+.pulso-sistemas .ready i{background:#6ee7ad;box-shadow:0 0 0 4px rgba(110,231,173,.12)}
+.pulso-sistemas .syncing i{background:#e5bd72;box-shadow:0 0 0 4px rgba(229,189,114,.12)}
+.pulso-sistemas .attention i{background:#ef8c80;box-shadow:0 0 0 4px rgba(239,140,128,.12)}
+
+/* O número vive dentro do cartão grande, não numa linha de texto abaixo. */
+.priority-conta{display:inline-block;margin-top:14px;padding:5px 11px;border-radius:30px;background:#ffffff14;color:#dfe9e2;font-size:11px;font-style:normal;font-weight:600}
+
+.hub-exportar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 26px;padding:16px 20px;border:1px solid var(--line);border-radius:15px;background:var(--surface)}
+.hub-exportar strong{display:block;margin-top:6px;font-size:14px;font-weight:600}
+.hub-exportar>button{display:flex;align-items:center;gap:7px;flex-shrink:0;padding:9px 13px;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface-raised);color:var(--text)}
+.hub-exportar>button:hover{border-color:var(--mint)}
+
+@media(max-width:900px){
+  .pulso-numeros{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pulso-sistemas{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:560px){
+  .hub-exportar{flex-direction:column;align-items:stretch}
+  .hub-exportar>button{justify-content:center}
+  .personal-intro.compacto{display:flex}
+}
