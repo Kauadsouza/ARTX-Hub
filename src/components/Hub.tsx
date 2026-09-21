@@ -777,6 +777,7 @@ export function Hub() {
         previewMode={previewMode}
         onPreviewMode={setPreviewMode}
         onStatus={registerSystemSignal}
+        onOpenCondor={() => goTo("condor")}
         onRefresh={() => { setRefreshKey((key) => key + 1); notify("Preview atualizado"); }}
       />}
     </section>
@@ -822,7 +823,7 @@ function EmptyState({ label, compact = false }: { label: string; compact?: boole
   return <div className={`empty-state ${compact ? "compact" : ""}`}><CheckCircle2 size={16} /><span>{t(label)}</span></div>;
 }
 
-function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh, onStatus }: {
+function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh, onStatus, onOpenCondor }: {
   workspace: Workspace;
   hubAccessToken: string | null;
   refreshKey: number;
@@ -830,6 +831,7 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
   onPreviewMode: (mode: "desktop" | "mobile") => void;
   onRefresh: () => void;
   onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void;
+  onOpenCondor: () => void;
 }) {
   const { t } = useI18n();
   const [focusMode, setFocusMode] = useState(false);
@@ -865,13 +867,13 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
           <button className="frame-action focus-action" onClick={() => setFocusMode((current) => !current)} aria-pressed={focusMode} title={focusMode ? t("Sair da tela ampla") : t("Abrir em tela ampla")}>{focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}<span>{focusMode ? t("Voltar ao Hub") : t("Tela ampla")}</span></button>
           <a href={workspace.url} target="_blank" rel="noreferrer" title={t("Abrir em outra aba")}><ExternalLink size={16} /></a>
         </div></div>
-        <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} onStatus={onStatus} /></div>
+        <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} onStatus={onStatus} onOpenCondor={onOpenCondor} /></div>
       </article>
     </section>
   </div>;
 }
 
-function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, refreshKey, onStatus }: { workspace: Workspace; accessToken: string | null; memberAccessToken?: string; refreshKey: number; onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void }) {
+function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, refreshKey, onStatus, onOpenCondor }: { workspace: Workspace; accessToken: string | null; memberAccessToken?: string; refreshKey: number; onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void; onOpenCondor?: () => void }) {
   const { t, language } = useI18n();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const usesHubSession = workspace.project === "videos" || workspace.project === "university" || workspace.project === "sat";
@@ -890,6 +892,10 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, ref
       if (event.source !== frameRef.current?.contentWindow || event.origin !== appOrigin) return;
       const expectedMessage = workspace.project === "videos" ? "ARTX_VIDEO_EMBED_READY" : workspace.project === "sat" ? "ARTX_STUDY_EMBED_READY" : "UNIVERSITY_PATH_EMBED_READY";
       if (usesHubSession && event.data?.type === expectedMessage) sendHubSession();
+      // O app embarcado pede a aba do Condor. Quem pode pedir ja foi filtrado
+      // pela checagem de origem acima, entao aqui nao ha o que validar alem do
+      // tipo — e o pedido so navega, nunca executa nada.
+      if (event.data?.type === "UNIVERSITY_PATH_OPEN_CONDOR") onOpenCondor?.();
       if (event.data?.type === "ARTX_SYSTEM_STATUS" && event.data.system === workspace.project && ["ready", "syncing", "attention"].includes(event.data.state) && typeof event.data.title === "string" && typeof event.data.detail === "string") {
         onStatus(workspace.project, { state: event.data.state, title: event.data.title.slice(0, 100), detail: event.data.detail.slice(0, 180) });
       }
@@ -898,7 +904,7 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, ref
     return () => {
       window.removeEventListener("message", onWorkspaceReady);
     };
-  }, [accessToken, appOrigin, onStatus, sendHubSession, usesHubSession, workspace.project]);
+  }, [accessToken, appOrigin, onOpenCondor, onStatus, sendHubSession, usesHubSession, workspace.project]);
 
   // Status messages update the parent. They must not restart authentication.
   useEffect(() => {
