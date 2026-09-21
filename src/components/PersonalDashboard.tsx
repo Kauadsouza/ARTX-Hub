@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowUpRight, BookOpen, Check, Circle, Cloud, Download, Plus, RefreshCw, Video } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowUpRight, BookOpen, CalendarClock, Check, Circle, Cloud, Download, Plus, RefreshCw, Video } from "lucide-react";
 import { PersonalFocus } from "./PersonalFocus";
 import { WeekAhead } from "./WeekAhead";
 import { daysUntil, type RouteSignals } from "@/lib/week-ahead";
+import { CHAVE, resumoParaOHub } from "@/lib/relatorio";
 import { useI18n } from "./I18n";
 
 type Task = { id: string; title: string; project_slug: string | null; completed: boolean };
 type Note = { id: string; content: string; created_at: string };
-type View = "overview" | "site" | "videos" | "sat" | "university" | "condor";
+type View = "overview" | "relatorio" | "site" | "videos" | "sat" | "university" | "condor";
 type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
 const labels: Record<string, string> = { geral: "Pessoal", sat: "Idiomas", videos: "KauaArtx Video Studio", site: "Site KauaArtx", university: "University Path", condor: "Condor AI" };
 
@@ -35,6 +36,7 @@ export function PersonalDashboard({ tasks, notes, systemSignals, routeSignals, s
   return <div className="overview-page personal-dashboard page-enter">
     <section className="personal-intro compacto"><div><p className="eyebrow">{t("KAUÃ · SEU ESPAÇO PESSOAL")}</p><h1>{t("Crie. Aprenda.")} <span>{t("Continue de onde parou.")}</span></h1></div><span className="day-label">{new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", timeZone: "Europe/London" }).format(new Date())}</span></section>
     <HubPulso tasks={tasks} notes={notes} routes={routeSignals} signals={systemSignals} onOpen={onOpen} />
+    <DocumentosVencendo onOpen={onOpen} />
     <WeekAhead routes={routeSignals} tasks={tasks} onOpen={onOpen} />
     {syncError && <div className="sync-alert" role="alert"><span>{t(syncError)}</span><button onClick={onRetry}><RefreshCw size={15} />{t(" Tentar novamente")}</button></div>}
     <section className="priority-grid">
@@ -137,5 +139,53 @@ function HubPulso({
         })}
       </div>
     </section>
+  );
+}
+
+/**
+ * Documento da Espanha vencendo, visto da Visão geral.
+ *
+ * O aviso existia só dentro da aba do relatório, o que é onde ele menos serve:
+ * quem abre aquela aba já foi olhar os documentos. Aqui ele aparece onde a
+ * pessoa passa todo dia — e some quando não há nada a dizer, em vez de ocupar
+ * espaço com "está tudo certo".
+ *
+ * Lê do mesmo cofre local, sem escrever nada.
+ */
+function DocumentosVencendo({ onOpen }: { onOpen: (view: View) => void }) {
+  const { t } = useI18n();
+  const [resumo, setResumo] = useState<ReturnType<typeof resumoParaOHub> | null>(null);
+
+  useEffect(() => {
+    try {
+      setResumo(resumoParaOHub(localStorage.getItem(CHAVE)));
+    } catch {
+      setResumo(null);
+    }
+  }, []);
+
+  if (!resumo || (resumo.vencendo === 0 && resumo.vencidos === 0)) return null;
+  const total = resumo.vencendo + resumo.vencidos;
+
+  return (
+    <button className={`doc-alerta ${resumo.vencidos > 0 ? "vencido" : ""}`} onClick={() => onOpen("relatorio")}>
+      <CalendarClock size={16} />
+      <span>
+        <strong>
+          {total} {t(total > 1 ? "documentos pedindo atenção" : "documento pedindo atenção")}
+        </strong>
+        {resumo.proximo && (
+          <small>
+            {resumo.proximo.nome} —{" "}
+            {resumo.proximo.dias < 0
+              ? t("já venceu")
+              : resumo.proximo.dias === 0
+                ? t("vence hoje")
+                : `${resumo.proximo.dias} ${t(resumo.proximo.dias > 1 ? "dias" : "dia")}`}
+          </small>
+        )}
+      </span>
+      <ArrowUpRight size={16} />
+    </button>
   );
 }

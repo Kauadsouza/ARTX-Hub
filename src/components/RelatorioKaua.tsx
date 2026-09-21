@@ -27,6 +27,7 @@ import {
   ler,
   porUrgencia,
   progressoDocumentos,
+  definirNota,
   definirValidade,
   diasParaVencer,
   estadoValidade,
@@ -429,6 +430,22 @@ export function RelatorioKaua() {
                             <Trash2 size={13} />
                           </button>
                         </div>
+
+                        <input
+                          className="relatorio-nota"
+                          value={doc.nota}
+                          maxLength={1000}
+                          placeholder="Observação — valor, onde tirar, protocolo…"
+                          aria-label={`Observação de ${doc.nome}`}
+                          onChange={(evento) =>
+                            aplicar({
+                              ...relatorio,
+                              documentos: relatorio.documentos.map((d) =>
+                                d.id === doc.id ? definirNota(d, evento.target.value) : d,
+                              ),
+                            })
+                          }
+                        />
 
                         {anexos.length > 0 && (
                           <ul className="relatorio-anexos">

@@ -205,6 +205,17 @@ export function criarDocumento(nome: string, nota = "", grupo: GrupoId = "meus")
   return { id: novoId(), nome: texto.slice(0, 200), nota: nota.trim().slice(0, 1000), feito: false, feitoEm: null, grupo, validade: null };
 }
 
+/**
+ * A observação do documento.
+ *
+ * É onde cabe o que só você sabe: o valor que o consulado pediu, onde tirar a
+ * segunda via, o número do protocolo. O campo existia no modelo desde o começo
+ * e nunca aparecia na tela — guardava a informação e não a mostrava a ninguém.
+ */
+export function definirNota(documento: Documento, nota: string): Documento {
+  return { ...documento, nota: nota.slice(0, 1000) };
+}
+
 export function alternarDocumento(documento: Documento, agora = new Date()): Documento {
   const feito = !documento.feito;
   return { ...documento, feito, feitoEm: feito ? agora.toISOString() : null };
@@ -247,7 +258,7 @@ export function semear(relatorio: Relatorio): { relatorio: Relatorio; adicionado
     if (existentes.has(id) || dispensados.has(id)) continue;
     // Um item que só mudou de nome já foi tratado acima e não entra de novo.
     if (renomeados.some((r) => r.nome === item.nome && existentes.has(r.id))) continue;
-    novos.push({ id, nome: item.nome, nota: "", feito: false, feitoEm: null, grupo: item.grupo, validade: null });
+    novos.push({ id, nome: item.nome, nota: item.nota ?? "", feito: false, feitoEm: null, grupo: item.grupo, validade: null });
   }
 
   return {
@@ -323,6 +334,29 @@ function ehDocumento(valor: unknown): valor is Documento {
   if (typeof d.grupo !== "string") d.grupo = "meus";
   if (typeof d.validade !== "string") d.validade = null;
   return true;
+}
+
+/**
+ * Resumo para outras telas.
+ *
+ * A Visão geral precisa saber se há documento vencendo sem ter que conhecer o
+ * formato inteiro do relatório. Lê, não escreve — e devolve zeros quando não há
+ * nada guardado, em vez de explodir.
+ */
+export function resumoParaOHub(bruto: string | null, agora = new Date()): {
+  vencendo: number;
+  vencidos: number;
+  proximo: { nome: string; dias: number } | null;
+} {
+  const relatorio = ler(bruto);
+  const alerta = precisamAtencao(relatorio.documentos, agora);
+  const vencidos = alerta.filter((item) => estadoValidade(item, agora) === "vencido").length;
+  const primeiro = alerta[0];
+  return {
+    vencendo: alerta.length - vencidos,
+    vencidos,
+    proximo: primeiro ? { nome: primeiro.nome, dias: diasParaVencer(primeiro, agora) ?? 0 } : null,
+  };
 }
 
 /**

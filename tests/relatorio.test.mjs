@@ -459,3 +459,94 @@ test('item renomeado mantém o id, porque o id é a chave dos anexos', async () 
   assert.equal(item.feito, true, 'renomear não desmarca');
   assert.equal(relatorio.documentos.filter((d) => d.nome === renomeados[0].nome).length, 1, 'não pode duplicar');
 });
+
+// ══════════════ A observação do documento ══════════════
+
+test('a observação da semente chega também em instalação nova', async () => {
+  const { semear, relatorioVazio } = await import('../src/lib/relatorio.ts');
+  const { semente } = await import('../src/lib/espanha.ts');
+
+  const comNota = semente.filter((item) => item.nota);
+  assert.ok(comNota.length > 0, 'ao menos um item da semente traz observação');
+
+  const { relatorio } = semear(relatorioVazio());
+  for (const item of comNota) {
+    const doc = relatorio.documentos.find((d) => d.nome === item.nome);
+    assert.ok(doc, `${item.nome} não foi semeado`);
+    assert.equal(doc.nota, item.nota, 'a observação não pode ficar só para quem já tinha a versão antiga');
+  }
+});
+
+test('a observação é editável e limitada', async () => {
+  const { criarDocumento, definirNota } = await import('../src/lib/relatorio.ts');
+  const d = criarDocumento('Antecedentes');
+  const anotado = definirNota(d, 'Tirar na Polícia Federal, validade de 90 dias');
+  assert.equal(anotado.nota, 'Tirar na Polícia Federal, validade de 90 dias');
+  assert.equal(definirNota(d, 'x'.repeat(2000)).nota.length, 1000);
+  assert.equal(definirNota(anotado, '').nota, '', 'apagar a observação é permitido');
+  assert.equal(d.nota, '', 'o documento original não muda');
+});
+
+test('editar a observação não mexe em mais nada', async () => {
+  const { criarDocumento, definirNota, alternarDocumento, definirValidade } = await import('../src/lib/relatorio.ts');
+  const base = definirValidade(alternarDocumento(criarDocumento('Passaporte')), '2030-01-01');
+  const depois = definirNota(base, 'observação nova');
+  assert.equal(depois.feito, base.feito);
+  assert.equal(depois.feitoEm, base.feitoEm);
+  assert.equal(depois.validade, base.validade);
+  assert.equal(depois.id, base.id);
+});
+
+// ══════════════ O resumo que a Visão geral lê ══════════════
+
+test('sem nada guardado o resumo é zerado, não quebra', async () => {
+  const { resumoParaOHub } = await import('../src/lib/relatorio.ts');
+  for (const entrada of [null, '', '{', 'lixo']) {
+    const r = resumoParaOHub(entrada);
+    assert.equal(r.vencendo, 0);
+    assert.equal(r.vencidos, 0);
+    assert.equal(r.proximo, null);
+  }
+});
+
+test('o resumo separa o que venceu do que está vencendo', async () => {
+  const { resumoParaOHub, criarDocumento, definirValidade, relatorioVazio } = await import('../src/lib/relatorio.ts');
+  const agora = meioDia('2026-09-21');
+  const guardado = JSON.stringify({
+    ...relatorioVazio(),
+    documentos: [
+      definirValidade(criarDocumento('Antecedentes'), '2026-08-01'),
+      definirValidade(criarDocumento('Certidão'), '2026-10-05'),
+      definirValidade(criarDocumento('Passaporte'), '2030-01-01'),
+      criarDocumento('Sem prazo'),
+    ],
+  });
+
+  const r = resumoParaOHub(guardado, agora);
+  assert.equal(r.vencidos, 1);
+  assert.equal(r.vencendo, 1);
+  assert.equal(r.proximo.nome, 'Antecedentes', 'o mais urgente vem primeiro');
+  assert.ok(r.proximo.dias < 0);
+});
+
+test('documento em dia não gera alerta nenhum', async () => {
+  const { resumoParaOHub, criarDocumento, definirValidade, relatorioVazio } = await import('../src/lib/relatorio.ts');
+  const guardado = JSON.stringify({
+    ...relatorioVazio(),
+    documentos: [definirValidade(criarDocumento('Passaporte'), '2030-01-01')],
+  });
+  const r = resumoParaOHub(guardado, meioDia('2026-09-21'));
+  assert.equal(r.vencendo + r.vencidos, 0);
+  assert.equal(r.proximo, null, 'sem alerta não há próximo');
+});
+
+test('o resumo só lê: não escreve nada no relatório', async () => {
+  const { resumoParaOHub, criarDocumento, definirValidade, relatorioVazio } = await import('../src/lib/relatorio.ts');
+  const original = JSON.stringify({
+    ...relatorioVazio(),
+    documentos: [definirValidade(criarDocumento('x'), '2026-08-01')],
+  });
+  const copia = String(original);
+  resumoParaOHub(original, meioDia('2026-09-21'));
+  assert.equal(original, copia);
+});

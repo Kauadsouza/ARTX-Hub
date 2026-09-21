@@ -111,7 +111,7 @@ export const renomeados: Array<{ id: string; nome: string; nota?: string }> = [
   },
 ];
 
-export const semente: Array<{ grupo: GrupoId; nome: string }> = [
+export const semente: Array<{ grupo: GrupoId; nome: string; nota?: string }> = [
   // ── Pessoais, válidos para qualquer caminho ──────────────────────────
   { grupo: "base", nome: "Passaporte brasileiro válido" },
   { grupo: "base", nome: "RG ou CIN em bom estado" },
@@ -136,7 +136,11 @@ export const semente: Array<{ grupo: GrupoId; nome: string }> = [
   { grupo: "estudante", nome: "Fotografia recente no padrão exigido" },
   { grupo: "estudante", nome: "Carta de admissão de instituição ou curso elegível" },
   { grupo: "estudante", nome: "Comprovante de matrícula ou pagamento, quando exigido" },
-  { grupo: "estudante", nome: "Comprovante de recursos financeiros" },
+  {
+    grupo: "estudante",
+    nome: "Comprovante de recursos financeiros",
+    nota: "Pelos meses que o consulado exigir. Confirme lá o período e o valor.",
+  },
   { grupo: "estudante", nome: "Seguro de saúde válido na Espanha" },
   { grupo: "estudante", nome: "Comprovante de alojamento, se solicitado" },
   { grupo: "estudante", nome: "Atestado médico, quando exigido" },
