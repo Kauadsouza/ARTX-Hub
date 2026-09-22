@@ -629,3 +629,11 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 .doc-alerta strong{display:block;font-size:13.5px}
 .doc-alerta small{display:block;margin-top:4px;color:#c8a878;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .doc-alerta.vencido small{color:#d9a49d}
+
+/* Estado do espelho na conta. Sempre visível: uma proteção que falha calada é
+   pior que não existir, porque a pessoa passa a confiar nela. */
+.relatorio-espelho{display:flex;align-items:center;gap:7px;padding:8px 12px;border:1px solid var(--line);border-radius:9px;font-size:11px;line-height:1.4;max-width:42ch}
+.relatorio-espelho>svg{flex-shrink:0}
+.relatorio-espelho.ok{border-color:rgba(106,213,167,.28);background:rgba(106,213,167,.07);color:#8fd9b0}
+.relatorio-espelho.alerta{border-color:#936b37;background:#302419;color:#f3d8b3}
+@media(max-width:560px){.relatorio-espelho{max-width:none;width:100%}}

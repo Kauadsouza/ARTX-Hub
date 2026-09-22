@@ -370,7 +370,7 @@ test('o limite por arquivo é declarado e é razoável para documento', async ()
   const { TAMANHO_MAXIMO, formatarTamanho } = await import('../src/lib/anexos.ts');
   assert.ok(TAMANHO_MAXIMO >= 10 * 1024 * 1024, 'um PDF escaneado pode passar de 10 MB');
   assert.ok(TAMANHO_MAXIMO <= 50 * 1024 * 1024, 'acima disso não é documento, é vídeo');
-  assert.equal(formatarTamanho(TAMANHO_MAXIMO), '25.0 MB');
+  assert.equal(formatarTamanho(TAMANHO_MAXIMO), '15.0 MB', 'o teto é o do cofre da conta');
 });
 
 // ══════════════ Validade dos documentos ══════════════
@@ -549,4 +549,127 @@ test('o resumo só lê: não escreve nada no relatório', async () => {
   const copia = String(original);
   resumoParaOHub(original, meioDia('2026-09-21'));
   assert.equal(original, copia);
+});
+
+// ══════════════ O espelho na conta ══════════════
+
+test('sem cliente de conta, o relatório continua funcionando e diz por quê', async () => {
+  const { puxar, empurrar, protegido } = await import('../src/lib/relatorio-espelho.ts');
+  const { relatorioVazio, criarDocumento } = await import('../src/lib/relatorio.ts');
+  const local = { ...relatorioVazio(), documentos: [criarDocumento('Passaporte')] };
+
+  const lido = await puxar(null, local);
+  assert.equal(lido.relatorio, local, 'o que está aqui não pode ser perdido');
+  assert.equal(lido.estado.tipo, 'so-local');
+  assert.equal(protegido(lido.estado), false, 'não pode dizer que está protegido quando não está');
+
+  const escrito = await empurrar(null, local, 0);
+  assert.equal(escrito.estado.tipo, 'so-local');
+});
+
+test('a constraint que falta vira uma frase que diz o que fazer', async () => {
+  const { puxar, descrever } = await import('../src/lib/relatorio-espelho.ts');
+  const { relatorioVazio } = await import('../src/lib/relatorio.ts');
+  const fake = {
+    from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { message: 'new row violates check constraint "hub_app_state_app_check"' } }) }) }) }) }),
+  };
+  const r = await puxar(fake, relatorioVazio());
+  assert.equal(r.estado.tipo, 'so-local');
+  assert.match(descrever(r.estado), /relatorio-state\.sql/, 'precisa dizer qual arquivo rodar');
+});
+
+test('a cópia da conta é juntada, nunca sobrescreve o que está aqui', async () => {
+  const { puxar } = await import('../src/lib/relatorio-espelho.ts');
+  const { relatorioVazio, criarDocumento, alternarDocumento } = await import('../src/lib/relatorio.ts');
+
+  const doc = criarDocumento('Antecedentes');
+  const feitoAqui = alternarDocumento(doc);
+  const local = { ...relatorioVazio(), documentos: [feitoAqui] };
+
+  // A conta tem o mesmo documento ainda pendente, mais um que falta aqui.
+  const remoto = { ...relatorioVazio(), documentos: [doc, criarDocumento('NIE')] };
+  const fake = {
+    from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { payload: remoto, revision: 7 }, error: null }) }) }) }) }),
+  };
+
+  const r = await puxar(fake, local);
+  assert.equal(r.revisao, 7, 'a revisão precisa vir junto para a gravação não atropelar');
+  assert.equal(r.relatorio.documentos.length, 2, 'o que faltava aqui entrou');
+  assert.equal(r.relatorio.documentos.find((d) => d.id === doc.id).feito, true, 'uma cópia antiga não desmarca o que já está pronto');
+  assert.equal(r.estado.tipo, 'guardado');
+});
+
+test('sem cópia na conta ainda, o estado é "iniciando" e a revisão é zero', async () => {
+  const { puxar } = await import('../src/lib/relatorio-espelho.ts');
+  const { relatorioVazio } = await import('../src/lib/relatorio.ts');
+  const fake = {
+    from: () => ({ select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }) }),
+  };
+  const r = await puxar(fake, relatorioVazio());
+  assert.equal(r.estado.tipo, 'iniciando');
+  assert.equal(r.revisao, 0, 'zero é o que a função do banco espera para criar a primeira linha');
+});
+
+test('gravação bem-sucedida devolve a revisão nova', async () => {
+  const { empurrar, protegido } = await import('../src/lib/relatorio-espelho.ts');
+  const { relatorioVazio } = await import('../src/lib/relatorio.ts');
+  const fake = { rpc: async () => ({ data: 8, error: null }) };
+  const r = await empurrar(fake, relatorioVazio(), 7);
+  assert.equal(r.revisao, 8);
+  assert.equal(protegido(r.estado), true);
+});
+
+test('gravação recusada por outra aba não perde nada e explica', async () => {
+  const { empurrar, descrever } = await import('../src/lib/relatorio-espelho.ts');
+  const { relatorioVazio } = await import('../src/lib/relatorio.ts');
+  const fake = { rpc: async () => ({ data: null, error: { code: '40001', message: 'Newer progress exists on another device' } }) };
+  const r = await empurrar(fake, relatorioVazio(), 7);
+  assert.equal(r.estado.tipo, 'falhou');
+  assert.equal(r.revisao, 7, 'a revisão não avança quando o banco recusou');
+  assert.match(descrever(r.estado), /juntar/i);
+});
+
+// ══════════════ Os anexos no cofre ══════════════
+
+test('o caminho no cofre começa pela pasta do dono, que é o que a política do banco olha', async () => {
+  const { caminho, PREFIXO } = await import('../src/lib/anexos-cofre.ts');
+  const p = caminho('uid-123', 'anexo-abc-def', 'meu passaporte.pdf');
+  assert.ok(p.startsWith('uid-123/'), 'a pasta do usuário precisa vir primeiro');
+  assert.ok(p.includes(`/${PREFIXO}/`), 'prefixo próprio, sem misturar com o University Path');
+  assert.ok(p.includes('anexo-abc-def'), 'o id evita que dois arquivos de mesmo nome se atropelem');
+  assert.ok(!p.includes(' '), 'espaço no caminho quebra a URL do storage');
+});
+
+test('nome de arquivo com caracteres estranhos não escapa do caminho', async () => {
+  const { caminho } = await import('../src/lib/anexos-cofre.ts');
+  const p = caminho('uid', 'id1', '../../etc/passwd');
+  assert.ok(!p.includes('..'), 'não pode subir de pasta');
+  assert.equal(p.split('/').length, 3, 'o caminho tem exatamente dono/prefixo/arquivo');
+});
+
+test('o limite local é o mesmo do cofre: nada é aceito aqui que não caiba lá', async () => {
+  const local = await import('../src/lib/anexos.ts');
+  const cofre = await import('../src/lib/anexos-cofre.ts');
+  assert.equal(local.TAMANHO_MAXIMO, cofre.TAMANHO_MAXIMO, 'aceitar mais aqui criaria arquivo que nunca seria protegido');
+});
+
+test('o cofre só aceita os formatos que o bucket guarda', async () => {
+  const { TIPOS_ACEITOS } = await import('../src/lib/anexos-cofre.ts');
+  assert.deepEqual([...TIPOS_ACEITOS].sort(), ['application/pdf', 'image/jpeg', 'image/png']);
+});
+
+test('sem conta, subir e listar falham dizendo o motivo — nunca em silêncio', async () => {
+  const { subir, listarNoCofre, restaurar } = await import('../src/lib/anexos-cofre.ts');
+  const ficha = { id: 'a1', documentoId: 'd1', nome: 'x.pdf', tipo: 'application/pdf', tamanho: 10, adicionadoEm: '2026-09-21T00:00:00Z' };
+
+  const s = await subir(null, ficha);
+  assert.equal(s.ok, false);
+  assert.ok(s.motivo.length > 10);
+
+  const l = await listarNoCofre(null);
+  assert.equal(l.ok, false);
+
+  const r = await restaurar(null, []);
+  assert.equal(r.baixados, 0);
+  assert.ok(r.motivo);
 });

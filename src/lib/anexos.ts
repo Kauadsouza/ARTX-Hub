@@ -10,17 +10,22 @@
  * tamanho ficassem no relatório e os bytes aqui, os dois poderiam divergir — e
  * a tela mostraria "passaporte.pdf" para um arquivo que não existe mais.
  *
- * Continua valendo o que vale para o resto desta aba: isto é este navegador,
- * neste computador. Não há servidor. Por isso cada anexo tem botão de baixar, e
- * a tela diz que a exportação em JSON não leva os arquivos junto.
+ * Este arquivo cuida só da cópia local, que é a que se lê: instantânea e sem
+ * rede. A cópia durável — a que sobrevive a limpar o navegador ou trocar de
+ * computador — fica em `anexos-cofre.ts`, no cofre da conta.
  */
 
 const BANCO = "artx-relatorio-anexos";
 const LOJA = "anexos";
 const VERSAO = 1;
 
-/** Teto por arquivo. Acima disto é quase certo que é vídeo, não documento. */
-export const TAMANHO_MAXIMO = 25 * 1024 * 1024;
+/**
+ * Teto por arquivo: o mesmo do cofre da conta.
+ *
+ * Aceitar mais aqui criaria arquivos que nunca poderiam ser copiados para a
+ * conta — a pessoa anexaria confiando, e a cópia falharia calada.
+ */
+export const TAMANHO_MAXIMO = 15 * 1024 * 1024;
 
 export type Anexo = {
   id: string;
@@ -103,6 +108,11 @@ export async function salvarAnexo(documentoId: string, arquivo: File): Promise<F
   const { arquivo: _bytes, ...ficha } = anexo;
   void _bytes;
   return ficha;
+}
+
+/** Guarda um anexo já montado. É por aqui que a restauração do cofre entra. */
+export async function salvarAnexoBruto(anexo: Anexo): Promise<void> {
+  await comLoja("readwrite", (loja) => loja.put(anexo));
 }
 
 /** As fichas de todos os anexos, sem carregar os bytes. */

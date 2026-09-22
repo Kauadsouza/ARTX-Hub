@@ -13,8 +13,8 @@
  * e um botão para devolver a semana quando a anotação ainda importa.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, Check, Circle, Download, Paperclip, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, CalendarClock, Check, Circle, Cloud, CloudOff, Download, Paperclip, Plus, RotateCcw, Trash2, Upload, X } from "lucide-react";
 
 import {
   CHAVE,
@@ -41,6 +41,9 @@ import {
   type Relatorio,
 } from "@/lib/relatorio";
 import { grupos } from "@/lib/espanha";
+import { createClient } from "@/lib/supabase/client";
+import { descrever, empurrar, protegido, puxar, type EstadoEspelho } from "@/lib/relatorio-espelho";
+import { remover as removerDoCofre, restaurar, subir, validar } from "@/lib/anexos-cofre";
 import {
   baixar,
   espacoUsado,
@@ -80,25 +83,72 @@ export function RelatorioKaua() {
   const [novoDoc, setNovoDoc] = useState("");
   const [fichas, setFichas] = useState<FichaAnexo[]>([]);
 
+  // O espelho na conta. O relatório continua morando aqui; isto é a cópia.
+  const supabase = useMemo(() => createClient(), []);
+  const [espelho, setEspelho] = useState<EstadoEspelho>({ tipo: "iniciando" });
+  const revisao = useRef(0);
+
   // Lê e já limpa o que passou do prazo, guardando o que saiu para contar.
   useEffect(() => {
+    let ativo = true;
     const lido = ler(typeof window === "undefined" ? null : localStorage.getItem(CHAVE));
+
+    // A tela abre com o que está aqui, sem esperar rede. A cópia da conta
+    // chega depois e é juntada — ninguém fica olhando para uma tela vazia
+    // porque a internet está lenta.
     const { relatorio: limpo, removidas } = expurgar(lido);
-    // A lista da Espanha entra aqui na primeira abertura. Semear não toca no
-    // que já existe nem traz de volta o que foi apagado.
     const { relatorio: completo, adicionados } = semear(limpo);
     setRelatorio(completo);
     setSaiu(removidas);
     if (removidas.length > 0 || adicionados > 0) guardar(completo);
     setPronto(true);
-    // Os arquivos vivem em outro cofre (IndexedDB) e são lidos à parte.
-    listarFichas().then(setFichas).catch(() => setFichas([]));
-  }, []);
+    void listarFichas()
+      .then(async (locais) => {
+        if (!ativo) return;
+        setFichas(locais);
+        // O que está no cofre e não está aqui volta — é isto que faz um
+        // navegador limpo recuperar os documentos.
+        const { baixados } = await restaurar(supabase, locais);
+        if (ativo && baixados > 0) {
+          setFichas(await listarFichas());
+          setAviso(`${baixados} arquivo(s) recuperado(s) da sua conta.`);
+        }
+      })
+      .catch(() => setFichas([]));
 
-  function aplicar(proximo: Relatorio) {
-    setRelatorio(proximo);
-    guardar(proximo);
-  }
+    void puxar(supabase, completo).then(({ relatorio: unido, revisao: rev, estado }) => {
+      if (!ativo) return;
+      revisao.current = rev;
+      setEspelho(estado);
+      // Semear de novo porque a cópia da conta pode ser de uma versão antiga
+      // da lista, sem os itens que entraram depois.
+      const { relatorio: final } = semear(unido);
+      setRelatorio(final);
+      guardar(final);
+    });
+
+    return () => {
+      ativo = false;
+    };
+  }, [supabase]);
+
+  /**
+   * Grava aqui primeiro, na conta depois.
+   *
+   * O local é imediato porque é o que a pessoa vê. A conta pode falhar, e
+   * quando falha a tela diz — o relatório continua inteiro de qualquer jeito.
+   */
+  const aplicar = useCallback(
+    (proximo: Relatorio) => {
+      setRelatorio(proximo);
+      guardar(proximo);
+      void empurrar(supabase, proximo, revisao.current).then(({ revisao: rev, estado }) => {
+        revisao.current = rev;
+        setEspelho(estado);
+      });
+    },
+    [supabase],
+  );
 
   const anotacoes = useMemo(() => porUrgencia(relatorio.anotacoes), [relatorio.anotacoes]);
   const progresso = progressoDocumentos(relatorio.documentos);
@@ -122,18 +172,34 @@ export function RelatorioKaua() {
     setNovoDoc("");
   }
 
+  /**
+   * Anexa aqui e manda a cópia para o cofre.
+   *
+   * A validação vem antes de tudo: formato e tamanho são conferidos contra o
+   * que o cofre aceita, e o tipo é checado pelos primeiros bytes, não pela
+   * extensão. Guardar um arquivo que a conta nunca aceitaria seria prometer
+   * uma proteção que não viria.
+   */
   async function anexar(documentoId: string, arquivo: File) {
     try {
-      await salvarAnexo(documentoId, arquivo);
+      await validar(arquivo);
+      const ficha = await salvarAnexo(documentoId, arquivo);
       setFichas(await listarFichas());
       setAviso("");
+
+      const copia = await subir(supabase, ficha);
+      if (!copia.ok) setAviso(`Guardado aqui, mas a cópia na conta falhou: ${copia.motivo}`);
     } catch (erro) {
       setAviso(erro instanceof Error ? erro.message : "Não consegui guardar esse arquivo.");
     }
   }
 
   async function tirarAnexo(id: string) {
+    const ficha = fichas.find((item) => item.id === id);
     await removerAnexo(id);
+    // A cópia do cofre sai junto: deixá-la lá seria guardar um documento que a
+    // pessoa mandou apagar.
+    if (ficha) await removerDoCofre(supabase, ficha);
     setFichas(await listarFichas());
   }
 
@@ -145,6 +211,9 @@ export function RelatorioKaua() {
    */
   async function apagarDocumento(id: string) {
     aplicar(removerDocumento(relatorio, id));
+    for (const ficha of fichas.filter((item) => item.documentoId === id)) {
+      await removerDoCofre(supabase, ficha);
+    }
     await removerDoDocumento(id);
     setFichas(await listarFichas());
   }
@@ -179,6 +248,10 @@ export function RelatorioKaua() {
           <h1>Relatório do Kauã</h1>
         </div>
         <div className="relatorio-acoes">
+          <span className={`relatorio-espelho ${protegido(espelho) ? "ok" : "alerta"}`} role="status">
+            {protegido(espelho) ? <Cloud size={14} /> : <CloudOff size={14} />}
+            {descrever(espelho)}
+          </span>
           <button onClick={exportar}>
             <Download size={15} /> Exportar
           </button>
@@ -486,8 +559,9 @@ export function RelatorioKaua() {
 
       <footer className="relatorio-rodape">
         <p>
-          Isto vive só neste navegador — sem conta e sem servidor, como você pediu. Limpar os dados do site apaga
-          tudo, inclusive os arquivos anexados.
+          {protegido(espelho)
+            ? "As anotações, a checklist e os arquivos anexados têm cópia na sua conta: limpar este navegador não perde nada."
+            : "Sem a cópia na conta, tudo isto vive só neste navegador — limpar os dados do site apaga tudo."}
         </p>
         {fichas.length > 0 && (
           <p className="relatorio-espaco">
