@@ -13,8 +13,9 @@ test('host confusion, credentials, local files and insecure navigation are rejec
   assert.equal(p.canNavigate('https://sat-simulado.vercel.app/', true), false);
 });
 test('external dispatch cannot pass commands or parameters to local protocols', () => {
-  for (const url of ['condor://open?command=delete', 'condor://open/other', 'cmd:/c calc', 'powershell:bad', 'file:///C:/bad.exe', 'ms-msdt:/bad', 'javascript:bad', 'https://user:secret@example.com']) assert.equal(p.externalTarget(url), null);
-  assert.equal(p.externalTarget('condor://open'), 'condor://open');
+  // Nenhum protocolo local passa mais: a única exceção que havia saiu com o
+  // Condor, e o teste agora guarda a ausência dela.
+  for (const url of ['condor://open', 'condor://open?command=delete', 'jade://open', 'cmd:/c calc', 'powershell:bad', 'file:///C:/bad.exe', 'ms-msdt:/bad', 'javascript:bad', 'https://user:secret@example.com']) assert.equal(p.externalTarget(url), null);
   assert.equal(p.externalTarget('https://www.ox.ac.uk/'), 'https://www.ox.ac.uk/');
 });
 test('exports must originate from the workspace', () => {

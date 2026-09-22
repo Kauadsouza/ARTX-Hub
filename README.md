@@ -22,7 +22,6 @@ The Hub is an **orchestration layer**. Each product keeps its own deployment, it
 | [Video Studio](https://github.com/Kauadsouza/KauaArtx-Video-Studio) | YouTube ideas, scripts and publishing | Embedded, with the Hub session |
 | [Idiomas](https://github.com/Kauadsouza/SAT-simulado) | English and Spanish: daily study and exams | Embedded, with the Hub session |
 | [University Path](https://github.com/Kauadsouza/University-Path) | UK undergraduate application planning | Embedded, with the Hub session |
-| [Condor](https://github.com/Kauadsouza/Condor-Ai) | Local-first personal assistant | Overview and local shortcut only |
 
 ## Windows application
 
@@ -43,7 +42,7 @@ The owner signs in with a Supabase account. Everyone else creates an account and
 - **No service credential in the browser.** Only the Supabase URL and publishable key reach the client.
 - **Hardened Electron:** sandbox, context isolation, and fuses disabling `runAsNode`, CLI inspection and loading outside the asar.
 - **Releases with provenance.** The build verifies that the tag matches the version, generates SHA256SUMS and emits a GitHub build-provenance attestation. The installer is not yet Authenticode-signed — that is stated in the release itself rather than hidden.
-- **Recovery documented honestly**, including what signing in does *not* bring back (Condor's local memory).
+- **Recovery documented honestly**, including what signing in does *not* bring back.
 
 ## Tech stack
 
@@ -69,7 +68,7 @@ NEXT_PUBLIC_SAT_URL
 
 Only public Supabase values belong in browser variables. Never use a `service_role` key in this application.
 
-Optional: `ANTHROPIC_API_KEY` enables the Hub assistant in the Condor tab. Without it, the tab explains that it is not configured yet and everything else keeps working.
+Optional: `ANTHROPIC_API_KEY` enables Jade, the Hub's intelligence. Without it, the tab explains that it is not configured yet and everything else keeps working.
 
 ## Verification
 

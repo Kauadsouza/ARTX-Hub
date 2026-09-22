@@ -9,14 +9,14 @@ The desktop app opens **https://artx-hub.vercel.app/** in a dedicated, sandboxed
 3. Run the installer and open the ARTX Hub shortcut.
 4. Sign in with your existing account. Use each application's sync indicator before changing devices.
 
-Requires Windows 10/11 x64 and internet. No Node.js, Python or Git is needed to use the Hub app. This is a Windows EXE, not an Android APK; phones use the website/PWA. Condor is installed separately and keeps its local permissions and private memory separate.
+Requires Windows 10/11 x64 and internet. No Node.js, Python or Git is needed to use the Hub app. This is a Windows EXE, not an Android APK; phones use the website/PWA.
 
 ## Security boundaries
 
 - HTTPS only for the Hub and its known embedded applications.
 - Sandboxing, context isolation, web security and cookie encryption enabled.
 - No preload bridge, Node integration, embedded terminals or privileged IPC exposed to the website.
-- Navigation is restricted; external HTTPS links and the exact `condor://open` protocol require a native confirmation.
+- Navigation is restricted; external HTTPS links require a native confirmation, and no local protocol is allowed.
 - Device access denied by default. Audio-only English practice requires approval for the study origin.
 - Downloads use a save dialog and are never automatically executed.
 - No credentials, browser profiles, private documents, database copies or environment files are included in the package.

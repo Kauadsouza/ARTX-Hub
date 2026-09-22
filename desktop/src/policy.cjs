@@ -21,7 +21,9 @@ function canNavigate(value, mainFrame) {
   return mainFrame ? isHub(value) : value === 'about:blank' || isWorkspace(value);
 }
 function externalTarget(value) {
-  if (value === 'condor://open') return value;
+  // Só HTTPS. A única exceção que existia aqui era o protocolo local do Condor,
+  // que saiu do Hub — e uma exceção numa lista de permissão precisa de um
+  // motivo vivo para continuar de pé.
   return secureURL(value)?.href ?? null;
 }
 function canDownload(value) {

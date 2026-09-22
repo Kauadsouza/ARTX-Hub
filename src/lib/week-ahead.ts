@@ -19,7 +19,7 @@ export type Urgency = "agora" | "semana" | "mes" | "adiante";
 export type Signal = {
   id: string;
   /** Para onde o clique leva. */
-  target: "site" | "videos" | "sat" | "university" | "condor" | "overview";
+  target: "site" | "videos" | "sat" | "university" | "jade" | "overview";
   urgency: Urgency;
   title: string;
   /** O número que importa, já pronto para a tela. */
@@ -135,7 +135,7 @@ export function projectLabel(slug: string): string {
     videos: "Video Studio",
     site: "Site KauaArtx",
     university: "University Path",
-    condor: "Condor AI",
+    jade: "Jade",
   };
   return labels[slug] ?? slug;
 }

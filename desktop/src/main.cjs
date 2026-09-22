@@ -31,12 +31,12 @@ async function openExternal(value) {
   try {
     const result = await dialog.showMessageBox(window, {
       type: 'question', title: 'ARTX Hub',
-      message: target === 'condor://open' ? 'Abrir o Condor instalado neste PC?' : 'Abrir este endereço no navegador?',
+      message: 'Abrir este endereço no navegador?',
       detail: target, buttons: ['Cancelar', 'Abrir'], defaultId: 0, cancelId: 0,
     });
     if (result.response === 1) await shell.openExternal(target);
   } catch {
-    await dialog.showMessageBox(window, { type: 'info', message: 'Não foi possível abrir o aplicativo ou endereço.', detail: 'Para usar o Condor, instale-o neste computador primeiro.' });
+    await dialog.showMessageBox(window, { type: 'info', message: 'Não foi possível abrir este endereço.' });
   } finally { externalPromptOpen = false; }
 }
 
@@ -125,7 +125,7 @@ function createWindow() {
       { label: 'Verificar atualizações agora', click: () => void checkNow(window) },
       { label: 'Todas as versões publicadas', click: () => void shell.openExternal(RELEASE_URL) },
       { label: 'Abrir o site', click: () => void shell.openExternal(policy.HUB_URL) },
-      { label: 'Sobre', click: () => void dialog.showMessageBox(window, { title: 'ARTX Hub', message: `ARTX Hub ${app.getVersion()}`, detail: `Aplicativo para Windows. Use sua conta do Hub para acessar os mesmos dados do site. O Condor requer instalação separada.
+      { label: 'Sobre', click: () => void dialog.showMessageBox(window, { title: 'ARTX Hub', message: `ARTX Hub ${app.getVersion()}`, detail: `Aplicativo para Windows. Use sua conta do Hub para acessar os mesmos dados do site.
 
 O conteúdo vem do site ao vivo, então ele se atualiza sozinho: se algo parecer antigo, use Recarregar ignorando o cache (Ctrl+Shift+R). Atualizar o aplicativo só é necessário quando muda o programa em volta.` }) },
     ] },

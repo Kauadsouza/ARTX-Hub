@@ -22,7 +22,6 @@ El Hub es una **capa de orquestación**. Cada producto conserva su propio despli
 | [Video Studio](https://github.com/Kauadsouza/KauaArtx-Video-Studio) | Ideas, guiones y publicación en YouTube | Integrada, con la sesión del Hub |
 | [Idiomas](https://github.com/Kauadsouza/SAT-simulado) | Inglés y español: estudio diario y exámenes | Integrada, con la sesión del Hub |
 | [University Path](https://github.com/Kauadsouza/University-Path) | Candidatura a universidades del Reino Unido | Integrada, con la sesión del Hub |
-| [Condor](https://github.com/Kauadsouza/Condor-Ai) | Asistente personal local | Solo vista general y acceso local |
 
 ## Aplicación para Windows
 
@@ -43,7 +42,7 @@ El propietario entra con su cuenta de Supabase. Las demás personas crean una cu
 - **Ninguna credencial de servicio en el navegador.** Solo la URL y la clave publicable de Supabase llegan al cliente.
 - **Electron endurecido:** sandbox, aislamiento de contexto y fuses que desactivan `runAsNode`, la inspección por CLI y la carga fuera del asar.
 - **Versiones con procedencia.** La compilación verifica que la etiqueta coincida con la versión, genera SHA256SUMS y emite una atestación de procedencia de GitHub. El instalador aún no está firmado con Authenticode, y eso se declara en la propia publicación en vez de ocultarse.
-- **Recuperación documentada con honestidad**, incluido lo que iniciar sesión *no* devuelve (la memoria local de Condor).
+- **Recuperación documentada con honestidad**, incluido lo que iniciar sesión *no* devuelve.
 
 ## Tecnologías
 
@@ -69,7 +68,7 @@ NEXT_PUBLIC_SAT_URL
 
 Solo los valores públicos de Supabase deben ir en variables del navegador. Nunca uses una clave `service_role` en esta aplicación.
 
-Opcional: `ANTHROPIC_API_KEY` habilita el asistente del Hub en la pestaña Condor. Sin ella, la pestaña explica que aún no está configurada y el resto sigue funcionando.
+Opcional: `ANTHROPIC_API_KEY` habilita a Jade, la inteligencia del Hub. Sin ella, la pestaña explica que aún no está configurada y el resto sigue funcionando.
 
 ## Verificación
 

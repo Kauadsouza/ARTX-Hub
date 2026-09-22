@@ -21,7 +21,7 @@ export default function DownloadPage() {
       <article><span>02</span><h2>Entre na sua conta</h2><p>Use seu login atual. Instalar o aplicativo não libera acesso às contas de outras pessoas. Novas contas continuam sujeitas à aprovação.</p></article>
       <article><span>03</span><h2>Continue de onde parou</h2><p>Os dados sincronizados com sua conta ficam disponíveis no site e no aplicativo. Confira o estado de sincronização em cada sistema antes de trocar de computador.</p></article>
     </section>
-    <section className="download-note"><ShieldCheck size={24} /><div><h2>Seu acesso continua privado</h2><p>O instalador é público; seus dados exigem autenticação. Ele não contém suas senhas ou seus arquivos. O Condor é instalado separadamente e sua memória local exige um backup próprio.</p><p>Esta versão ainda não possui assinatura digital de editor. Confira a origem e os arquivos de verificação no GitHub. Você também pode continuar usando o site.</p></div></section>
+    <section className="download-note"><ShieldCheck size={24} /><div><h2>Seu acesso continua privado</h2><p>O instalador é público; seus dados exigem autenticação. Ele não contém suas senhas ou seus arquivos.</p><p>Esta versão ainda não possui assinatura digital de editor. Confira a origem e os arquivos de verificação no GitHub. Você também pode continuar usando o site.</p></div></section>
     <footer><Link href="/">Voltar ao Hub</Link><a href="https://github.com/Kauadsouza/ARTX-Hub/blob/main/docs/RECOVERY.md">Recuperar acesso em outro PC <ArrowUpRight size={14} /></a></footer>
   </main>;
 }

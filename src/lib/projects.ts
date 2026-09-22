@@ -1,7 +1,7 @@
 import { BrainCircuit, Film, Globe2, GraduationCap, type LucideIcon } from "lucide-react";
 
 export type Project = {
-  slug: "site" | "videos" | "sat" | "university" | "condor";
+  slug: "site" | "videos" | "sat" | "university" | "jade";
   name: string;
   description: string;
   status: string;
@@ -53,8 +53,8 @@ export const projects: Project[] = [
     mode: "external",
   },
   {
-    slug: "condor",
-    name: "Condor AI",
+    slug: "jade",
+    name: "Jade",
     description: "Seu assistente local e centro de automações no PC.",
     status: "Local no PC",
     color: "orange",

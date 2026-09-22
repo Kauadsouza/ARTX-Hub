@@ -18,12 +18,9 @@ O site continua disponível se você não puder instalar o aplicativo. Ele reque
 | Progresso de estudos | IndexedDB e sincronização de conta | Mesmo perfil/conta; confirmar que houve envio antes de perder o dispositivo |
 | Planejamento universitário | Dados locais e sincronização de conta | Mesmo login; confirmar sincronização |
 | Documentos e certificados enviados | Supabase Storage privado | Mesmo login, desde que o upload tenha sido concluído |
-| Memória, identidade e configurações locais do Condor | Pasta privada `.condor` no PC | Backup próprio dessa pasta e a frase secreta original |
 | Código dos seis sistemas | Repositórios GitHub independentes | Clonar ou baixar o repositório correspondente |
 
-**O login recupera o que foi sincronizado. Arquivos que ficaram apenas no PC não aparecem automaticamente em outro dispositivo.** Este instalador não cria um backup da memória local do Condor nem transforma o GitHub em banco de dados pessoal.
-
-Para cobrir esse ponto, o repositório do [Condor](https://github.com/Kauadsouza/Condor-Ai) tem `scripts/backup_condor_data.ps1` e `scripts/restore_condor_data.ps1`: eles copiam apenas os dados privados e únicos (`config.yaml`, memória, segurança, auditoria e logs — não os modelos, que são grandes e podem ser baixados de novo) e geram um arquivo `.enc` criptografado com AES-256 a partir de uma frase secreta escolhida na hora. Guarde esse arquivo fora deste PC (pendrive, nuvem pessoal) e a frase secreta em um cofre de senhas separado; sem a frase, nem o próprio dono recupera o backup.
+**O login recupera o que foi sincronizado. Arquivos que ficaram apenas no PC não aparecem automaticamente em outro dispositivo.** Este instalador não transforma o GitHub em banco de dados pessoal.
 
 ## Contas e privacidade
 
@@ -40,7 +37,6 @@ Repositórios:
 - [SAT & English Learning](https://github.com/Kauadsouza/SAT-simulado)
 - [University Path — acesso privado](https://github.com/Kauadsouza/University-Path)
 - [Site KauaArtx](https://github.com/Kauadsouza/Site-KauaArtx)
-- [Condor](https://github.com/Kauadsouza/Condor-Ai)
 
 O GitHub guarda código, migrações, documentação e instaladores publicados. Os projetos Vercel e Supabase pertencem às respectivas contas e continuam existindo quando o PC é perdido. Variáveis secretas ficam nos serviços e não devem ser publicadas no código. A perda também dessas contas exige um plano adicional de backup da infraestrutura.
 

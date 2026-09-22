@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 export const dynamic = "force-static";
 
 export default function manifest(): MetadataRoute.Manifest {
-  const basePath = process.env.CONDOR_LOCAL_BUILD === "1" ? "/hub" : "";
+  const basePath = process.env.HUB_LOCAL_BUILD === "1" ? "/hub" : "";
   return {
     name: "ARTX Hub",
     short_name: "ARTX Hub",

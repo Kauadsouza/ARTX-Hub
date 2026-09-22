@@ -22,7 +22,6 @@ O Hub é uma **camada de orquestração**. Cada produto continua com deploy pró
 | [Video Studio](https://github.com/Kauadsouza/KauaArtx-Video-Studio) | Ideias, roteiros e publicação no YouTube | Embutida, com sessão do Hub |
 | [Idiomas](https://github.com/Kauadsouza/SAT-simulado) | Inglês e espanhol: estudo diário e provas | Embutida, com sessão do Hub |
 | [University Path](https://github.com/Kauadsouza/University-Path) | Candidatura a universidades no Reino Unido | Embutida, com sessão do Hub |
-| [Condor](https://github.com/Kauadsouza/Condor-Ai) | Assistente pessoal local | Só visão geral e atalho local |
 
 ## Aplicativo para Windows
 
@@ -43,7 +42,7 @@ O proprietário entra pela conta Supabase. Outras pessoas criam conta e ficam **
 - **Nenhuma credencial de serviço no navegador.** Só URL e chave publicável do Supabase chegam ao cliente.
 - **Electron endurecido:** sandbox, isolamento de contexto e fuses desligando `runAsNode`, inspeção por CLI e carregamento fora do asar.
 - **Release com procedência.** A build confere se a tag bate com a versão, gera SHA256SUMS e emite atestado de proveniência do GitHub. O instalador ainda não tem assinatura Authenticode — isso está declarado na própria release, não escondido.
-- **Recuperação documentada e honesta**, incluindo o que o login *não* traz de volta (a memória local do Condor).
+- **Recuperação documentada e honesta**, incluindo o que o login *não* traz de volta.
 
 ## Tecnologias
 
@@ -69,7 +68,7 @@ NEXT_PUBLIC_SAT_URL
 
 Só valores públicos do Supabase entram em variáveis do navegador. Nunca use uma chave `service_role` nesta aplicação.
 
-Opcional: `ANTHROPIC_API_KEY` habilita o assistente do Hub na aba Condor. Sem ela, a aba explica que ainda não foi configurada e o resto segue funcionando.
+Opcional: `ANTHROPIC_API_KEY` habilita a Jade, a inteligência do Hub. Sem ela, a aba explica que ainda não foi configurada e o resto segue funcionando.
 
 ## Verificação
 

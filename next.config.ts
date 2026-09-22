@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const isCondorLocalBuild = process.env.CONDOR_LOCAL_BUILD === "1";
+const isHubLocalBuild = process.env.HUB_LOCAL_BUILD === "1";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -33,7 +33,7 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
 ];
 
-const nextConfig: NextConfig = isCondorLocalBuild
+const nextConfig: NextConfig = isHubLocalBuild
   ? {
       output: "export",
       basePath: "/hub",

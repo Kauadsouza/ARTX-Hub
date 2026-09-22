@@ -38,7 +38,7 @@ import { parseRouteSignals, type RouteSignals } from "@/lib/week-ahead";
 import { certificateBucket, certificatePath, certificateReference, downloadCertificate, localCertificate, parseCertificateReference, isStoredCertificate, validateCertificate } from "@/lib/course-certificates";
 import { PersonalDashboard } from "@/components/PersonalDashboard";
 import { RelatorioKaua } from "@/components/RelatorioKaua";
-import { CondorWorkspace } from "@/components/CondorWorkspace";
+import { JadeWorkspace } from "@/components/JadeWorkspace";
 import { CoursesResume, courseCatalog, type CourseProgress, type CourseProgressPatch, type CourseProgressStatus } from "@/components/CoursesResume";
 import { AccountApprovals } from "./AccountApprovals";
 import { useI18n, LanguageSwitch } from "./I18n";
@@ -51,8 +51,8 @@ type Task = {
   created_at?: string;
 };
 
-type View = "approvals" | "security" | "overview" | "relatorio" | "site" | "videos" | "sat" | "university" | "career" | "condor";
-type ProjectKey = "site" | "videos" | "sat" | "university" | "condor" | "geral";
+type View = "approvals" | "security" | "overview" | "relatorio" | "site" | "videos" | "sat" | "university" | "career" | "jade";
+type ProjectKey = "site" | "videos" | "sat" | "university" | "jade" | "geral";
 type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
 type MemberWorkspace = "videos" | "study" | "university";
 type MemberHubSession = { token: string; principal: string; owner: false; username: string; appTokens: Partial<Record<MemberWorkspace, string>> };
@@ -100,7 +100,7 @@ async function localHubRequest<T>(path: string, init?: RequestInit): Promise<T> 
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.erro || "O Condor não concluiu esta ação.");
+  if (!response.ok) throw new Error(payload.erro || "A Jade não concluiu esta ação.");
   return payload as T;
 }
 
@@ -153,12 +153,12 @@ const workspaces: Record<Exclude<View, "overview" | "career" | "approvals" | "se
     status: "Planejamento",
     statusTone: "mint",
   },
-  condor: {
-    label: "Condor AI",
+  jade: {
+    label: "Jade",
     eyebrow: "INTELIGÊNCIA DO HUB",
     description: "Assistente independente. Os estudos e o canal funcionam sem depender dele.",
-    logo: assetPath("/brand/condor.svg"),
-    project: "condor",
+    logo: assetPath("/brand/jade.svg"),
+    project: "jade",
     icon: MonitorCog,
     accent: "mint",
     status: "Separado",
@@ -176,13 +176,13 @@ const pageMeta: Record<View, { eyebrow: string; title: string }> = {
   sat: { eyebrow: workspaces.sat.eyebrow, title: workspaces.sat.label },
   university: { eyebrow: workspaces.university.eyebrow, title: workspaces.university.label },
   career: { eyebrow: "DESENVOLVIMENTO PESSOAL", title: "Currículo & Cursos" },
-  condor: { eyebrow: workspaces.condor.eyebrow, title: workspaces.condor.label },
+  jade: { eyebrow: workspaces.jade.eyebrow, title: workspaces.jade.label },
 };
 
 
 
 function isWorkspaceView(view: View): view is keyof typeof workspaces {
-  return view === "site" || view === "videos" || view === "sat" || view === "university" || view === "condor";
+  return view === "site" || view === "videos" || view === "sat" || view === "university" || view === "jade";
 }
 
 export function Hub() {
@@ -755,7 +755,7 @@ export function Hub() {
         <button className="icon-button menu-button" onClick={() => setSidebarOpen(true)} aria-label={t("Abrir menu")}><Menu size={19} /></button>
         <div className="breadcrumb"><span>ARTX</span><ChevronRight size={13} /><strong>{t(page.title)}</strong></div>
         <div className="header-actions"><LanguageSwitch />
-          <button className={`condor-header-trigger${activeView === "condor" ? " active" : ""}`} onClick={() => goTo("condor")} title="Condor" aria-label="Condor" aria-pressed={activeView === "condor"}><Sparkles size={16} /><span>Condor</span></button>
+          <button className={`jade-header-trigger${activeView === "jade" ? " active" : ""}`} onClick={() => goTo("jade")} title="Jade" aria-label="Jade" aria-pressed={activeView === "jade"}><Sparkles size={16} /><span>Jade</span></button>
           <button className="command-trigger" onClick={() => setCommandOpen(true)}><Search size={16} /><span>{t("Buscar")}</span><kbd>⌘ K</kbd></button>
           <button className="quick-create" onClick={() => goTo("overview")}><Sparkles size={16} /><span>{t("Meu foco")}</span></button>
           <button className="synced sync-status" onClick={() => void loadWorkspace()} title={t("Atualizar dados")} aria-live="polite"><Cloud size={15} /><span>{syncing ? t("Sincronizando…") : syncError ? t("Verificar conexão") : localMode ? "Local" : t("Sincronizado")}</span></button>
@@ -768,21 +768,21 @@ export function Hub() {
       {activeView === "career" && <CoursesResume progress={courseProgress} savingCourseId={savingCourseId ?? certificateBusyId ?? (!localMode && (syncing || syncError) ? "sync" : null)} localOnly={localMode} onUpdate={updateCourseProgress} onAttach={attachCourseCertificate} onDownload={retrieveCourseCertificate} />}
       {activeView === "approvals" && <AccountApprovals token={hubAccessToken} />}
       {activeView === "security" && <section className="security-settings"><p className="eyebrow">CONTA PROPRIETÁRIA</p><h1>Alterar senha do Hub</h1><p>Conta conectada: <strong>{sessionEmail || "Sessão local"}</strong>. Esta ação muda somente a senha principal; dados e aprovações continuam intactos.</p><form onSubmit={changeOwnerPassword}><label>Nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPassword} onChange={(event) => setOwnerPassword(event.target.value)} /></label><label>Confirmar nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPasswordConfirmation} onChange={(event) => setOwnerPasswordConfirmation(event.target.value)} /></label><button className="quick-create" type="submit" disabled={passwordUpdatePending}>{passwordUpdatePending ? "Atualizando…" : "Salvar nova senha"}</button><p role="status" aria-live="polite">{passwordUpdateMessage}</p></form></section>}
-      {activeView === "condor" && <CondorWorkspace
+      {activeView === "jade" && <JadeWorkspace
         localMode={localMode}
         accessToken={hubAccessToken}
         activities={tasks}
         onCreateActivity={createActivity}
         onToggleActivity={toggleTask}
       />}
-      {activeWorkspace && activeView !== "condor" && <WorkspaceView
+      {activeWorkspace && activeView !== "jade" && <WorkspaceView
         workspace={activeWorkspace}
         hubAccessToken={hubAccessToken}
         refreshKey={refreshKey}
         previewMode={previewMode}
         onPreviewMode={setPreviewMode}
         onStatus={registerSystemSignal}
-        onOpenCondor={() => goTo("condor")}
+        onOpenJade={() => goTo("jade")}
         onRefresh={() => { setRefreshKey((key) => key + 1); notify("Preview atualizado"); }}
       />}
     </section>
@@ -828,7 +828,7 @@ function EmptyState({ label, compact = false }: { label: string; compact?: boole
   return <div className={`empty-state ${compact ? "compact" : ""}`}><CheckCircle2 size={16} /><span>{t(label)}</span></div>;
 }
 
-function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh, onStatus, onOpenCondor }: {
+function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh, onStatus, onOpenJade }: {
   workspace: Workspace;
   hubAccessToken: string | null;
   refreshKey: number;
@@ -836,7 +836,7 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
   onPreviewMode: (mode: "desktop" | "mobile") => void;
   onRefresh: () => void;
   onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void;
-  onOpenCondor: () => void;
+  onOpenJade: () => void;
 }) {
   const { t } = useI18n();
   const [focusMode, setFocusMode] = useState(false);
@@ -872,13 +872,13 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
           <button className="frame-action focus-action" onClick={() => setFocusMode((current) => !current)} aria-pressed={focusMode} title={focusMode ? t("Sair da tela ampla") : t("Abrir em tela ampla")}>{focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}<span>{focusMode ? t("Voltar ao Hub") : t("Tela ampla")}</span></button>
           <a href={workspace.url} target="_blank" rel="noreferrer" title={t("Abrir em outra aba")}><ExternalLink size={16} /></a>
         </div></div>
-        <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} onStatus={onStatus} onOpenCondor={onOpenCondor} /></div>
+        <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} onStatus={onStatus} onOpenJade={onOpenJade} /></div>
       </article>
     </section>
   </div>;
 }
 
-function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, refreshKey, onStatus, onOpenCondor }: { workspace: Workspace; accessToken: string | null; memberAccessToken?: string; refreshKey: number; onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void; onOpenCondor?: () => void }) {
+function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, refreshKey, onStatus, onOpenJade }: { workspace: Workspace; accessToken: string | null; memberAccessToken?: string; refreshKey: number; onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void; onOpenJade?: () => void }) {
   const { t, language } = useI18n();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const usesHubSession = workspace.project === "videos" || workspace.project === "university" || workspace.project === "sat";
@@ -897,10 +897,10 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, ref
       if (event.source !== frameRef.current?.contentWindow || event.origin !== appOrigin) return;
       const expectedMessage = workspace.project === "videos" ? "ARTX_VIDEO_EMBED_READY" : workspace.project === "sat" ? "ARTX_STUDY_EMBED_READY" : "UNIVERSITY_PATH_EMBED_READY";
       if (usesHubSession && event.data?.type === expectedMessage) sendHubSession();
-      // O app embarcado pede a aba do Condor. Quem pode pedir ja foi filtrado
+      // O app embarcado pede a aba da Jade. Quem pode pedir ja foi filtrado
       // pela checagem de origem acima, entao aqui nao ha o que validar alem do
       // tipo — e o pedido so navega, nunca executa nada.
-      if (event.data?.type === "UNIVERSITY_PATH_OPEN_CONDOR") onOpenCondor?.();
+      if (event.data?.type === "UNIVERSITY_PATH_OPEN_JADE") onOpenJade?.();
       if (event.data?.type === "ARTX_SYSTEM_STATUS" && event.data.system === workspace.project && ["ready", "syncing", "attention"].includes(event.data.state) && typeof event.data.title === "string" && typeof event.data.detail === "string") {
         onStatus(workspace.project, { state: event.data.state, title: event.data.title.slice(0, 100), detail: event.data.detail.slice(0, 180) });
       }
@@ -909,7 +909,7 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, ref
     return () => {
       window.removeEventListener("message", onWorkspaceReady);
     };
-  }, [accessToken, appOrigin, onOpenCondor, onStatus, sendHubSession, usesHubSession, workspace.project]);
+  }, [accessToken, appOrigin, onOpenJade, onStatus, sendHubSession, usesHubSession, workspace.project]);
 
   // Status messages update the parent. They must not restart authentication.
   useEffect(() => {

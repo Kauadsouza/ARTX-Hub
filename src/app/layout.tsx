@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import "./condor.css";
+import "./jade.css";
 import { I18nProvider } from "@/components/I18n";
 
-const basePath = process.env.CONDOR_LOCAL_BUILD === "1" ? "/hub" : "";
+const basePath = process.env.HUB_LOCAL_BUILD === "1" ? "/hub" : "";
 
 export const metadata: Metadata = {
   title: "ARTX Hub",

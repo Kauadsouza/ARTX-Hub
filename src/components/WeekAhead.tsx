@@ -18,7 +18,7 @@ export function WeekAhead({
 }: {
   routes: RouteSignals | null;
   tasks: Task[];
-  onOpen: (view: "site" | "videos" | "sat" | "university" | "condor" | "overview") => void;
+  onOpen: (view: "site" | "videos" | "sat" | "university" | "jade" | "overview") => void;
 }) {
   const signals = buildWeek({ routes, tasks });
   if (signals.length === 0) return null;

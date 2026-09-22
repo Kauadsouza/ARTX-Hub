@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 function request(body, headers = {}) {
-  return new Request('http://localhost/api/condor-assistant', {
+  return new Request('http://localhost/api/jade-assistant', {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
@@ -11,14 +11,14 @@ function request(body, headers = {}) {
 
 test('rejects non-JSON content types', async () => {
   delete process.env.ANTHROPIC_API_KEY;
-  const { POST } = await import('../src/app/api/condor-assistant/route.ts');
-  const response = await POST(new Request('http://localhost/api/condor-assistant', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'x' }));
+  const { POST } = await import('../src/app/api/jade-assistant/route.ts');
+  const response = await POST(new Request('http://localhost/api/jade-assistant', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'x' }));
   assert.equal(response.status, 415);
 });
 
 test('reports not_configured without breaking the rest of the Hub when no API key is set', async () => {
   delete process.env.ANTHROPIC_API_KEY;
-  const { POST } = await import('../src/app/api/condor-assistant/route.ts');
+  const { POST } = await import('../src/app/api/jade-assistant/route.ts');
   const response = await POST(request({ accessToken: 'x', messages: [{ role: 'user', content: 'oi' }] }));
   assert.equal(response.status, 503);
   const body = await response.json();
@@ -29,7 +29,7 @@ test('rejects malformed message payloads once configured', async () => {
   process.env.ANTHROPIC_API_KEY = 'test-key';
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'test-public-key';
-  const { POST } = await import('../src/app/api/condor-assistant/route.ts');
+  const { POST } = await import('../src/app/api/jade-assistant/route.ts');
   const missingToken = await POST(request({ messages: [{ role: 'user', content: 'oi' }] }));
   assert.equal(missingToken.status, 401);
   const emptyMessages = await POST(request({ accessToken: 'x', messages: [] }));
