@@ -637,3 +637,11 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 .relatorio-espelho.ok{border-color:rgba(106,213,167,.28);background:rgba(106,213,167,.07);color:#8fd9b0}
 .relatorio-espelho.alerta{border-color:#936b37;background:#302419;color:#f3d8b3}
 @media(max-width:560px){.relatorio-espelho{max-width:none;width:100%}}
+
+/* O bloco do alerta, com a oferta de aviso no navegador ao lado. */
+.doc-alerta-bloco{display:flex;align-items:stretch;gap:8px;margin-bottom:22px}
+.doc-alerta-bloco .doc-alerta{flex:1;margin-bottom:0}
+.doc-alerta-permitir{display:flex;align-items:center;gap:7px;flex-shrink:0;padding:0 15px;border:1px solid #936b37;border-radius:14px;background:transparent;color:#f3d8b3;font-size:11.5px;white-space:nowrap;cursor:pointer}
+.doc-alerta-permitir:hover{border-color:#c89a5a}
+.doc-alerta-bloco.vencido .doc-alerta-permitir{border-color:#8a4038;color:#f5c3bd}
+@media(max-width:700px){.doc-alerta-bloco{flex-direction:column}.doc-alerta-permitir{justify-content:center;padding:11px 15px}}

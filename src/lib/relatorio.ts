@@ -360,6 +360,50 @@ export function resumoParaOHub(bruto: string | null, agora = new Date()): {
 }
 
 /**
+ * O relatório como itens de busca.
+ *
+ * A paleta do Hub já achava atividades e notas, mas não enxergava nada daqui —
+ * e é aqui que estão a checklist da Espanha e as anotações da semana. Procurar
+ * "passaporte" e não achar o item que se chama exatamente isso é o tipo de
+ * falha que faz a pessoa parar de usar a busca.
+ *
+ * Só lê. Devolve o texto e para onde ir; quem monta o comando é a paleta.
+ */
+export function itensParaBusca(bruto: string | null, agora = new Date()): Array<{
+  id: string;
+  grupo: "Anotações" | "Documentos";
+  texto: string;
+  detalhe: string;
+}> {
+  const relatorio = ler(bruto);
+  const itens: Array<{ id: string; grupo: "Anotações" | "Documentos"; texto: string; detalhe: string }> = [];
+
+  for (const nota of relatorio.anotacoes) {
+    const dias = diasRestantes(nota, agora);
+    itens.push({
+      id: `relatorio-nota-${nota.id}`,
+      grupo: "Anotações",
+      // A descrição entra na busca junto do título: quem lembra do conteúdo e
+      // não do nome ainda encontra.
+      texto: nota.descricao ? `${nota.titulo} — ${nota.descricao}` : nota.titulo,
+      detalhe: dias <= 0 ? "vence hoje" : `${dias} dia${dias > 1 ? "s" : ""}`,
+    });
+  }
+
+  for (const doc of relatorio.documentos) {
+    const estado = estadoValidade(doc, agora);
+    itens.push({
+      id: `relatorio-doc-${doc.id}`,
+      grupo: "Documentos",
+      texto: doc.nota ? `${doc.nome} — ${doc.nota}` : doc.nome,
+      detalhe: doc.feito ? "pronto" : estado === "vencido" ? "vencido" : estado === "vencendo" ? "vencendo" : "pendente",
+    });
+  }
+
+  return itens;
+}
+
+/**
  * Junta um arquivo importado ao que já existe, sem perder nada.
  *
  * Nada é sobrescrito: o que tem o mesmo id fica como está aqui. Um documento já

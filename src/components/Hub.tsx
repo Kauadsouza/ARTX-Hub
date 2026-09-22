@@ -36,6 +36,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { parseRouteSignals, type RouteSignals } from "@/lib/week-ahead";
 import { certificateBucket, certificatePath, certificateReference, downloadCertificate, localCertificate, parseCertificateReference, isStoredCertificate, validateCertificate } from "@/lib/course-certificates";
+import { itensParaBusca } from "@/lib/relatorio";
 import { PersonalDashboard } from "@/components/PersonalDashboard";
 import { RelatorioKaua } from "@/components/RelatorioKaua";
 import { JadeWorkspace } from "@/components/JadeWorkspace";
@@ -211,6 +212,22 @@ export function Hub() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+
+  /**
+   * O Relatório entra na busca.
+   *
+   * Ele mora no localStorage, não na conta, então é lido aqui e relido toda vez
+   * que a paleta abre — assim o que foi anotado há um minuto já aparece.
+   */
+  const [itensRelatorio, setItensRelatorio] = useState<ReturnType<typeof itensParaBusca>>([]);
+  useEffect(() => {
+    if (!commandOpen) return;
+    try {
+      setItensRelatorio(itensParaBusca(localStorage.getItem("artx-relatorio-kaua-v1")));
+    } catch {
+      setItensRelatorio([]);
+    }
+  }, [commandOpen]);
   const [commandQuery, setCommandQuery] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
@@ -708,8 +725,20 @@ export function Hub() {
 
     { id: "activity", group: "Pessoal", label: "Criar uma atividade", icon: Sparkles, run: () => goTo("overview") },
     { id: "backup", group: "Segurança", label: "Exportar backup do Hub", icon: Cloud, run: downloadHubBackup },
-    ...tasks.slice(0, 20).map(task => ({ id: `task-${task.id}`, group: "Atividades", label: task.title, icon: CheckCircle2, run: () => goTo("overview") })),
-    ...notes.slice(0, 20).map(note => ({ id: `note-${note.id}`, group: "Notas", label: note.content.slice(0, 90), icon: Command, run: () => goTo("overview") })),
+    { id: "relatorio", group: "Pessoal", label: "Abrir Relatório do Kauã", icon: NotebookPen, run: () => goTo("relatorio") },
+
+    /*
+      Sem `slice` pequeno antes do filtro.
+
+      Cortar em 20 aqui fazia a busca ignorar a atividade de número 21: a lista
+      era truncada e só depois filtrada, então procurar pelo nome exato não
+      achava nada. O teto agora existe só para não montar milhares de itens de
+      uma vez, e fica bem acima do uso real.
+    */
+    ...tasks.slice(0, 300).map(task => ({ id: `task-${task.id}`, group: "Atividades", label: task.title, icon: CheckCircle2, run: () => goTo("overview") })),
+    ...notes.slice(0, 300).map(note => ({ id: `note-${note.id}`, group: "Notas", label: note.content.slice(0, 90), icon: Command, run: () => goTo("overview") })),
+    ...courseProgress.slice(0, 100).map(item => ({ id: `course-${item.course_id}`, group: "Cursos", label: courseCatalog.find(c => c.id === item.course_id)?.name ?? item.course_id, icon: Award, run: () => goTo("career") })),
+    ...itensRelatorio.map(item => ({ id: item.id, group: item.grupo, label: `${item.texto} · ${item.detalhe}`, icon: NotebookPen, run: () => goTo("relatorio") })),
   ];
 
   return <main className={`hub-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""} ${activeWorkspace ? "workspace-active" : ""}`}>

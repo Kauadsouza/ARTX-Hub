@@ -673,3 +673,76 @@ test('sem conta, subir e listar falham dizendo o motivo — nunca em silêncio',
   assert.equal(r.baixados, 0);
   assert.ok(r.motivo);
 });
+
+// ══════════════ Busca unificada ══════════════
+
+test('anotações e documentos viram itens de busca, com o estado de cada um', async () => {
+  const { itensParaBusca, relatorioVazio, criarAnotacao, criarDocumento, definirValidade, alternarDocumento, definirNota } = await import('../src/lib/relatorio.ts');
+  const agora = meioDia('2026-09-21');
+
+  const guardado = JSON.stringify({
+    ...relatorioVazio(),
+    anotacoes: [criarAnotacao('Ligar pro consulado', 'pedir a lista vigente', meioDia('2026-09-20'))],
+    documentos: [
+      alternarDocumento(criarDocumento('Passaporte')),
+      definirValidade(criarDocumento('Antecedentes'), '2026-08-01'),
+      definirNota(criarDocumento('CPF'), 'tirar segunda via na Receita'),
+    ],
+  });
+
+  const itens = itensParaBusca(guardado, agora);
+  assert.equal(itens.length, 4);
+
+  const nota = itens.find((i) => i.grupo === 'Anotações');
+  assert.match(nota.texto, /Ligar pro consulado/);
+  assert.match(nota.texto, /lista vigente/, 'a descrição entra na busca: quem lembra do conteúdo e não do nome ainda acha');
+
+  assert.equal(itens.find((i) => i.texto.startsWith('Passaporte')).detalhe, 'pronto');
+  assert.equal(itens.find((i) => i.texto.startsWith('Antecedentes')).detalhe, 'vencido');
+  assert.match(itens.find((i) => i.texto.startsWith('CPF')).texto, /segunda via/, 'a observação também é buscável');
+});
+
+test('relatório vazio não gera item de busca, e lixo não quebra', async () => {
+  const { itensParaBusca } = await import('../src/lib/relatorio.ts');
+  for (const entrada of [null, '', '{', 'lixo', '{"anotacoes":1}']) {
+    assert.deepEqual(itensParaBusca(entrada), []);
+  }
+});
+
+// ══════════════ O aviso no título ══════════════
+
+test('o contador entra e sai do título sem empilhar', async () => {
+  globalThis.document = { title: 'ARTX Hub' };
+  const { marcarTitulo, limparTitulo } = await import('../src/lib/aviso-titulo.ts');
+
+  marcarTitulo(3);
+  assert.equal(document.title, '(3) ARTX Hub');
+
+  marcarTitulo(2);
+  assert.equal(document.title, '(2) ARTX Hub', 'não pode virar "(2) (3) ARTX Hub"');
+
+  marcarTitulo(0);
+  assert.equal(document.title, 'ARTX Hub', 'zero devolve o título limpo');
+
+  marcarTitulo(1);
+  limparTitulo();
+  assert.equal(document.title, 'ARTX Hub');
+  delete globalThis.document;
+});
+
+test('o texto do aviso cobre os três casos e cala quando não há nada', async () => {
+  const { textoDoAviso } = await import('../src/lib/aviso-titulo.ts');
+  assert.equal(textoDoAviso(0, 0), null, 'sem nada, não avisa');
+  assert.match(textoDoAviso(2, 0), /venceram/);
+  assert.match(textoDoAviso(0, 3), /vencendo/);
+  const ambos = textoDoAviso(1, 2);
+  assert.match(ambos, /vencido/);
+  assert.match(ambos, /vencendo/);
+});
+
+test('nunca dispara nem pede permissão sem que tenha sido concedida', async () => {
+  const { avisarSePermitido, podeOferecer } = await import('../src/lib/aviso-titulo.ts');
+  // Sem a API do navegador, as duas coisas respondem sem explodir.
+  assert.equal(avisarSePermitido('x'), false);
+  assert.equal(podeOferecer(), false);
+});

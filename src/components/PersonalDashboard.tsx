@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowUpRight, BookOpen, CalendarClock, Check, Circle, Cloud, Download, Plus, RefreshCw, Video } from "lucide-react";
+import { ArrowUpRight, Bell, BookOpen, CalendarClock, Check, Circle, Cloud, Download, Plus, RefreshCw, Video } from "lucide-react";
 import { PersonalFocus } from "./PersonalFocus";
 import { WeekAhead } from "./WeekAhead";
 import { daysUntil, type RouteSignals } from "@/lib/week-ahead";
 import { CHAVE, resumoParaOHub } from "@/lib/relatorio";
+import { avisarSePermitido, limparTitulo, marcarTitulo, pedirPermissao, podeOferecer, textoDoAviso } from "@/lib/aviso-titulo";
 import { useI18n } from "./I18n";
 
 type Task = { id: string; title: string; project_slug: string | null; completed: boolean };
@@ -156,36 +157,76 @@ function DocumentosVencendo({ onOpen }: { onOpen: (view: View) => void }) {
   const { t } = useI18n();
   const [resumo, setResumo] = useState<ReturnType<typeof resumoParaOHub> | null>(null);
 
+  const [oferecer, setOferecer] = useState(false);
+
   useEffect(() => {
+    let r = null;
     try {
-      setResumo(resumoParaOHub(localStorage.getItem(CHAVE)));
+      r = resumoParaOHub(localStorage.getItem(CHAVE));
     } catch {
-      setResumo(null);
+      r = null;
     }
+    setResumo(r);
+
+    /*
+      O contador no título da aba.
+
+      É o que alcança a pessoa sem servidor: enquanto o Hub estiver aberto em
+      algum lugar, o número aparece na aba, na barra de tarefas e no alternador
+      de janelas — mesmo com a aba no fundo. Notificação com o navegador
+      fechado exigiria e-mail ou push, que este sistema não tem, e prometer
+      isso seria mentir.
+    */
+    const pendentes = r ? r.vencidos + r.vencendo : 0;
+    marcarTitulo(pendentes);
+
+    const texto = r ? textoDoAviso(r.vencidos, r.vencendo) : null;
+    if (texto) avisarSePermitido(texto);
+    setOferecer(Boolean(texto) && podeOferecer());
+
+    // Sair da Visão geral não pode deixar o título sujo para sempre.
+    return () => limparTitulo();
   }, []);
 
   if (!resumo || (resumo.vencendo === 0 && resumo.vencidos === 0)) return null;
   const total = resumo.vencendo + resumo.vencidos;
 
   return (
-    <button className={`doc-alerta ${resumo.vencidos > 0 ? "vencido" : ""}`} onClick={() => onOpen("relatorio")}>
-      <CalendarClock size={16} />
-      <span>
-        <strong>
-          {total} {t(total > 1 ? "documentos pedindo atenção" : "documento pedindo atenção")}
-        </strong>
-        {resumo.proximo && (
-          <small>
-            {resumo.proximo.nome} —{" "}
-            {resumo.proximo.dias < 0
-              ? t("já venceu")
-              : resumo.proximo.dias === 0
-                ? t("vence hoje")
-                : `${resumo.proximo.dias} ${t(resumo.proximo.dias > 1 ? "dias" : "dia")}`}
-          </small>
-        )}
-      </span>
-      <ArrowUpRight size={16} />
-    </button>
+    <div className={`doc-alerta-bloco ${resumo.vencidos > 0 ? "vencido" : ""}`}>
+      <button className={`doc-alerta ${resumo.vencidos > 0 ? "vencido" : ""}`} onClick={() => onOpen("relatorio")}>
+        <CalendarClock size={16} />
+        <span>
+          <strong>
+            {total} {t(total > 1 ? "documentos pedindo atenção" : "documento pedindo atenção")}
+          </strong>
+          {resumo.proximo && (
+            <small>
+              {resumo.proximo.nome} —{" "}
+              {resumo.proximo.dias < 0
+                ? t("já venceu")
+                : resumo.proximo.dias === 0
+                  ? t("vence hoje")
+                  : `${resumo.proximo.dias} ${t(resumo.proximo.dias > 1 ? "dias" : "dia")}`}
+            </small>
+          )}
+        </span>
+        <ArrowUpRight size={16} />
+      </button>
+
+      {/*
+        A permissão só é pedida a partir deste clique.
+
+        Um site que abre a caixa de permissão sozinho é o que faz todo mundo
+        clicar em "bloquear" — e aí o canal morre para sempre.
+      */}
+      {oferecer && (
+        <button
+          className="doc-alerta-permitir"
+          onClick={() => void pedirPermissao().then(() => setOferecer(false))}
+        >
+          <Bell size={13} /> {t("Avisar no navegador")}
+        </button>
+      )}
+    </div>
   );
 }
