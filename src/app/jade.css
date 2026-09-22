@@ -27,9 +27,9 @@
   width: 38px;
   height: 38px;
   place-items: center;
-  border: 1px solid rgba(91, 220, 255, .25);
+  border: 1px solid rgba(106, 213, 167, .28);
   border-radius: 11px;
-  background: linear-gradient(145deg, rgba(69, 218, 255, .13), rgba(124, 91, 255, .13));
+  background: linear-gradient(145deg, rgba(106, 213, 167, .13), rgba(58, 140, 110, .13));
   color: #7de9ff;
 }
 .jade-identity > div { display: grid; gap: 2px; }
@@ -63,8 +63,8 @@
   border: 1px solid rgba(111, 119, 150, .19);
   border-radius: 20px;
   background:
-    radial-gradient(circle at 82% 50%, rgba(38, 172, 207, .18), transparent 28%),
-    radial-gradient(circle at 92% 20%, rgba(111, 75, 230, .2), transparent 23%),
+    radial-gradient(circle at 82% 50%, rgba(42, 160, 120, .18), transparent 28%),
+    radial-gradient(circle at 92% 20%, rgba(58, 140, 110, .2), transparent 23%),
     linear-gradient(135deg, #10121b, #080a10 63%, #0b1018);
   box-shadow: 0 28px 90px rgba(0, 0, 0, .27);
 }
@@ -72,13 +72,13 @@
   position: absolute;
   inset: 0;
   opacity: .18;
-  background-image: linear-gradient(rgba(99, 215, 255, .1) 1px, transparent 1px), linear-gradient(90deg, rgba(99, 215, 255, .1) 1px, transparent 1px);
+  background-image: linear-gradient(rgba(106, 213, 167, .1) 1px, transparent 1px), linear-gradient(90deg, rgba(106, 213, 167, .1) 1px, transparent 1px);
   background-size: 34px 34px;
   mask-image: linear-gradient(90deg, transparent 8%, black 92%);
   content: "";
 }
 .jade-assistant-hero > div:first-child { position: relative; z-index: 2; align-self: center; padding: 44px 30px 44px 48px; }
-.jade-assistant-hero p { display: flex; align-items: center; gap: 6px; margin: 0; color: #6de1ff; font-size: 9px; font-weight: 850; letter-spacing: 1.35px; }
+.jade-assistant-hero p { display: flex; align-items: center; gap: 6px; margin: 0; color: #6ad5a7; font-size: 9px; font-weight: 850; letter-spacing: 1.35px; }
 .jade-assistant-hero h1 { margin: 12px 0 12px; font-size: clamp(40px, 5vw, 68px); letter-spacing: -3px; line-height: .98; }
 .jade-assistant-hero > div:first-child > span { display: block; max-width: 650px; color: #9aa2b5; font-size: 14px; line-height: 1.65; }
 
@@ -90,23 +90,23 @@
   width: 118px;
   height: 118px;
   place-items: center;
-  border: 1px solid rgba(101, 224, 255, .5);
+  border: 1px solid rgba(106, 213, 167, .5);
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(71, 215, 255, .25), rgba(74, 67, 156, .18) 44%, rgba(5, 8, 14, .95) 72%);
-  box-shadow: 0 0 75px rgba(64, 197, 242, .22), inset 0 0 35px rgba(83, 213, 255, .13);
+  background: radial-gradient(circle, rgba(106, 213, 167, .25), rgba(40, 110, 88, .18) 44%, rgba(5, 8, 14, .95) 72%);
+  box-shadow: 0 0 75px rgba(74, 194, 148, .22), inset 0 0 35px rgba(106, 213, 167, .13);
   font-size: 35px;
   font-weight: 900;
-  text-shadow: 0 0 22px rgba(122, 231, 255, .8);
+  text-shadow: 0 0 22px rgba(142, 229, 192, .8);
 }
 .jade-hero-core i {
   position: absolute;
   width: 180px;
   height: 180px;
-  border: 1px dashed rgba(91, 220, 255, .3);
+  border: 1px dashed rgba(106, 213, 167, .3);
   border-radius: 50%;
   animation: jade-spin 18s linear infinite;
 }
-.jade-hero-core i:last-child { width: 230px; height: 105px; border-color: rgba(139, 110, 255, .3); animation-direction: reverse; animation-duration: 12s; }
+.jade-hero-core i:last-child { width: 230px; height: 105px; border-color: rgba(74, 194, 148, .22); animation-direction: reverse; animation-duration: 12s; }
 
 .jade-assistant-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(330px, .55fr); gap: 12px; margin-top: 12px; }
 .jade-chat-panel,
@@ -129,7 +129,7 @@
 .jade-chat-panel > header > div,
 .jade-ready-panel > header > div { display: flex; align-items: center; gap: 10px; }
 .jade-chat-panel > header svg,
-.jade-ready-panel > header svg { color: #72e3fc; }
+.jade-ready-panel > header svg { color: #6ad5a7; }
 .jade-chat-panel header span,
 .jade-ready-panel header span { display: grid; gap: 2px; }
 .jade-chat-panel header strong,
@@ -142,32 +142,32 @@
 .jade-message { display: flex; align-items: flex-end; gap: 8px; max-width: 78%; }
 .jade-message.user { align-self: flex-end; }
 .jade-message p { margin: 0; padding: 11px 13px; border: 1px solid rgba(255, 255, 255, .07); border-radius: 5px 13px 13px 13px; background: rgba(255, 255, 255, .035); color: #c8cedb; font-size: 11px; line-height: 1.55; }
-.jade-message.user p { border-color: rgba(111, 94, 230, .28); border-radius: 13px 5px 13px 13px; background: linear-gradient(135deg, rgba(78, 57, 173, .65), rgba(35, 118, 148, .65)); color: #fff; }
-.jade-avatar { display: grid; width: 27px; height: 27px; flex: 0 0 27px; place-items: center; border: 1px solid rgba(99, 222, 251, .25); border-radius: 8px; background: rgba(63, 198, 231, .1); color: #7fe6fc; font-size: 10px; font-weight: 900; }
+.jade-message.user p { border-color: rgba(74, 194, 148, .3); border-radius: 13px 5px 13px 13px; background: linear-gradient(135deg, rgba(32, 104, 82, .8), rgba(26, 82, 68, .8)); color: #fff; }
+.jade-avatar { display: grid; width: 27px; height: 27px; flex: 0 0 27px; place-items: center; border: 1px solid rgba(106, 213, 167, .3); border-radius: 8px; background: rgba(106, 213, 167, .12); color: #8ee5c0; font-size: 10px; font-weight: 900; }
 .jade-thinking { display: flex; gap: 4px; }
 .jade-thinking i { width: 5px; height: 5px; border-radius: 50%; background: #79ddf5; animation: jade-think 1s ease-in-out infinite; }
 .jade-thinking i:nth-child(2) { animation-delay: .12s; }
 .jade-thinking i:nth-child(3) { animation-delay: .24s; }
 
 .jade-suggestions { display: flex; gap: 7px; padding: 0 20px 13px; overflow-x: auto; }
-.jade-suggestions button { flex: 0 0 auto; padding: 7px 10px; border: 1px solid rgba(118, 216, 243, .16); border-radius: 99px; background: rgba(60, 195, 228, .05); color: #91cdda; font-size: 9px; }
-.jade-suggestions button:hover { border-color: rgba(118, 216, 243, .38); color: #d8f8ff; }
+.jade-suggestions button { flex: 0 0 auto; padding: 7px 10px; border: 1px solid rgba(106, 213, 167, .18); border-radius: 99px; background: rgba(106, 213, 167, .06); color: #8ec9ae; font-size: 9px; }
+.jade-suggestions button:hover { border-color: rgba(106, 213, 167, .42); color: #dcf6e9; }
 .jade-composer { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 13px; border-top: 1px solid var(--line); background: rgba(4, 6, 10, .45); }
 .jade-composer input { min-width: 0; padding: 12px 13px; border: 1px solid rgba(255, 255, 255, .08); border-radius: 10px; outline: 0; background: rgba(255, 255, 255, .035); color: #fff; font-size: 11px; }
-.jade-composer input:focus { border-color: rgba(97, 218, 247, .42); box-shadow: 0 0 0 3px rgba(76, 201, 231, .06); }
-.jade-composer button { display: grid; width: 43px; place-items: center; border: 1px solid rgba(107, 224, 255, .42); border-radius: 10px; background: linear-gradient(135deg, #237d9f, #7256d7); color: #fff; }
+.jade-composer input:focus { border-color: rgba(106, 213, 167, .45); box-shadow: 0 0 0 3px rgba(106, 213, 167, .08); }
+.jade-composer button { display: grid; width: 43px; place-items: center; border: 1px solid rgba(106, 213, 167, .45); border-radius: 10px; background: linear-gradient(135deg, #2f9a75, #1d6b52); color: #fff; }
 .jade-composer button:disabled { cursor: not-allowed; opacity: .42; }
 .jade-assistant-error { margin: 0; padding: 0 20px 13px; color: #e9ad61; font-size: 11px; }
 
-.jade-next-action { display: grid; gap: 5px; margin: 14px; padding: 15px; border: 1px solid rgba(107, 224, 255, .16); border-radius: 12px; background: radial-gradient(circle at 100% 0, rgba(77, 215, 247, .09), transparent 40%), rgba(255, 255, 255, .025); }
+.jade-next-action { display: grid; gap: 5px; margin: 14px; padding: 15px; border: 1px solid rgba(106, 213, 167, .18); border-radius: 12px; background: radial-gradient(circle at 100% 0, rgba(106, 213, 167, .09), transparent 40%), rgba(255, 255, 255, .025); }
 .jade-next-action small,
-.jade-destinations > small { color: #69dbf5; font-size: 8px; font-weight: 850; letter-spacing: 1px; }
+.jade-destinations > small { color: #6ad5a7; font-size: 8px; font-weight: 850; letter-spacing: 1px; }
 .jade-next-action strong { font-size: 14px; line-height: 1.35; }
 .jade-next-action span { color: #7f899c; font-size: 9px; }
 .jade-activity-list { display: grid; gap: 5px; padding: 0 14px 14px; }
 .jade-activity-list button { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 10px; border: 1px solid transparent; border-radius: 9px; background: rgba(255, 255, 255, .022); color: #9ca5b7; text-align: left; }
-.jade-activity-list button:hover { border-color: rgba(107, 224, 255, .16); background: rgba(67, 202, 237, .055); }
-.jade-activity-list button > svg:first-child { color: #65dcf6; }
+.jade-activity-list button:hover { border-color: rgba(106, 213, 167, .18); background: rgba(106, 213, 167, .06); }
+.jade-activity-list button > svg:first-child { color: #6ad5a7; }
 .jade-activity-list button > svg:last-child { opacity: 0; color: #6de0b2; transition: opacity .15s ease; }
 .jade-activity-list button:hover > svg:last-child { opacity: 1; }
 .jade-activity-list button span { display: grid; gap: 2px; min-width: 0; }
@@ -178,7 +178,7 @@
 .jade-destinations { padding: 13px 14px; border-top: 1px solid var(--line); }
 .jade-destinations > div { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 9px; }
 .jade-destinations button { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 7px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, .02); color: #a6aebd; font-size: 9px; text-align: left; }
-.jade-destinations button:hover { border-color: rgba(122, 105, 240, .28); color: #fff; }
+.jade-destinations button:hover { border-color: rgba(106, 213, 167, .3); color: #fff; }
 .jade-destinations button svg:first-child { color: #7cdef4; }
 .jade-overview-button { display: flex; align-items: center; justify-content: center; gap: 7px; width: calc(100% - 28px); margin: 0 14px 14px; padding: 10px; border: 1px solid rgba(255, 255, 255, .08); border-radius: 9px; background: rgba(255, 255, 255, .025); color: #919aad; font-size: 9px; }
 
