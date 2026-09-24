@@ -48,8 +48,18 @@ type CourseLevel = "Básico" | "Intermediário" | "Avançado";
 type CourseTier = "free" | "paid";
 type Tone = "violet" | "blue" | "cyan" | "mint" | "orange";
 
+/**
+ * Idiomas ou programação.
+ *
+ * O Hub tinha uma aba só de Idiomas e outra de Cursos, e as duas ensinavam
+ * coisas — uma com o sistema de estudo, a outra com a lista. Juntar tudo aqui
+ * deixa uma pergunta só ("o que estudar?") com um lugar só para responder.
+ */
+type CourseCategory = "idiomas" | "programacao";
+
 type Course = {
   id: string;
+  categoria: CourseCategory;
   tier: CourseTier;
   name: string;
   shortName: string;
@@ -77,7 +87,146 @@ export type CourseProgressPatch = Partial<Pick<CourseProgress,
 
 export const courseCatalog: Course[] = [
   {
+    id: "duolingo",
+    categoria: "idiomas",
+    tier: "free",
+    name: "Duolingo — Inglês e Espanhol",
+    shortName: "Duolingo",
+    provider: "Duolingo",
+    area: "Inglês e Espanhol",
+    level: "Básico",
+    duration: "Diário · no seu ritmo",
+    language: "Português",
+    prerequisite: "Nenhum",
+    certificate: "Não emite certificado reconhecido. O Duolingo English Test é outro produto, pago e separado.",
+    summary: "Prática diária curta de vocabulário e frases. Serve para manter constância, não para provar nível.",
+    cvValue: "Não vale como comprovação. Vale como hábito diário que sustenta os cursos que valem.",
+    skills: ["Vocabulário", "Leitura", "Constância"],
+    url: "https://www.duolingo.com/",
+    certificateUrl: "",
+    priority: 20,
+    icon: Languages,
+    tone: "mint",
+    mark: "I1",
+  },
+  {
+    id: "bbc-learning-english",
+    categoria: "idiomas",
+    tier: "free",
+    name: "BBC Learning English",
+    shortName: "BBC English",
+    provider: "BBC",
+    area: "Inglês",
+    level: "Intermediário",
+    duration: "Aulas curtas · no seu ritmo",
+    language: "Inglês",
+    prerequisite: "Inglês básico",
+    certificate: "Não emite certificado.",
+    summary: "Vídeos, notícias adaptadas e gramática explicada por uma fonte que também é jornalismo real.",
+    cvValue: "Não vale como comprovação, mas é onde a escuta melhora de verdade: inglês falado por adulto, no ritmo normal.",
+    skills: ["Escuta", "Gramática", "Vocabulário"],
+    url: "https://www.bbc.co.uk/learningenglish",
+    certificateUrl: "",
+    priority: 21,
+    icon: Languages,
+    tone: "blue",
+    mark: "I2",
+  },
+  {
+    id: "britishcouncil-learnenglish",
+    categoria: "idiomas",
+    tier: "free",
+    name: "LearnEnglish — British Council",
+    shortName: "British Council",
+    provider: "British Council",
+    area: "Inglês",
+    level: "Intermediário",
+    duration: "Por nível · no seu ritmo",
+    language: "Inglês",
+    prerequisite: "Inglês básico",
+    certificate: "O material gratuito não certifica. Os cursos pagos e os exames da instituição, sim.",
+    summary: "Exercícios organizados por nível do quadro europeu, com gramática, escuta e escrita.",
+    cvValue: "Prepara para o que vale no visto: o exame reconhecido. O estudo é gratuito; a prova é paga.",
+    skills: ["Gramática", "Escrita", "Escuta"],
+    url: "https://learnenglish.britishcouncil.org/",
+    certificateUrl: "",
+    priority: 22,
+    icon: Languages,
+    tone: "cyan",
+    mark: "I3",
+  },
+  {
+    id: "cambridge-english",
+    categoria: "idiomas",
+    tier: "paid",
+    name: "Cambridge English — preparação e exame",
+    shortName: "Cambridge",
+    provider: "Cambridge University Press & Assessment",
+    area: "Inglês certificado",
+    level: "Avançado",
+    duration: "Depende do nível de entrada",
+    language: "Inglês",
+    prerequisite: "Inglês intermediário",
+    certificate: "Certificado reconhecido por universidades e consulados. O valor varia por país e por exame — confira no site.",
+    summary: "Material de preparação e os exames que emitem o certificado aceito em candidatura e visto.",
+    cvValue: "É o tipo de comprovação que a universidade e o consulado aceitam. Sem ela, nível de inglês é afirmação.",
+    skills: ["Inglês certificado", "Escrita acadêmica", "Fala"],
+    url: "https://www.cambridgeenglish.org/learning-english/",
+    certificateUrl: "https://www.cambridgeenglish.org/",
+    priority: 23,
+    icon: Award,
+    tone: "violet",
+    mark: "I4",
+  },
+  {
+    id: "cervantes-ave",
+    categoria: "idiomas",
+    tier: "paid",
+    name: "AVE Global — Instituto Cervantes",
+    shortName: "Cervantes AVE",
+    provider: "Instituto Cervantes",
+    area: "Espanhol",
+    level: "Básico",
+    duration: "Por nível · com tutoria",
+    language: "Espanhol",
+    prerequisite: "Nenhum",
+    certificate: "Emite certificado de aproveitamento. O DELE, que é o diploma oficial, é um exame à parte.",
+    summary: "Curso de espanhol do órgão oficial da língua, com tutor acompanhando.",
+    cvValue: "A instituição é a referência oficial do espanhol — o que pesa numa candidatura à Espanha.",
+    skills: ["Espanhol", "Gramática", "Conversação"],
+    url: "https://ave.cervantes.es/",
+    certificateUrl: "https://www.cervantes.es/",
+    priority: 24,
+    icon: Languages,
+    tone: "orange",
+    mark: "I5",
+  },
+  {
+    id: "italki",
+    categoria: "idiomas",
+    tier: "paid",
+    name: "italki — aulas com professor",
+    shortName: "italki",
+    provider: "italki",
+    area: "Inglês e Espanhol",
+    level: "Intermediário",
+    duration: "Por aula · você escolhe",
+    language: "Inglês ou Espanhol",
+    prerequisite: "Conseguir montar frases simples",
+    certificate: "Não emite certificado.",
+    summary: "Aula particular por videochamada, cobrada por hora. O preço varia muito por professor.",
+    cvValue: "Não certifica nada, mas é o único jeito de treinar fala com alguém corrigindo — que é o que trava na entrevista.",
+    skills: ["Fala", "Escuta", "Entrevista"],
+    url: "https://www.italki.com/",
+    certificateUrl: "",
+    priority: 25,
+    icon: Languages,
+    tone: "mint",
+    mark: "I6",
+  },
+  {
     id: "cs50x-2026",
+    categoria: "programacao",
     tier: "free",
     name: "CS50x 2026 — Introduction to Computer Science",
     shortName: "CS50x",
@@ -100,6 +249,7 @@ export const courseCatalog: Course[] = [
   },
   {
     id: "cs50-python",
+    categoria: "programacao",
     tier: "free",
     name: "CS50’s Introduction to Programming with Python",
     shortName: "CS50P",
@@ -122,6 +272,7 @@ export const courseCatalog: Course[] = [
   },
   {
     id: "cs50-sql",
+    categoria: "programacao",
     tier: "free",
     name: "CS50’s Introduction to Databases with SQL",
     shortName: "CS50 SQL",
@@ -144,6 +295,7 @@ export const courseCatalog: Course[] = [
   },
   {
     id: "cs50-web",
+    categoria: "programacao",
     tier: "free",
     name: "CS50’s Web Programming with Python and JavaScript",
     shortName: "CS50W",
@@ -166,6 +318,7 @@ export const courseCatalog: Course[] = [
   },
   {
     id: "meta-frontend",
+    categoria: "programacao",
     tier: "paid",
     name: "Meta Front-End Developer Professional Certificate",
     shortName: "Meta Front-End",
@@ -188,6 +341,7 @@ export const courseCatalog: Course[] = [
   },
   {
     id: "meta-backend",
+    categoria: "programacao",
     tier: "paid",
     name: "Meta Back-End Developer Professional Certificate",
     shortName: "Meta Back-End",
@@ -210,6 +364,7 @@ export const courseCatalog: Course[] = [
   },
   {
     id: "ibm-full-stack",
+    categoria: "programacao",
     tier: "paid",
     name: "IBM Full Stack Software Developer Professional Certificate",
     shortName: "IBM Full Stack",
@@ -232,6 +387,7 @@ export const courseCatalog: Course[] = [
   },
   {
     id: "microsoft-devops-engineering",
+    categoria: "programacao",
     tier: "paid",
     name: "Microsoft DevOps Engineering Professional Certificate",
     shortName: "Microsoft DevOps",
@@ -256,6 +412,17 @@ export const courseCatalog: Course[] = [
 
 const levels: Array<"Todos" | CourseLevel> = ["Todos", "Básico", "Intermediário", "Avançado"];
 const currentCatalogIds = new Set(courseCatalog.map((course) => course.id));
+
+/**
+ * Quantos cursos cada aba tem, de verdade.
+ *
+ * O número era "4" escrito à mão nas duas abas. Com 14 cursos e um filtro de
+ * categoria, número fixo vira mentira na primeira troca — e um contador errado
+ * é pior que contador nenhum.
+ */
+function contar(tier: CourseTier, categoria: CourseCategory | "todas"): number {
+  return courseCatalog.filter((curso) => curso.tier === tier && (categoria === "todas" || curso.categoria === categoria)).length;
+}
 const courseAssetPath = (path: string) => `${process.env.NEXT_PUBLIC_ARTX_BASE_PATH ?? ""}${path}`;
 
 export function CoursesResume({
@@ -265,6 +432,7 @@ export function CoursesResume({
   onUpdate,
   onAttach,
   onDownload,
+  onAbrirIdiomas,
 }: {
   progress: CourseProgress[];
   savingCourseId: string | null;
@@ -272,16 +440,18 @@ export function CoursesResume({
   onUpdate: (courseId: string, patch: CourseProgressPatch) => Promise<boolean>;
   onAttach: (courseId: string, file: File) => Promise<boolean>;
   onDownload: (courseId: string, reference: string) => Promise<void>;
+  onAbrirIdiomas?: () => void;
 }) {
   const { t } = useI18n();
   const [tier, setTier] = useState<CourseTier>("free");
+  const [categoria, setCategoria] = useState<CourseCategory | "todas">("todas");
   const [level, setLevel] = useState<"Todos" | CourseLevel>("Todos");
   const [expandedCourse, setExpandedCourse] = useState<string>("");
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const catalogProgress = useMemo(() => progress.filter((item) => currentCatalogIds.has(item.course_id)), [progress]);
   const progressByCourse = useMemo(() => new Map(catalogProgress.map((item) => [item.course_id, item])), [catalogProgress]);
   const visibleCourses = courseCatalog
-    .filter((course) => course.tier === tier && (level === "Todos" || course.level === level))
+    .filter((course) => course.tier === tier && (categoria === "todas" || course.categoria === categoria) && (level === "Todos" || course.level === level))
     .sort((a, b) => a.priority - b.priority);
   function getNote(courseId: string, saved?: CourseProgress) {
     return noteDrafts[courseId] ?? saved?.private_note ?? saved?.current_step ?? "";
@@ -338,16 +508,40 @@ export function CoursesResume({
 
       <div className="course-controls">
         <div className="course-tabs" role="tablist" aria-label="Tipo de curso">
-          <button role="tab" aria-selected={tier === "free"} className={tier === "free" ? "active" : ""} onClick={() => setTier("free")}><GraduationCap size={16} />{t(" Gratuitos ")}<small>4</small></button>
-          <button role="tab" aria-selected={tier === "paid"} className={tier === "paid" ? "active" : ""} onClick={() => setTier("paid")}><WalletCards size={16} />{t(" Pagos ")}<small>4</small></button>
+          <button role="tab" aria-selected={tier === "free"} className={tier === "free" ? "active" : ""} onClick={() => setTier("free")}><GraduationCap size={16} />{t(" Gratuitos ")}<small>{contar("free", categoria)}</small></button>
+          <button role="tab" aria-selected={tier === "paid"} className={tier === "paid" ? "active" : ""} onClick={() => setTier("paid")}><WalletCards size={16} />{t(" Pagos ")}<small>{contar("paid", categoria)}</small></button>
         </div>
+        <div className="course-level-filters" aria-label={t("Filtrar por área")}>
+          {([["todas", "Tudo"], ["idiomas", "Idiomas"], ["programacao", "Programação"]] as const).map(([chave, rotulo]) => (
+            <button key={chave} className={categoria === chave ? "active" : ""} aria-pressed={categoria === chave} onClick={() => setCategoria(chave)}>
+              {t(rotulo)}
+            </button>
+          ))}
+        </div>
+
+        {categoria === "idiomas" && onAbrirIdiomas && (
+          /*
+            O sistema de Idiomas saiu da barra lateral, mas continua existindo e
+            guardando o progresso dele. Sem este caminho de volta ele viraria um
+            app no ar que ninguém alcança.
+          */
+          <button type="button" className="curso-idiomas-link" onClick={onAbrirIdiomas}>
+            <Languages size={15} />
+            <span>
+              <strong>{t("Seu sistema de estudo")}</strong>
+              <small>{t("Plano diário, exercícios e progresso de inglês e espanhol")}</small>
+            </span>
+            <ArrowRight size={15} />
+          </button>
+        )}
+
         <div className="course-level-filters" aria-label={t("Filtrar por nível")}>
           {levels.map((item) => <button type="button" className={level === item ? "active" : ""} key={item} onClick={() => setLevel(item)}>{t(item)}</button>)}
         </div>
       </div>
 
       <div className="course-tab-note">
-        <span>{tier === "free" ? t("Acesso gratuito · certificado verificado do edX é pago.") : "Certificados pagos; confirme o valor local antes de assinar."}</span>
+        <span>{tier === "free" ? t("Acesso gratuito. Alguns não emitem certificado — cada cartão diz o que emite.") : t("Pagos. O valor muda por país e por exame; confirme no site antes de assinar.")}</span>
         <span><CheckCircle2 size={13} />{t(" Links e requisitos conferidos em 04/09/2026")}</span>
       </div>
 

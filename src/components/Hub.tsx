@@ -190,7 +190,7 @@ const pageMeta: Record<View, { eyebrow: string; title: string }> = {
   videos: { eyebrow: workspaces.videos.eyebrow, title: workspaces.videos.label },
   sat: { eyebrow: workspaces.sat.eyebrow, title: workspaces.sat.label },
   university: { eyebrow: workspaces.university.eyebrow, title: workspaces.university.label },
-  career: { eyebrow: "DESENVOLVIMENTO PESSOAL", title: "Currículo & Cursos" },
+  career: { eyebrow: "DESENVOLVIMENTO PESSOAL", title: "Cursos" },
   jade: { eyebrow: workspaces.jade.eyebrow, title: workspaces.jade.label },
 };
 
@@ -717,9 +717,8 @@ export function Hub() {
     { id: "overview", group: "Navegar", label: "Abrir visão geral", icon: LayoutDashboard, run: () => goTo("overview") },
     { id: "site", group: "Sistemas", label: "Abrir Site KauaArtx", icon: Compass, run: () => goTo("site") },
     { id: "videos", group: "Sistemas", label: "Abrir KauaArtx Video Studio", icon: Video, run: () => goTo("videos") },
-    { id: "sat", group: "Sistemas", label: "Abrir Idiomas", icon: GraduationCap, run: () => goTo("sat") },
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
-    { id: "career", group: "Estudos", label: "Abrir Currículo & Cursos", icon: Award, run: () => goTo("career") },
+    { id: "career", group: "Estudos", label: "Abrir Cursos", icon: Award, run: () => goTo("career") },
     { id: "approvals", group: "Segurança", label: "Aprovação de contas", icon: Award, run: () => goTo("approvals") },
     { id: "config", group: "Conta", label: "Abrir configurações", icon: Settings2, run: () => goTo("config") },
 
@@ -763,9 +762,8 @@ export function Hub() {
         <NavButton active={activeView === "videos"} icon={Video} logo={workspaces.videos.logo} label="KauaArtx Video Studio" onClick={() => goTo("videos")} />
       </SidebarGroup>
       <SidebarGroup label="Estudos">
-        <NavButton active={activeView === "sat"} icon={GraduationCap} logo={workspaces.sat.logo} label="Idiomas" onClick={() => goTo("sat")} />
         <NavButton active={activeView === "university"} icon={GraduationCap} logo={workspaces.university.logo} label="University Path" onClick={() => goTo("university")} />
-        <NavButton active={activeView === "career"} icon={Award} label={t("Currículo & Cursos")} onClick={() => goTo("career")} badge={courseProgress.filter((item) => courseCatalog.some((course) => course.id === item.course_id) && item.status === "in_progress").length} />
+        <NavButton active={activeView === "career"} icon={Award} label={t("Cursos")} onClick={() => goTo("career")} badge={courseProgress.filter((item) => courseCatalog.some((course) => course.id === item.course_id) && item.status === "in_progress").length} />
         <NavButton active={activeView === "approvals"} icon={Award} label="Aprovação de contas" onClick={() => goTo("approvals")} />
         <NavButton active={activeView === "config"} icon={Settings2} label={t("Configurações")} onClick={() => goTo("config")} />
       </SidebarGroup>
@@ -794,7 +792,7 @@ export function Hub() {
 
       {activeView === "relatorio" && <RelatorioKaua />}
       {activeView === "overview" && <PersonalDashboard tasks={tasks} notes={notes} systemSignals={systemSignals} routeSignals={routeSignals} syncing={syncing} syncError={syncError} onOpen={goTo} onCreate={createActivity} onToggle={toggleTask} onNote={createNote} onRetry={() => void loadWorkspace()} onBackup={downloadHubBackup} />}
-      {activeView === "career" && <CoursesResume progress={courseProgress} savingCourseId={savingCourseId ?? certificateBusyId ?? (!localMode && (syncing || syncError) ? "sync" : null)} localOnly={localMode} onUpdate={updateCourseProgress} onAttach={attachCourseCertificate} onDownload={retrieveCourseCertificate} />}
+      {activeView === "career" && <CoursesResume progress={courseProgress} savingCourseId={savingCourseId ?? certificateBusyId ?? (!localMode && (syncing || syncError) ? "sync" : null)} localOnly={localMode} onUpdate={updateCourseProgress} onAttach={attachCourseCertificate} onDownload={retrieveCourseCertificate} onAbrirIdiomas={() => goTo("sat")} />}
       {activeView === "approvals" && <AccountApprovals token={hubAccessToken} />}
       {activeView === "config" && <Configuracoes
         email={sessionEmail}
