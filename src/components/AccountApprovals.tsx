@@ -19,9 +19,12 @@ import {
   acoesDoEstado,
   agrupar,
   contarSelecionados,
+  decididoEm,
   estadoDaConta,
+  estadoDoSistema,
   idsDaConta,
   rotuloDoEstado,
+  rotuloDoSistema,
   selecoesDoServidor,
   type AppKey,
   type Concessao,
@@ -34,6 +37,13 @@ const apps: Array<{ key: AppKey; label: string; detail: string }> = [
   { key: 'study', label: 'Inglês', detail: 'Aulas, exercícios e progresso' },
   { key: 'university', label: 'Universidades', detail: 'Pesquisa e planejamento acadêmico' },
 ];
+
+/** Data curta, ou traço quando o valor não dá para ler. */
+function formatarData(iso: string): string {
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return '—';
+  return data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 export function AccountApprovals({ token }: { token: string | null }) {
   const [rows, setRows] = useState<Concessao[]>([]);
@@ -85,11 +95,15 @@ export function AccountApprovals({ token }: { token: string | null }) {
 
   async function save(account: Conta) {
     const escolhidos = apps.filter(app => selections[account.key]?.[app.key]);
-    const resumo = escolhidos.length ? escolhidos.map(app => app.label).join(', ') : 'somente o Hub';
+    const resumo = escolhidos.length ? escolhidos.map(app => app.label).join(', ') : 'nenhum sistema';
     const desbloqueando = estadoDaConta(account) === 'bloqueada';
-    const pergunta = desbloqueando
-      ? `Desbloquear a conta de ${account.username} e liberar ${resumo}?`
-      : `Liberar ${resumo} para ${account.username}?`;
+    // Salvar sem nada marcado revoga tudo. A confirmação precisa dizer isso: é
+    // a mesma ação com um efeito oposto ao que o botão sugere.
+    const pergunta = !escolhidos.length
+      ? `Nenhum sistema marcado. Isso vai retirar todos os acessos de ${account.username}. Continuar?`
+      : desbloqueando
+        ? `Desbloquear a conta de ${account.username} e liberar ${resumo}?`
+        : `Liberar ${resumo} para ${account.username}?`;
     if (!window.confirm(pergunta)) return;
 
     setBusy(true);
@@ -126,7 +140,10 @@ export function AccountApprovals({ token }: { token: string | null }) {
     <section className="approval-page">
       <p className="eyebrow">ADMINISTRAÇÃO</p>
       <h1>Aprovação de contas</h1>
-      <p>Cada pessoa aparece uma única vez. Escolha os sistemas permitidos e confirme em um só botão.</p>
+      <p>
+        As pessoas criam conta dentro do sistema que querem usar. Aqui você decide quem entra em quê — e o Hub
+        continua só seu: aprovar um sistema não dá acesso a este painel.
+      </p>
 
       <button className="quick-create" disabled={busy} onClick={() => void refresh()}>Atualizar pedidos</button>
       <p role="status" className="approval-notice">{busy ? 'Salvando…' : notice}</p>
@@ -149,22 +166,45 @@ export function AccountApprovals({ token }: { token: string | null }) {
                       ? `${marcados} sistema${marcados > 1 ? 's' : ''} liberado${marcados > 1 ? 's' : ''}`
                       : 'Escolha o que esta pessoa poderá acessar'}
                   </p>
+
+                  {/* O que a pessoa pediu, e quando — o dono decide melhor sabendo disso. */}
+                  <dl className="approval-ficha">
+                    <div>
+                      <dt>Pediu em</dt>
+                      <dd>{formatarData(account.createdAt)}</dd>
+                    </div>
+                    {decididoEm(account) && (
+                      <div>
+                        <dt>Última decisão</dt>
+                        <dd>{formatarData(decididoEm(account)!)}</dd>
+                      </div>
+                    )}
+                    <div>
+                      <dt>Pedidos</dt>
+                      <dd>{account.grants.filter(g => g.app !== 'hub').length}</dd>
+                    </div>
+                  </dl>
                 </div>
               </header>
 
               <div className="approval-apps">
                 {apps.map(app => {
-                  const grant = account.grants.find(item => item.app === app.key);
                   const checked = Boolean(selections[account.key]?.[app.key]);
                   return (
                     <label key={app.key} className={checked ? 'selected' : ''}>
                       <input
                         type="checkbox"
                         checked={checked}
-                        disabled={busy || !grant}
+                        disabled={busy}
                         onChange={event => toggle(account.key, app.key, event.target.checked)}
                       />
-                      <span><strong>{app.label}</strong><small>{app.detail}</small></span>
+                      <span>
+                        <strong>{app.label}</strong>
+                        <small>{app.detail}</small>
+                        <em className={`approval-sistema ${estadoDoSistema(account, app.key)}`}>
+                          {rotuloDoSistema[estadoDoSistema(account, app.key)]}
+                        </em>
+                      </span>
                       <i aria-hidden="true">{checked ? '✓' : ''}</i>
                     </label>
                   );
@@ -195,7 +235,8 @@ export function AccountApprovals({ token }: { token: string | null }) {
       </div>
 
       <p className="approval-footnote">
-        A conta sempre entra pelo Hub. Os sistemas não selecionados permanecem bloqueados e os dados continuam separados.
+        Aprovar um sistema não cria conta no Hub. Os sistemas não selecionados permanecem bloqueados, os dados
+        continuam separados, e a pessoa vê a sua decisão ao entrar no sistema que pediu.
       </p>
     </section>
   );

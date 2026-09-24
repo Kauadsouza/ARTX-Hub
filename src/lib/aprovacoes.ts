@@ -22,6 +22,8 @@ export type Concessao = {
   memberId: string;
   app: "hub" | AppKey;
   status: string;
+  /** Quando esta concessão mudou pela última vez. */
+  updatedAt?: string;
   member: { username: string; createdAt: string };
 };
 
@@ -64,17 +66,63 @@ export function selecoesDoServidor(linhas: Concessao[]): Selecoes {
 
 export type EstadoConta = "ativa" | "aguardando" | "bloqueada";
 
+/** Os três sistemas. O Hub não é um deles: é o painel do dono. */
+export const SISTEMAS: AppKey[] = ["videos", "study", "university"];
+
 /**
  * Em que pé a conta está.
  *
- * O acesso ao Hub é o que decide: sem ele a pessoa não entra em lugar nenhum,
- * por mais sistemas que estejam marcados.
+ * O estado vem dos SISTEMAS, não do Hub.
+ *
+ * Antes o acesso ao Hub era o interruptor geral, o que fazia sentido quando
+ * todo mundo entrava por ele. Hoje ninguém entra: a pessoa cria conta dentro do
+ * sistema que quer usar, e o Hub é só o painel onde o dono decide. Quem pediu
+ * Vídeos e foi liberado não tem linha de Hub nenhuma — e pela regra antiga
+ * aparecia como bloqueado, com o acesso funcionando.
+ *
+ *   ativa       ao menos um sistema liberado
+ *   aguardando  nenhum liberado, mas algum esperando decisão
+ *   bloqueada   nada liberado e nada esperando
  */
 export function estadoDaConta(conta: Conta): EstadoConta {
-  const hub = conta.grants.find((grant) => grant.app === "hub")?.status;
-  if (hub === "approved") return "ativa";
-  if (hub === "pending") return "aguardando";
+  const sistemas = conta.grants.filter((grant) => grant.app !== "hub");
+  if (sistemas.some((grant) => grant.status === "approved")) return "ativa";
+  if (sistemas.some((grant) => grant.status === "pending")) return "aguardando";
   return "bloqueada";
+}
+
+export type EstadoSistema = "liberado" | "esperando" | "negado" | "nao-pediu";
+
+/**
+ * O que cada sistema está para esta pessoa.
+ *
+ * "Não pediu" é diferente de "negado", e a tela precisa distinguir: um é a
+ * ausência de um pedido, o outro é uma decisão que o dono tomou.
+ */
+export function estadoDoSistema(conta: Conta, app: AppKey): EstadoSistema {
+  const grant = conta.grants.find((item) => item.app === app);
+  if (!grant) return "nao-pediu";
+  if (grant.status === "approved") return "liberado";
+  if (grant.status === "pending") return "esperando";
+  return "negado";
+}
+
+export const rotuloDoSistema: Record<EstadoSistema, string> = {
+  liberado: "liberado",
+  esperando: "esperando decisão",
+  negado: "negado",
+  "nao-pediu": "não pediu",
+};
+
+/** Quando a pessoa pediu pela primeira vez. */
+export function pedidoEm(conta: Conta): string {
+  return conta.createdAt;
+}
+
+/** A decisão mais recente sobre esta pessoa, quando houver. */
+export function decididoEm(conta: Conta): string | null {
+  const datas = conta.grants.map((grant) => grant.updatedAt).filter((data): data is string => Boolean(data));
+  return datas.length ? datas.sort().at(-1)! : null;
 }
 
 export const rotuloDoEstado: Record<EstadoConta, string> = {

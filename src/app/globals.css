@@ -653,3 +653,14 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 .approval-status.bloqueada { background: rgba(255,113,130,.12); color: #ffadb8; }
 /* A conta bloqueada se distingue à distância: é a que precisa de decisão. */
 .approval-account.bloqueada { border-color: rgba(255,113,130,.24); }
+
+/* Ficha da pessoa e estado por sistema, na aprovação de contas. */
+.approval-ficha { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.approval-ficha dt { color: var(--subtle); font-size: 9px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; }
+.approval-ficha dd { margin: 3px 0 0; font-size: 12px; }
+.approval-sistema { display: block; margin-top: 5px; font-size: 10px; font-style: normal; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
+.approval-sistema.liberado { color: #9be5c3; }
+.approval-sistema.esperando { color: #ffd28c; }
+.approval-sistema.negado { color: #ffadb8; }
+/* "Não pediu" é ausência de pedido, não decisão: fica apagado de propósito. */
+.approval-sistema.nao-pediu { color: var(--subtle); font-weight: 500; }

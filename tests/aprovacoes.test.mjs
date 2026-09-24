@@ -41,21 +41,20 @@ test('sem nenhuma concessão, nenhuma seleção é inventada', () => {
 
 // ══════════════ Estado da conta ══════════════
 
-test('o acesso ao Hub é o que decide o estado', () => {
-  const conta = (hubStatus) => agrupar([grant('m1', 'hub', hubStatus), grant('m1', 'videos', 'approved')])[0];
-  assert.equal(estadoDaConta(conta('approved')), 'ativa');
-  assert.equal(estadoDaConta(conta('pending')), 'aguardando');
-  assert.equal(estadoDaConta(conta('revoked')), 'bloqueada');
+test('são os sistemas que decidem o estado, em qualquer combinação', () => {
+  // A regra mudou junto com o modelo: ninguém entra pelo Hub, então o estado
+  // da pessoa é o dos sistemas que ela pediu.
+  const de = (...concessoes) => estadoDaConta(agrupar(concessoes)[0]);
+  assert.equal(de(grant('m1', 'videos', 'approved')), 'ativa');
+  assert.equal(de(grant('m1', 'videos', 'pending')), 'aguardando');
+  assert.equal(de(grant('m1', 'videos', 'revoked')), 'bloqueada');
+  // Um liberado basta, mesmo com outros negados.
+  assert.equal(de(grant('m1', 'videos', 'approved'), grant('m1', 'study', 'revoked')), 'ativa');
 });
 
-test('conta sem linha de Hub conta como bloqueada, não como ativa', () => {
-  const conta = agrupar([grant('m1', 'videos', 'approved')])[0];
+test('conta sem nenhuma concessão de sistema é bloqueada', () => {
+  const conta = agrupar([grant('m1', 'hub', 'approved')])[0];
   assert.equal(estadoDaConta(conta), 'bloqueada', 'na dúvida, o acesso é negado');
-});
-
-test('sistema liberado não torna ativa uma conta sem Hub', () => {
-  const conta = agrupar([grant('m1', 'hub', 'revoked'), grant('m1', 'videos', 'approved')])[0];
-  assert.equal(estadoDaConta(conta), 'bloqueada', 'sem o Hub a pessoa não entra em lugar nenhum');
 });
 
 // ══════════════ Os botões de cada estado ══════════════
@@ -114,4 +113,58 @@ test('contar selecionados ignora o que está desmarcado e a conta sem seleção'
   const s = { kauaartx: { videos: true, study: false, university: true } };
   assert.equal(contarSelecionados(s, 'kauaartx'), 2);
   assert.equal(contarSelecionados(s, 'ninguem'), 0);
+});
+
+// ══════════════ O modelo de conta chefe ══════════════
+
+test('quem pediu só um sistema e foi liberado aparece como ativa, não bloqueada', async () => {
+  // Pela regra antiga o Hub era o interruptor geral. Quem cria conta dentro do
+  // Vídeos não tem linha de Hub nenhuma, e aparecia bloqueado com o acesso
+  // funcionando.
+  const conta = agrupar([grant('m1', 'videos', 'approved')])[0];
+  assert.equal(estadoDaConta(conta), 'ativa');
+});
+
+test('nada liberado mas algo esperando conta como aguardando', () => {
+  const conta = agrupar([grant('m1', 'videos', 'pending'), grant('m1', 'study', 'revoked')])[0];
+  assert.equal(estadoDaConta(conta), 'aguardando');
+});
+
+test('tudo revogado é bloqueada', () => {
+  const conta = agrupar([grant('m1', 'videos', 'revoked'), grant('m1', 'study', 'revoked')])[0];
+  assert.equal(estadoDaConta(conta), 'bloqueada');
+});
+
+test('o acesso ao Hub não torna a conta ativa: o Hub é o painel do dono', () => {
+  const conta = agrupar([grant('m1', 'hub', 'approved'), grant('m1', 'videos', 'revoked')])[0];
+  assert.equal(estadoDaConta(conta), 'bloqueada', 'o estado vem dos sistemas, não do Hub');
+});
+
+test('"não pediu" é diferente de "negado"', async () => {
+  const { estadoDoSistema } = await import('../src/lib/aprovacoes.ts');
+  const conta = agrupar([grant('m1', 'videos', 'approved'), grant('m1', 'study', 'revoked')])[0];
+  assert.equal(estadoDoSistema(conta, 'videos'), 'liberado');
+  assert.equal(estadoDoSistema(conta, 'study'), 'negado');
+  assert.equal(estadoDoSistema(conta, 'university'), 'nao-pediu', 'ausência de pedido não é uma decisão');
+});
+
+test('cada estado de sistema tem rótulo', async () => {
+  const { rotuloDoSistema } = await import('../src/lib/aprovacoes.ts');
+  for (const estado of ['liberado', 'esperando', 'negado', 'nao-pediu']) {
+    assert.ok(rotuloDoSistema[estado].length > 3, `${estado} sem rótulo`);
+  }
+});
+
+test('a última decisão é a mais recente entre as concessões', async () => {
+  const { decididoEm } = await import('../src/lib/aprovacoes.ts');
+  const conta = agrupar([
+    { ...grant('m1', 'videos', 'approved'), updatedAt: '2026-09-10T00:00:00Z' },
+    { ...grant('m1', 'study', 'revoked'), updatedAt: '2026-09-20T00:00:00Z' },
+  ])[0];
+  assert.equal(decididoEm(conta), '2026-09-20T00:00:00Z');
+});
+
+test('sem data de decisão, a ficha não inventa uma', async () => {
+  const { decididoEm } = await import('../src/lib/aprovacoes.ts');
+  assert.equal(decididoEm(agrupar([grant('m1', 'videos', 'pending')])[0]), null);
 });
