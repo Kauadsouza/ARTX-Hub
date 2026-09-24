@@ -645,3 +645,11 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 .doc-alerta-permitir:hover{border-color:#c89a5a}
 .doc-alerta-bloco.vencido .doc-alerta-permitir{border-color:#8a4038;color:#f5c3bd}
 @media(max-width:700px){.doc-alerta-bloco{flex-direction:column}.doc-alerta-permitir{justify-content:center;padding:11px 15px}}
+
+/* Estados da conta, com os nomes que o componente usa hoje. As classes antigas
+   (.pending, .approved) ficam válidas para não quebrar nada que ainda as use. */
+.approval-status.aguardando { background: rgba(255,190,94,.12); color: #ffd28c; }
+.approval-status.ativa { background: rgba(104,224,168,.12); color: #9be5c3; }
+.approval-status.bloqueada { background: rgba(255,113,130,.12); color: #ffadb8; }
+/* A conta bloqueada se distingue à distância: é a que precisa de decisão. */
+.approval-account.bloqueada { border-color: rgba(255,113,130,.24); }
