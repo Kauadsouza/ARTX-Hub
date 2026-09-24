@@ -23,7 +23,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { lerAnexo, salvarAnexoBruto, type Anexo, type FichaAnexo } from "./anexos.ts";
 
-export const BUCKET = "university-documents";
+const BUCKET = "university-documents";
 export const PREFIXO = "relatorio";
 
 /** Teto do bucket. Acima disto o upload seria recusado pelo servidor. */

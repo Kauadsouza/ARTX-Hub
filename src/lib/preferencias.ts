@@ -21,7 +21,7 @@
  * interruptor.
  */
 
-export const CHAVE_COR = "artx-cor-acento";
+const CHAVE_COR = "artx-cor-acento";
 
 export type Acento = {
   id: string;

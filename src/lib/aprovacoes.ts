@@ -66,9 +66,6 @@ export function selecoesDoServidor(linhas: Concessao[]): Selecoes {
 
 export type EstadoConta = "ativa" | "aguardando" | "bloqueada";
 
-/** Os três sistemas. O Hub não é um deles: é o painel do dono. */
-export const SISTEMAS: AppKey[] = ["videos", "study", "university"];
-
 /**
  * Em que pé a conta está.
  *
@@ -113,11 +110,6 @@ export const rotuloDoSistema: Record<EstadoSistema, string> = {
   negado: "negado",
   "nao-pediu": "não pediu",
 };
-
-/** Quando a pessoa pediu pela primeira vez. */
-export function pedidoEm(conta: Conta): string {
-  return conta.createdAt;
-}
 
 /** A decisão mais recente sobre esta pessoa, quando houver. */
 export function decididoEm(conta: Conta): string | null {

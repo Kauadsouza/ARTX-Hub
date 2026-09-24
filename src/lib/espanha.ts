@@ -83,10 +83,6 @@ export const grupos: Grupo[] = [
   },
 ];
 
-export function grupoPorId(id: GrupoId): Grupo {
-  return grupos.find((item) => item.id === id) ?? grupos[grupos.length - 1];
-}
-
 /**
  * A semente.
  *

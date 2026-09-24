@@ -22,7 +22,7 @@
  *      anotação ainda importa no sexto dia, um clique devolve a semana.
  */
 
-import { SEMENTE_VERSAO, grupos, idDaSemente, renomeados, semente, type GrupoId } from "./espanha.ts";
+import { SEMENTE_VERSAO, idDaSemente, renomeados, semente, type GrupoId } from "./espanha.ts";
 
 export const DIAS_DE_VIDA = 7;
 
@@ -285,14 +285,6 @@ export function removerDocumento(relatorio: Relatorio, id: string): Relatorio {
 /** Os documentos de um grupo, na ordem em que entraram. */
 export function documentosDoGrupo(relatorio: Relatorio, grupo: GrupoId): Documento[] {
   return relatorio.documentos.filter((item) => item.grupo === grupo);
-}
-
-/** Quais grupos têm ao menos um documento, na ordem definida em espanha.ts. */
-export function gruposComDocumentos(relatorio: Relatorio): GrupoId[] {
-  const presentes = new Set(relatorio.documentos.map((item) => item.grupo));
-  return [...presentes].sort(
-    (a, b) => grupos.findIndex((g) => g.id === a) - grupos.findIndex((g) => g.id === b),
-  );
 }
 
 /* ── Guardar e ler ─────────────────────────────────────────────────────── */

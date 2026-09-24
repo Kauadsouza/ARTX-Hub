@@ -36,23 +36,7 @@
 .jade-identity small { color: #727a8f; font-size: 8px; font-weight: 800; letter-spacing: 1.15px; }
 .jade-identity strong { font-size: 14px; }
 
-.jade-presence {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: #7ee4bc;
-  font-size: 10px;
-  font-weight: 750;
-  text-transform: uppercase;
-}
 .jade-presence i,
-.jade-live i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #58d69e;
-  box-shadow: 0 0 13px rgba(88, 214, 158, .8);
-}
 
 .jade-assistant-hero {
   position: relative;
@@ -159,11 +143,7 @@
 .jade-composer button:disabled { cursor: not-allowed; opacity: .42; }
 .jade-assistant-error { margin: 0; padding: 0 20px 13px; color: #e9ad61; font-size: 11px; }
 
-.jade-next-action { display: grid; gap: 5px; margin: 14px; padding: 15px; border: 1px solid rgba(106, 213, 167, .18); border-radius: 12px; background: radial-gradient(circle at 100% 0, rgba(106, 213, 167, .09), transparent 40%), rgba(255, 255, 255, .025); }
 .jade-next-action small,
-.jade-destinations > small { color: #6ad5a7; font-size: 8px; font-weight: 850; letter-spacing: 1px; }
-.jade-next-action strong { font-size: 14px; line-height: 1.35; }
-.jade-next-action span { color: #7f899c; font-size: 9px; }
 .jade-activity-list { display: grid; gap: 5px; padding: 0 14px 14px; }
 .jade-activity-list button { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 10px; border: 1px solid transparent; border-radius: 9px; background: rgba(255, 255, 255, .022); color: #9ca5b7; text-align: left; }
 .jade-activity-list button:hover { border-color: rgba(106, 213, 167, .18); background: rgba(106, 213, 167, .06); }
@@ -175,12 +155,6 @@
 .jade-activity-list button small { color: #697386; font-size: 8px; }
 .jade-empty { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 80px; color: #747d8f; font-size: 10px; }
 .jade-empty svg { color: #5bcf9e; }
-.jade-destinations { padding: 13px 14px; border-top: 1px solid var(--line); }
-.jade-destinations > div { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 9px; }
-.jade-destinations button { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 7px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, .02); color: #a6aebd; font-size: 9px; text-align: left; }
-.jade-destinations button:hover { border-color: rgba(106, 213, 167, .3); color: #fff; }
-.jade-destinations button svg:first-child { color: #7cdef4; }
-.jade-overview-button { display: flex; align-items: center; justify-content: center; gap: 7px; width: calc(100% - 28px); margin: 0 14px 14px; padding: 10px; border: 1px solid rgba(255, 255, 255, .08); border-radius: 9px; background: rgba(255, 255, 255, .025); color: #919aad; font-size: 9px; }
 
 @keyframes jade-spin { to { transform: rotate(360deg); } }
 @keyframes jade-think { 0%, 100% { opacity: .3; transform: translateY(1px); } 50% { opacity: 1; transform: translateY(-2px); } }
@@ -221,10 +195,7 @@
 .jade-connect-panel>small { font-size:10px;letter-spacing:2px;color:#a7b8a3; }
 .jade-connect-panel h1 { font-size:clamp(30px,3vw,46px);font-weight:500;line-height:1.12;letter-spacing:-1.8px;max-width:450px;margin:18px 0; }
 .jade-connect-panel>p { font-size:14px;line-height:1.8;color:var(--muted);max-width:560px; }
-.jade-launch { display:inline-flex;align-items:center;gap:9px;background:#c4e9aa;color:#183020!important;padding:13px 19px;border-radius:10px;margin:17px 0;text-decoration:none;font-weight:600;font-size:13px; }
 .jade-connect-panel .jade-launch-help { font-size:11px;max-width:450px; }
-.jade-capabilities { display:grid;gap:16px;margin-top:32px;padding-top:25px;border-top:1px solid var(--line); }
-.jade-capabilities span { display:flex;gap:11px;align-items:center;font-size:12px;color:#b7c9b3; }
 .jade-task-form { padding:20px;border-top:1px solid var(--line); }
 .jade-task-form label { display:block;font-size:12px;color:var(--muted);margin-bottom:10px; }
 .jade-task-form input { width:100%;padding:11px;background:rgba(0,0,0,.15);border:1px solid var(--line);border-radius:9px;color:inherit; }

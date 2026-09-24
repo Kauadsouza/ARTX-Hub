@@ -26,8 +26,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ler, relatorioVazio, unir, type Relatorio } from "./relatorio.ts";
 
 /** Chave do payload dentro de `hub_app_state`. */
-export const APP = "relatorio";
-export const PERFIL = "kaua";
+const APP = "relatorio";
+const PERFIL = "kaua";
 
 export type EstadoEspelho =
   /** Ainda não tentamos. */
