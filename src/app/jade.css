@@ -163,7 +163,7 @@
   .jade-assistant-grid { grid-template-columns: 1fr; }
   .jade-ready-panel { display: grid; grid-template-columns: 1fr 1fr; }
   .jade-ready-panel > header { grid-column: 1 / -1; }
-  .jade-destinations { border-top: 0; }
+
   .jade-overview-button { grid-column: 1 / -1; }
 }
 
@@ -174,7 +174,7 @@
   .jade-assistant-hero h1 { font-size: 42px; letter-spacing: -2px; }
   .jade-hero-core { min-height: 190px; transform: scale(.78); }
   .jade-ready-panel { display: block; }
-  .jade-destinations { border-top: 1px solid var(--line); }
+
 }
 
 @media (max-width: 480px) {
@@ -183,7 +183,7 @@
   .jade-messages { min-height: 260px; padding: 18px 14px; }
   .jade-message { max-width: 92%; }
   .jade-suggestions { padding-inline: 14px; }
-  .jade-destinations > div { grid-template-columns: 1fr; }
+
 }
 .jade-header-trigger { display:flex;align-items:center;gap:7px;border:1px solid #405941;background:#1c2d21;color:#c4e9aa;padding:8px 12px;border-radius:9px;font-size:12px;cursor:pointer; }
 .jade-header-trigger.active { background:#304a32;border-color:#98bc7f; }
