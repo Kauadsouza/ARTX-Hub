@@ -37,11 +37,13 @@ import { createClient } from "@/lib/supabase/client";
 import { parseRouteSignals, type RouteSignals } from "@/lib/week-ahead";
 import { certificateBucket, certificatePath, certificateReference, downloadCertificate, localCertificate, parseCertificateReference, isStoredCertificate, validateCertificate } from "@/lib/course-certificates";
 import { itensParaBusca } from "@/lib/relatorio";
+import { aplicarAcento, lerAcentoGuardado } from "@/lib/preferencias";
 import { PersonalDashboard } from "@/components/PersonalDashboard";
 import { RelatorioKaua } from "@/components/RelatorioKaua";
 import { JadeWorkspace } from "@/components/JadeWorkspace";
 import { CoursesResume, courseCatalog, type CourseProgress, type CourseProgressPatch, type CourseProgressStatus } from "@/components/CoursesResume";
 import { AccountApprovals } from "./AccountApprovals";
+import { Configuracoes } from "./Configuracoes";
 import { useI18n, LanguageSwitch } from "./I18n";
 
 type Task = {
@@ -52,7 +54,7 @@ type Task = {
   created_at?: string;
 };
 
-type View = "approvals" | "security" | "overview" | "relatorio" | "site" | "videos" | "sat" | "university" | "career" | "jade";
+type View = "approvals" | "config" | "overview" | "relatorio" | "site" | "videos" | "sat" | "university" | "career" | "jade";
 type ProjectKey = "site" | "videos" | "sat" | "university" | "jade" | "geral";
 type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
 type MemberWorkspace = "videos" | "study" | "university";
@@ -94,6 +96,18 @@ async function memberRequest(action: string, data: Record<string, unknown> = {},
   return result;
 }
 
+/**
+ * O nome de exibição da conta.
+ *
+ * Vem do metadado do usuário. Sem ele, a parte do e-mail antes do @ é um começo
+ * melhor que um campo vazio — e o Kauã troca quando quiser.
+ */
+function nomeDaSessao(user: { email?: string | null; user_metadata?: Record<string, unknown> } | null | undefined): string {
+  const doMetadado = user?.user_metadata?.display_name;
+  if (typeof doMetadado === "string" && doMetadado.trim()) return doMetadado.trim();
+  return user?.email?.split("@")[0] ?? "";
+}
+
 async function localHubRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -105,7 +119,7 @@ async function localHubRequest<T>(path: string, init?: RequestInit): Promise<T> 
   return payload as T;
 }
 
-const workspaces: Record<Exclude<View, "overview" | "career" | "approvals" | "security" | "relatorio">, Workspace> = {
+const workspaces: Record<Exclude<View, "overview" | "career" | "approvals" | "config" | "relatorio">, Workspace> = {
   site: {
     label: "Site KauaArtx",
     eyebrow: "PRESENÇA DIGITAL",
@@ -169,7 +183,7 @@ const workspaces: Record<Exclude<View, "overview" | "career" | "approvals" | "se
 
 const pageMeta: Record<View, { eyebrow: string; title: string }> = {
   approvals: { eyebrow: "ADMINISTRAÇÃO", title: "Aprovação de contas" },
-  security: { eyebrow: "CONTA PROPRIETÁRIA", title: "Segurança" },
+  config: { eyebrow: "CONTA E PREFERÊNCIAS", title: "Configurações" },
   overview: { eyebrow: "CENTRAL DE COMANDO", title: "Visão geral" },
   relatorio: { eyebrow: "SÓ SEU", title: "Relatório do Kauã" },
   site: { eyebrow: workspaces.site.eyebrow, title: workspaces.site.label },
@@ -200,10 +214,6 @@ export function Hub() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [ownerPassword, setOwnerPassword] = useState("");
-  const [ownerPasswordConfirmation, setOwnerPasswordConfirmation] = useState("");
-  const [passwordUpdatePending, setPasswordUpdatePending] = useState(false);
-  const [passwordUpdateMessage, setPasswordUpdateMessage] = useState("");
   const [message, setMessage] = useState("");
   const [loginPending, setLoginPending] = useState(false);
   const [recoveryPending, setRecoveryPending] = useState(false);
@@ -212,6 +222,10 @@ export function Hub() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+
+  // A cor guardada vale desde a abertura: entrar nas Configurações para a
+  // escolha aparecer seria a escolha não valer.
+  useEffect(() => { aplicarAcento(lerAcentoGuardado()); }, []);
 
   /**
    * O Relatório entra na busca.
@@ -242,6 +256,7 @@ export function Hub() {
   const [syncing, setSyncing] = useState(true);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [sessionEmail, setSessionEmail] = useState("");
+  const [sessionName, setSessionName] = useState("");
   const [systemSignals, setSystemSignals] = useState<Partial<Record<ProjectKey, SystemSignal>>>({});
   // O University Path publica o proprio resumo de prazos. O Hub so consome:
   // duplicar o calendario de cada pais aqui criaria dois que divergem sozinhos.
@@ -308,6 +323,7 @@ export function Hub() {
       sessionIdentity.current = data.session?.user.id ?? null;
       setSessionUserId(sessionIdentity.current);
       setSessionEmail(data.session?.user.email ?? "");
+      setSessionName(nomeDaSessao(data.session?.user));
       setSignedIn(Boolean(data.session));
       setHubAccessToken(data.session?.access_token ?? null);
       setSessionReady(true);
@@ -321,6 +337,7 @@ export function Hub() {
       sessionIdentity.current = nextOwner;
       setSessionUserId(nextOwner);
       setSessionEmail(session?.user.email ?? "");
+      setSessionName(nomeDaSessao(session?.user));
       setSignedIn(Boolean(session));
       setHubAccessToken(session?.access_token ?? null);
       if (!session) { setTasks([]); setNotes([]); setCourseProgress([]); }
@@ -472,23 +489,6 @@ export function Hub() {
     setRecoveryMode(false);
   }
 
-  async function changeOwnerPassword(event: React.FormEvent) {
-    event.preventDefault();
-    if (!supabase || passwordUpdatePending) return;
-    if (ownerPassword.length < 8) { setPasswordUpdateMessage("Use pelo menos 8 caracteres."); return; }
-    if (ownerPassword !== ownerPasswordConfirmation) { setPasswordUpdateMessage("As senhas não coincidem."); return; }
-    setPasswordUpdatePending(true);
-    setPasswordUpdateMessage("Atualizando senha…");
-    try {
-      const { error } = await supabase.auth.updateUser({ password: ownerPassword });
-      if (error) { setPasswordUpdateMessage(`O provedor recusou a alteração: ${error.message}`); return; }
-      setOwnerPassword("");
-      setOwnerPasswordConfirmation("");
-      setPasswordUpdateMessage("Senha atualizada. O próximo login já usará a nova senha.");
-    } catch {
-      setPasswordUpdateMessage("Não foi possível atualizar a senha. Entre novamente ou use a recuperação por e-mail.");
-    } finally { setPasswordUpdatePending(false); }
-  }
 
   async function createActivity(title: string, projectSlug: string | null) {
     const cleanTitle = title.trim();
@@ -721,7 +721,7 @@ export function Hub() {
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
     { id: "career", group: "Estudos", label: "Abrir Currículo & Cursos", icon: Award, run: () => goTo("career") },
     { id: "approvals", group: "Segurança", label: "Aprovação de contas", icon: Award, run: () => goTo("approvals") },
-    { id: "security", group: "Segurança", label: "Alterar senha do Hub", icon: Settings2, run: () => goTo("security") },
+    { id: "config", group: "Conta", label: "Abrir configurações", icon: Settings2, run: () => goTo("config") },
 
     { id: "activity", group: "Pessoal", label: "Criar uma atividade", icon: Sparkles, run: () => goTo("overview") },
     { id: "backup", group: "Segurança", label: "Exportar backup do Hub", icon: Cloud, run: downloadHubBackup },
@@ -767,7 +767,7 @@ export function Hub() {
         <NavButton active={activeView === "university"} icon={GraduationCap} logo={workspaces.university.logo} label="University Path" onClick={() => goTo("university")} />
         <NavButton active={activeView === "career"} icon={Award} label={t("Currículo & Cursos")} onClick={() => goTo("career")} badge={courseProgress.filter((item) => courseCatalog.some((course) => course.id === item.course_id) && item.status === "in_progress").length} />
         <NavButton active={activeView === "approvals"} icon={Award} label="Aprovação de contas" onClick={() => goTo("approvals")} />
-        <NavButton active={activeView === "security"} icon={Settings2} label="Segurança" onClick={() => goTo("security")} />
+        <NavButton active={activeView === "config"} icon={Settings2} label={t("Configurações")} onClick={() => goTo("config")} />
       </SidebarGroup>
 
       <div className="sidebar-bottom">
@@ -796,7 +796,29 @@ export function Hub() {
       {activeView === "overview" && <PersonalDashboard tasks={tasks} notes={notes} systemSignals={systemSignals} routeSignals={routeSignals} syncing={syncing} syncError={syncError} onOpen={goTo} onCreate={createActivity} onToggle={toggleTask} onNote={createNote} onRetry={() => void loadWorkspace()} onBackup={downloadHubBackup} />}
       {activeView === "career" && <CoursesResume progress={courseProgress} savingCourseId={savingCourseId ?? certificateBusyId ?? (!localMode && (syncing || syncError) ? "sync" : null)} localOnly={localMode} onUpdate={updateCourseProgress} onAttach={attachCourseCertificate} onDownload={retrieveCourseCertificate} />}
       {activeView === "approvals" && <AccountApprovals token={hubAccessToken} />}
-      {activeView === "security" && <section className="security-settings"><p className="eyebrow">CONTA PROPRIETÁRIA</p><h1>Alterar senha do Hub</h1><p>Conta conectada: <strong>{sessionEmail || "Sessão local"}</strong>. Esta ação muda somente a senha principal; dados e aprovações continuam intactos.</p><form onSubmit={changeOwnerPassword}><label>Nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPassword} onChange={(event) => setOwnerPassword(event.target.value)} /></label><label>Confirmar nova senha<input type="password" autoComplete="new-password" minLength={8} required value={ownerPasswordConfirmation} onChange={(event) => setOwnerPasswordConfirmation(event.target.value)} /></label><button className="quick-create" type="submit" disabled={passwordUpdatePending}>{passwordUpdatePending ? "Atualizando…" : "Salvar nova senha"}</button><p role="status" aria-live="polite">{passwordUpdateMessage}</p></form></section>}
+      {activeView === "config" && <Configuracoes
+        email={sessionEmail}
+        nome={sessionName}
+        onBackup={downloadHubBackup}
+        salvar={{
+          nome: async (valor) => {
+            if (!supabase) throw new Error("Conta não configurada neste ambiente.");
+            const { error } = await supabase.auth.updateUser({ data: { display_name: valor } });
+            if (error) throw new Error(error.message);
+            setSessionName(valor);
+          },
+          email: async (valor) => {
+            if (!supabase) throw new Error("Conta não configurada neste ambiente.");
+            const { error } = await supabase.auth.updateUser({ email: valor });
+            if (error) throw new Error(error.message);
+          },
+          senha: async (valor) => {
+            if (!supabase) throw new Error("Conta não configurada neste ambiente.");
+            const { error } = await supabase.auth.updateUser({ password: valor });
+            if (error) throw new Error(error.message);
+          },
+        }}
+      />}
       {activeView === "jade" && <JadeWorkspace
         accessToken={hubAccessToken}
         activities={tasks}
