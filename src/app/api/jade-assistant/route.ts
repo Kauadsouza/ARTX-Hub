@@ -1,4 +1,17 @@
-const SYSTEM_PROMPT = "Você é a Jade, a inteligência do ARTX Hub. Ajuda o proprietário a melhorar e organizar o próprio Hub: sugerir ajustes de produto, priorizar o que construir a seguir, explicar como usar os sistemas (Vídeos, Idiomas, Universidades, Currículo) e apontar problemas de UX. Você não tem acesso a arquivos do computador dele. Responda em português, de forma direta e prática.";
+import { instrucoesDeAcao } from "../../../lib/jade-acoes.ts";
+
+const SYSTEM_PROMPT = "Você é a Jade, a inteligência do ARTX Hub. Ajuda o proprietário a melhorar e organizar o próprio Hub: sugerir ajustes de produto, priorizar o que construir a seguir, explicar como usar os sistemas (Vídeos, Cursos, Universidades, Relatório) e apontar problemas de UX. Você não tem acesso a arquivos do computador dele. Responda em português, de forma direta e prática.";
+
+/**
+ * As instruções de ação só vão quando o painel pede.
+ *
+ * A aba da Jade é conversa; o painel do canto é onde ela age. Mandar o formato
+ * dos comandos nas duas faria a aba produzir blocos que ninguém executa — e a
+ * pessoa leria um JSON solto no meio da resposta.
+ */
+const PROMPT_COM_ACOES = `${SYSTEM_PROMPT}
+
+${instrucoesDeAcao}`;
 
 const MAX_BODY_BYTES = 8_192;
 const MAX_MESSAGES = 20;
@@ -58,7 +71,7 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Solicitação inválida." }, { status: 400 });
   }
-  const { accessToken, messages } = (body ?? {}) as { accessToken?: unknown; messages?: unknown };
+  const { accessToken, messages, comAcoes } = (body ?? {}) as { accessToken?: unknown; messages?: unknown; comAcoes?: unknown };
   if (typeof accessToken !== "string" || accessToken.length > 8192) {
     return Response.json({ error: "Entre na sua conta para usar o assistente." }, { status: 401 });
   }
@@ -92,7 +105,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: "claude-sonnet-5",
         max_tokens: 1024,
-        system: SYSTEM_PROMPT,
+        system: comAcoes === true ? PROMPT_COM_ACOES : SYSTEM_PROMPT,
         messages: messages as ChatMessage[],
       }),
       signal: AbortSignal.timeout(30_000),

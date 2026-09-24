@@ -703,3 +703,44 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 .curso-idiomas-link > span { flex: 1; min-width: 0; }
 .curso-idiomas-link strong { display: block; font-size: 13.5px; }
 .curso-idiomas-link small { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; }
+
+/* ── A Jade no canto ────────────────────────────────────────────────────── */
+.jade-bolha { position: fixed; right: 22px; bottom: 22px; z-index: 60; display: grid; place-items: center; width: 52px; height: 52px; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--violet); color: #fff; box-shadow: 0 12px 34px rgba(0,0,0,.34); cursor: pointer; transition: transform .16s; }
+.jade-bolha:hover { transform: translateY(-3px); }
+@media (prefers-reduced-motion: reduce) { .jade-bolha { transition: none; } .jade-bolha:hover { transform: none; } }
+
+.jade-canto { position: fixed; right: 22px; bottom: 22px; z-index: 60; display: flex; flex-direction: column; width: min(380px, calc(100vw - 32px)); max-height: min(560px, calc(100vh - 44px)); border: 1px solid var(--line-strong); border-radius: 18px; background: var(--surface); box-shadow: 0 24px 64px rgba(0,0,0,.42); overflow: hidden; }
+.jade-canto > header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.jade-canto-marca { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 9px; background: var(--violet-soft); color: var(--violet-bright); }
+.jade-canto header > div { flex: 1; min-width: 0; }
+.jade-canto header strong { display: block; font-size: 13.5px; }
+.jade-canto header small { display: block; color: var(--muted); font-size: 10.5px; }
+.jade-canto header > button { border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.jade-canto header > button:hover { color: var(--text); }
+
+.jade-canto-conversa { flex: 1; min-height: 160px; overflow-y: auto; padding: 14px 16px; display: grid; gap: 10px; align-content: start; }
+.jade-canto-vazio { margin: 0; color: var(--subtle); font-size: 12px; line-height: 1.65; }
+.jade-canto-msg { max-width: 88%; padding: 10px 13px; border-radius: 13px; font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.jade-canto-msg.assistant { justify-self: start; border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 13px 13px 13px 4px; }
+.jade-canto-msg.user { justify-self: end; background: var(--violet); color: #fff; border-radius: 13px 13px 4px 13px; }
+.jade-canto-msg.pensando { display: flex; gap: 4px; padding: 14px; }
+.jade-canto-msg.pensando i { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); animation: jade-pulso 1.2s infinite; }
+.jade-canto-msg.pensando i:nth-child(2) { animation-delay: .18s; }
+.jade-canto-msg.pensando i:nth-child(3) { animation-delay: .36s; }
+@keyframes jade-pulso { 0%,60%,100% { opacity: .25; } 30% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .jade-canto-msg.pensando i { animation: none; opacity: .6; } }
+
+/* A decisão pendente fica presa acima do campo: não dá para digitar outra
+   coisa e esquecer que ficou algo esperando. */
+.jade-canto-confirmar { padding: 13px 16px; border-top: 1px solid #936b37; background: #302419; color: #f3d8b3; }
+.jade-canto-confirmar p { margin: 0 0 10px; font-size: 12px; line-height: 1.55; }
+.jade-canto-confirmar > div { display: flex; gap: 8px; }
+.jade-canto-confirmar button:last-child { border: 1px solid var(--line-strong); border-radius: 9px; background: transparent; color: #c8a878; padding: 8px 12px; font-size: 12px; cursor: pointer; }
+
+.jade-canto form { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); }
+.jade-canto form input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; font-size: 12.5px; }
+.jade-canto form input:focus { outline: none; border-color: var(--violet); box-shadow: 0 0 0 3px var(--violet-soft); }
+.jade-canto form button { display: grid; place-items: center; width: 40px; flex-shrink: 0; border: 0; border-radius: 10px; background: var(--violet); color: #fff; cursor: pointer; }
+.jade-canto form button:disabled { opacity: .45; cursor: not-allowed; }
+
+@media (max-width: 560px) { .jade-canto { right: 10px; left: 10px; bottom: 10px; width: auto; } .jade-bolha { right: 16px; bottom: 16px; } }

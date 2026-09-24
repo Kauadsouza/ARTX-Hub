@@ -38,12 +38,14 @@ import { parseRouteSignals, type RouteSignals } from "@/lib/week-ahead";
 import { certificateBucket, certificatePath, certificateReference, downloadCertificate, localCertificate, parseCertificateReference, isStoredCertificate, validateCertificate } from "@/lib/course-certificates";
 import { itensParaBusca } from "@/lib/relatorio";
 import { aplicarAcento, lerAcentoGuardado } from "@/lib/preferencias";
+import { destinos, type Acao } from "@/lib/jade-acoes";
 import { PersonalDashboard } from "@/components/PersonalDashboard";
 import { RelatorioKaua } from "@/components/RelatorioKaua";
 import { JadeWorkspace } from "@/components/JadeWorkspace";
 import { CoursesResume, courseCatalog, type CourseProgress, type CourseProgressPatch, type CourseProgressStatus } from "@/components/CoursesResume";
 import { AccountApprovals } from "./AccountApprovals";
 import { Configuracoes } from "./Configuracoes";
+import { JadeCanto } from "./JadeCanto";
 import { useI18n, LanguageSwitch } from "./I18n";
 
 type Task = {
@@ -702,6 +704,49 @@ export function Hub() {
     notify("Backup do Hub exportado");
   }
 
+  /**
+   * O que a Jade faz, de verdade.
+   *
+   * Cada ação usa a mesma função que o botão da tela usaria — nada aqui tem um
+   * caminho próprio para o banco. Assim a Jade não consegue fazer nada que o
+   * Kauã já não pudesse fazer clicando, e um erro dela não vira um erro que só
+   * ela sabe causar.
+   *
+   * Devolve a frase que aparece na conversa. Falha também é frase: silêncio
+   * depois de um pedido faz a pessoa achar que funcionou.
+   */
+  const executarAcaoDaJade = useCallback(async (acao: Acao): Promise<string> => {
+    if (acao.tipo === "abrir") {
+      const destino = destinos[acao.destino];
+      if (!destino) return "Não conheço essa aba.";
+      goTo(destino as View);
+      return `Abri ${acao.destino}.`;
+    }
+
+    if (acao.tipo === "criar-atividade") {
+      const ok = await createActivity(acao.titulo, acao.projeto);
+      return ok ? `Criei "${acao.titulo}".` : "Não consegui criar agora. Tente de novo.";
+    }
+
+    if (acao.tipo === "criar-nota") {
+      const ok = await createNote(acao.conteudo);
+      return ok ? "Guardei a nota." : "Não consegui guardar a nota agora.";
+    }
+
+    // Concluir: acha pelo texto, porque é assim que ela foi pedida. Sem achar,
+    // diz — marcar a atividade errada é pior que não marcar nenhuma.
+    const alvo = tasks.find(
+      (item) => !item.completed && item.title.toLocaleLowerCase().includes(acao.titulo.toLocaleLowerCase()),
+    );
+    if (!alvo) return `Não achei uma atividade em aberto com "${acao.titulo}".`;
+    await toggleTask(alvo);
+    return `Marquei "${alvo.title}" como concluída.`;
+    // `createActivity`, `createNote` e `toggleTask` sao funcoes normais do
+    // componente, recriadas a cada render; incluí-las aqui refaria o callback
+    // toda vez e nao acrescentaria nada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks]);
+
   if (!sessionReady || !memberReady) {
     return <main className="loading"><img className="loading-logo" src={assetPath("/brand/artx-hub.svg")} alt="ARTX Hub" /><p>{t("Abrindo sua central...")}</p></main>;
   }
@@ -712,6 +757,7 @@ export function Hub() {
 
   const activeWorkspace = isWorkspaceView(activeView) ? workspaces[activeView] : null;
   const page = pageMeta[activeView];
+
 
   const commands: CommandItem[] = [
     { id: "overview", group: "Navegar", label: "Abrir visão geral", icon: LayoutDashboard, run: () => goTo("overview") },
@@ -842,6 +888,8 @@ export function Hub() {
       <button className={activeView === "university" ? "active" : ""} onClick={() => goTo("university")}><Compass size={20} /><span>{t("Universidade")}</span></button>
       <button onClick={() => setSidebarOpen(true)}><Menu size={20} /><span>{t("Tudo")}</span></button>
     </nav>
+
+    <JadeCanto accessToken={hubAccessToken} executar={executarAcaoDaJade} />
 
     <CommandPalette
       open={commandOpen}
