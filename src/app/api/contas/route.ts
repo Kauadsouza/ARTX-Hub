@@ -85,6 +85,22 @@ async function ler(request: Request) {
   return JSON.parse(Buffer.concat(partes).toString("utf8")) as Record<string, unknown>;
 }
 
+/**
+ * A tabela de arquivos existe?
+ *
+ * Ela é criada à mão enquanto o banco ainda mora no sistema de vídeos. Sem
+ * esta conferência, a ausência dela aparece como a mensagem genérica de
+ * falha — que não diz o que fazer. Com ela, diz.
+ */
+async function temTabelaDeArquivos(): Promise<boolean> {
+  const [linha] = await prisma.$queryRaw<{ existe: string | null }[]>`
+    SELECT to_regclass('public."MemberFile"')::text AS existe
+  `;
+  return Boolean(linha?.existe);
+}
+
+const SEM_TABELA = "O lugar de guardar arquivos ainda não foi criado no banco. Rode a migração MemberFile.";
+
 export async function POST(request: Request) {
   let headers: Record<string, string>;
   try {
@@ -121,10 +137,26 @@ export async function POST(request: Request) {
         const memberId = String(body.memberId ?? "");
         const conta = await prisma.memberAccount.findUnique({ where: { id: memberId }, select: { id: true } });
         if (!conta) throw new Error("Conta não encontrada.");
+
+        /*
+          A tabela de arquivos é conferida antes, e não assumida.
+
+          Ela nasceu com os certificados e é criada à mão enquanto o banco
+          ainda mora no sistema de vídeos. Enquanto não existir, qualquer
+          comando que a mencione derruba a transação inteira — e foi
+          exatamente isso que aconteceu: apagar conta parou de funcionar no
+          instante em que o certificado entrou, sem nenhuma relação aparente
+          entre as duas coisas.
+
+          Apagar uma conta não pode depender de uma funcionalidade que ela
+          nem usa.
+        */
+        const guardaArquivos = await temTabelaDeArquivos();
+
         await prisma.$transaction(async (tx) => {
           await tx.memberSession.deleteMany({ where: { principal: memberId } });
           await tx.memberState.deleteMany({ where: { principal: memberId } });
-          await tx.memberFile.deleteMany({ where: { principal: memberId } });
+          if (guardaArquivos) await tx.memberFile.deleteMany({ where: { principal: memberId } });
           await tx.memberAccount.delete({ where: { id: memberId } });
         });
       } else if (action === "admin-decide-all" || action === "admin-configure") {
@@ -285,59 +317,9 @@ export async function POST(request: Request) {
           if (!atualizado.count) throw new Error("Outra sessão alterou seus dados. Recarregue antes de salvar.");
           result = { revision: revision + 1 };
         }
-      } else if (action === "file-put") {
-        /*
-          Guardar um arquivo da pessoa — hoje, o certificado de um curso.
-
-          O formato é conferido pelos primeiros bytes, não pela extensão nem
-          pelo tipo que o navegador declara: os dois são texto que quem envia
-          escolhe. O nome também é refeito aqui, porque nome de arquivo que
-          veio de fora é onde se esconde caminho e caractere de controle.
-        */
-        const chave = String(body.chave ?? "").trim();
-        if (!chave || chave.length > 120) throw new Error("Chave de arquivo inválida.");
-        if (typeof body.conteudo !== "string") throw new Error("Arquivo ausente.");
-
-        const bytes = Buffer.from(body.conteudo, "base64");
-        if (!bytes.length) throw new Error("Arquivo vazio.");
-        if (bytes.length > LIMITE_BYTES) {
-          throw new Error(`O arquivo passa de ${Math.round(LIMITE_BYTES / 100000) / 10} MB. Envie um menor.`);
-        }
-
-        const formato = formatoDe(bytes);
-        if (!formato) throw new Error("Só PDF, PNG, JPG ou WEBP. O arquivo enviado não é nenhum dos quatro.");
-
-        const nome = nomeSeguro(String(body.nome ?? ""), formato.extensao);
-        const dados = { nome, tipo: formato.tipo, tamanho: bytes.length, conteudo: bytes };
-        await prisma.memberFile.upsert({
-          where: { principal_app_chave: { principal, app, chave } },
-          create: { principal, app, chave, ...dados },
-          update: dados,
-        });
-        result = { chave, nome, tipo: formato.tipo, tamanho: bytes.length };
-      } else if (action === "file-list") {
-        // Sem o conteúdo: a lista é para a tela saber o que existe.
-        result = await prisma.memberFile.findMany({
-          where: { principal, app },
-          select: { chave: true, nome: true, tipo: true, tamanho: true, criadoEm: true },
-          orderBy: { criadoEm: "desc" },
-          take: 200,
-        });
-      } else if (action === "file-get") {
-        const chave = String(body.chave ?? "").trim();
-        const arquivo = await prisma.memberFile.findUnique({
-          where: { principal_app_chave: { principal, app, chave } },
-        });
-        if (!arquivo) throw new Error("Arquivo não encontrado.");
-        result = {
-          chave: arquivo.chave,
-          nome: arquivo.nome,
-          tipo: arquivo.tipo,
-          conteudo: Buffer.from(arquivo.conteudo).toString("base64"),
-        };
-      } else if (action === "file-delete") {
-        const chave = String(body.chave ?? "").trim();
-        await prisma.memberFile.deleteMany({ where: { principal, app, chave } });
+      } else if (action === "file-put" || action === "file-list" || action === "file-get" || action === "file-delete") {
+        if (!(await temTabelaDeArquivos())) throw new Error(SEM_TABELA);
+        result = await arquivos(action, principal, app, body);
       } else {
         throw new Error("Ação inválida.");
       }
@@ -352,4 +334,71 @@ export async function POST(request: Request) {
         : "Não foi possível concluir. Seus dados foram preservados; tente novamente.";
     return NextResponse.json({ error: seguro }, { status: 400, headers });
   }
+}
+
+/**
+ * Guardar, listar, buscar e apagar arquivos da pessoa — hoje, os certificados.
+ *
+ * Fora da função principal porque são quatro ações que só falam entre si, e
+ * deixá-las lá dentro fazia o bloco crescer sem que nenhuma delas tivesse a
+ * ver com conta, sessão ou aprovação.
+ */
+async function arquivos(action: string, principal: string, app: string, body: Record<string, unknown>) {
+  const chave = String(body.chave ?? "").trim();
+
+  if (action === "file-list") {
+    // Sem o conteúdo: a lista é só para a tela saber o que existe.
+    return prisma.memberFile.findMany({
+      where: { principal, app },
+      select: { chave: true, nome: true, tipo: true, tamanho: true, criadoEm: true },
+      orderBy: { criadoEm: "desc" },
+      take: 200,
+    });
+  }
+
+  if (!chave || chave.length > 120) throw new Error("Chave de arquivo inválida.");
+
+  if (action === "file-put") {
+    /*
+      O formato é conferido pelos primeiros bytes, não pela extensão nem pelo
+      tipo que o navegador declara: os dois são texto que quem envia escolhe.
+      O nome também é refeito aqui, porque nome de arquivo vindo de fora é
+      onde se esconde caminho e caractere de controle.
+    */
+    if (typeof body.conteudo !== "string") throw new Error("Arquivo ausente.");
+
+    const bytes = Buffer.from(body.conteudo, "base64");
+    if (!bytes.length) throw new Error("Arquivo vazio.");
+    if (bytes.length > LIMITE_BYTES) {
+      throw new Error(`O arquivo passa de ${Math.round(LIMITE_BYTES / 100000) / 10} MB. Envie um menor.`);
+    }
+
+    const formato = formatoDe(bytes);
+    if (!formato) throw new Error("Só PDF, PNG, JPG ou WEBP. O arquivo enviado não é nenhum dos quatro.");
+
+    const nome = nomeSeguro(String(body.nome ?? ""), formato.extensao);
+    const dados = { nome, tipo: formato.tipo, tamanho: bytes.length, conteudo: bytes };
+    await prisma.memberFile.upsert({
+      where: { principal_app_chave: { principal, app, chave } },
+      create: { principal, app, chave, ...dados },
+      update: dados,
+    });
+    return { chave, nome, tipo: formato.tipo, tamanho: bytes.length };
+  }
+
+  if (action === "file-get") {
+    const arquivo = await prisma.memberFile.findUnique({
+      where: { principal_app_chave: { principal, app, chave } },
+    });
+    if (!arquivo) throw new Error("Arquivo não encontrado.");
+    return {
+      chave: arquivo.chave,
+      nome: arquivo.nome,
+      tipo: arquivo.tipo,
+      conteudo: Buffer.from(arquivo.conteudo).toString("base64"),
+    };
+  }
+
+  await prisma.memberFile.deleteMany({ where: { principal, app, chave } });
+  return { ok: true };
 }
