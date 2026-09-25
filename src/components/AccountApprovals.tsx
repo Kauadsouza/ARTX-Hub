@@ -21,6 +21,7 @@ import {
   contarSelecionados,
   decididoEm,
   estadoDaConta,
+  podeAplicar,
   estadoDoSistema,
   idsDaConta,
   rotuloDoEstado,
@@ -97,7 +98,17 @@ export function AccountApprovals({ token }: { token: string | null }) {
   async function save(account: Conta) {
     const escolhidos = apps.filter(app => selections[account.key]?.[app.key]);
     const resumo = escolhidos.length ? escolhidos.map(app => app.label).join(', ') : 'nenhum sistema';
-    const desbloqueando = estadoDaConta(account) === 'bloqueada';
+    const estado = estadoDaConta(account);
+
+    // O botão diz "Aprovar" ou "Desbloquear". Mandar seleção vazia dali faria o
+    // contrário, então ele recusa em vez de pedir confirmação para o oposto.
+    const permitido = podeAplicar(estado, escolhidos.length);
+    if (!permitido.ok) {
+      setNotice(permitido.motivo);
+      return;
+    }
+
+    const desbloqueando = estado === 'bloqueada';
     // Salvar sem nada marcado revoga tudo. A confirmação precisa dizer isso: é
     // a mesma ação com um efeito oposto ao que o botão sugere.
     const pergunta = !escolhidos.length
@@ -164,7 +175,7 @@ export function AccountApprovals({ token }: { token: string | null }) {
                   <h2>{account.username}</h2>
                   <p>
                     {marcados
-                      ? `${marcados} sistema${marcados > 1 ? 's' : ''} liberado${marcados > 1 ? 's' : ''}`
+                      ? `${marcados} sistema${marcados > 1 ? 's' : ''} marcado${marcados > 1 ? 's' : ''} — salve para valer`
                       : 'Escolha o que esta pessoa poderá acessar'}
                   </p>
 

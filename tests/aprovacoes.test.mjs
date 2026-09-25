@@ -7,6 +7,7 @@ import {
   contarSelecionados,
   estadoDaConta,
   idsDaConta,
+  podeAplicar,
   selecoesDoServidor,
 } from '../src/lib/aprovacoes.ts';
 
@@ -167,4 +168,54 @@ test('a última decisão é a mais recente entre as concessões', async () => {
 test('sem data de decisão, a ficha não inventa uma', async () => {
   const { decididoEm } = await import('../src/lib/aprovacoes.ts');
   assert.equal(decididoEm(agrupar([grant('m1', 'videos', 'pending')])[0]), null);
+});
+
+// ══════════════ O defeito que fazia "Aprovar conta" revogar tudo ══════════════
+
+test('o sistema pedido já vem marcado, para que aprovar signifique aprovar', () => {
+  // Antes só `approved` vinha marcado. Uma conta nova abria com tudo vazio, e o
+  // botão dela dizia "Aprovar conta" — clicar mandava seleção vazia, que
+  // significa "retire tudo". O dono aprovava e revogava o que a pessoa pediu.
+  const s = selecoesDoServidor([grant('m1', 'cursos', 'pending')]);
+  assert.equal(s.kauaartx.cursos, true, 'o pedido precisa vir marcado');
+});
+
+test('negado continua desmarcado: aprovar não ressuscita o que foi recusado', () => {
+  const s = selecoesDoServidor([grant('m1', 'cursos', 'revoked'), grant('m1', 'videos', 'pending')]);
+  assert.equal(s.kauaartx.cursos, false);
+  assert.equal(s.kauaartx.videos, true);
+});
+
+test('numa conta aguardando, seleção vazia é recusada em vez de virar revogação', () => {
+  const r = podeAplicar('aguardando', 0);
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /Bloquear conta/, 'precisa dizer por onde se nega o pedido');
+});
+
+test('numa conta bloqueada, desbloquear sem marcar nada também é recusado', () => {
+  assert.equal(podeAplicar('bloqueada', 0).ok, false);
+});
+
+test('numa conta ativa, seleção vazia continua valendo: é como se retira tudo', () => {
+  assert.equal(podeAplicar('ativa', 0).ok, true);
+});
+
+test('com algum sistema marcado, qualquer estado pode aplicar', () => {
+  for (const estado of ['ativa', 'aguardando', 'bloqueada']) {
+    assert.equal(podeAplicar(estado, 1).ok, true, estado);
+  }
+});
+
+test('o caminho completo do bug: conta nova, aprovar, e o acesso sai liberado', () => {
+  const linhas = [grant('m1', 'cursos', 'pending')];
+  const conta = agrupar(linhas)[0];
+  const selecoes = selecoesDoServidor(linhas);
+
+  assert.equal(estadoDaConta(conta), 'aguardando');
+  assert.equal(acoesDoEstado(estadoDaConta(conta)).principal, 'Aprovar conta');
+
+  // O que o botão manda para o servidor.
+  const escolhidos = Object.entries(selecoes[conta.key]).filter(([, marcado]) => marcado).map(([app]) => app);
+  assert.equal(podeAplicar(estadoDaConta(conta), escolhidos.length).ok, true);
+  assert.deepEqual(escolhidos, ['cursos'], 'aprovar tem que liberar justamente o que foi pedido');
 });

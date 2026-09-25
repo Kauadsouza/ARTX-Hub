@@ -53,15 +53,47 @@ export function agrupar(linhas: Concessao[]): Conta[] {
  * Sempre do servidor. O estado local anterior não entra: se entrasse, uma conta
  * recém-bloqueada continuaria aparecendo com sistemas liberados, e o próximo
  * clique mandaria de volta uma seleção que já não existia.
+ *
+ * O sistema PEDIDO vem marcado, e isso conserta um estrago.
+ *
+ * Antes só `approved` vinha marcado. Uma conta nova, portanto, abria com todas
+ * as caixas vazias — e o botão dela dizia "Aprovar conta". Clicar mandava uma
+ * seleção vazia, e seleção vazia significa "retire tudo". O dono clicava em
+ * aprovar e revogava justamente o acesso que a pessoa tinha pedido; ela voltava
+ * ao sistema e continuava barrada. Foi o que aconteceu.
+ *
+ * Marcar o pendente faz o botão cumprir o que o nome promete: aprovar o que foi
+ * pedido. A caixa continua visível e desmarcável, com o rótulo dizendo que
+ * aquele sistema está aguardando, então negar segue sendo um clique.
  */
 export function selecoesDoServidor(linhas: Concessao[]): Selecoes {
   const selecoes: Selecoes = {};
   for (const linha of linhas) {
     if (linha.app === "hub") continue;
     const key = linha.member.username.trim().toLowerCase();
-    selecoes[key] = { ...selecoes[key], [linha.app]: linha.status === "approved" };
+    const marcada = linha.status === "approved" || linha.status === "pending";
+    selecoes[key] = { ...selecoes[key], [linha.app]: marcada };
   }
   return selecoes;
+}
+
+/**
+ * Se a ação principal pode ser aplicada do jeito que está.
+ *
+ * Seleção vazia quer dizer "retire todos os acessos". Numa conta ativa isso é
+ * uma ação legítima, e a confirmação avisa. Numa conta aguardando ou bloqueada
+ * o botão se chama "Aprovar conta" ou "Desbloquear conta" — mandar uma seleção
+ * vazia ali faria o contrário exato do que está escrito nele, e nenhuma
+ * confirmação conserta um botão que mente.
+ */
+export function podeAplicar(estado: EstadoConta, escolhidos: number): { ok: true } | { ok: false; motivo: string } {
+  if (escolhidos > 0 || estado === "ativa") return { ok: true };
+  return {
+    ok: false,
+    motivo: estado === "aguardando"
+      ? "Marque ao menos um sistema para aprovar. Para negar o pedido, use Bloquear conta."
+      : "Marque ao menos um sistema para desbloquear.",
+  };
 }
 
 export type EstadoConta = "ativa" | "aguardando" | "bloqueada";
