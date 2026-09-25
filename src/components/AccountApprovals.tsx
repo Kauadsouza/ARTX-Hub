@@ -36,6 +36,7 @@ const apps: Array<{ key: AppKey; label: string; detail: string }> = [
   { key: 'videos', label: 'Vídeos', detail: 'Ideias, roteiros e produção' },
   { key: 'study', label: 'Inglês', detail: 'Aulas, exercícios e progresso' },
   { key: 'university', label: 'Universidades', detail: 'Pesquisa e planejamento acadêmico' },
+  { key: 'cursos', label: 'Cursos', detail: 'Catálogo, trilha e progresso' },
 ];
 
 /** Data curta, ou traço quando o valor não dá para ler. */

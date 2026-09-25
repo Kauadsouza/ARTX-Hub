@@ -27,7 +27,6 @@ export type Acao =
 export const destinos: Record<string, string> = {
   "visao-geral": "overview",
   relatorio: "relatorio",
-  cursos: "career",
   universidades: "university",
   videos: "videos",
   site: "site",
@@ -137,7 +136,7 @@ texto e acrescente NO FIM um bloco com o comando:
 <<ACAO>>{"tipo":"criar-atividade","titulo":"...","projeto":"videos|sat|university|site|geral"}<</ACAO>>
 <<ACAO>>{"tipo":"criar-nota","conteudo":"..."}<</ACAO>>
 <<ACAO>>{"tipo":"concluir-atividade","titulo":"..."}<</ACAO>>
-<<ACAO>>{"tipo":"abrir","destino":"visao-geral|relatorio|cursos|universidades|videos|site|idiomas|aprovacoes|configuracoes"}<</ACAO>>
+<<ACAO>>{"tipo":"abrir","destino":"visao-geral|relatorio|universidades|videos|site|idiomas|aprovacoes|configuracoes"}<</ACAO>>
 
 Regras:
 - Um bloco por resposta, no máximo. Sem bloco quando a pergunta não pede ação.

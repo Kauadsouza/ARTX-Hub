@@ -16,7 +16,7 @@
  * leitura — que só acontece ao abrir a tela ou depois de uma ação dela.
  */
 
-export type AppKey = "videos" | "study" | "university";
+export type AppKey = "videos" | "study" | "university" | "cursos";
 
 export type Concessao = {
   memberId: string;
