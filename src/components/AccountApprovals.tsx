@@ -57,7 +57,8 @@ export function AccountApprovals({ token }: { token: string | null }) {
 
   const request = useCallback(async (action: string, data: Record<string, unknown> = {}) => {
     if (!token) throw new Error('Entre na conta proprietária do Hub.');
-    const response = await fetch('https://sistema-videos.vercel.app/api/members', {
+    // Mesma origem: o serviço de contas é do Hub.
+    const response = await fetch('/api/contas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ action, ...data }),

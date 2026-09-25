@@ -1,0 +1,64 @@
+// As contas das pessoas — e só elas.
+//
+// Este serviço mora no Hub porque o Hub é o único ponto que centraliza: é onde
+// o dono aprova quem entra em quê. Antes ele morava dentro do sistema de
+// vídeos, e o efeito era que um deploy do sistema de vídeos derrubava o login
+// de todos os outros — inclusive o do próprio Hub.
+//
+// O schema aqui descreve só as tabelas de conta. As tabelas de vídeo existem no
+// mesmo banco, mas não são deste sistema e não aparecem aqui: o Hub não tem o
+// que fazer com elas.
+//
+// As migrações continuam sendo aplicadas pelo sistema de vídeos enquanto o
+// banco fisicamente morar lá. Quando ele vier para o Supabase do Hub, elas vêm
+// junto — e aí a separação fica completa.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model MemberAccount {
+  id String @id @default(uuid())
+  username String @unique
+  passwordHash String
+  createdAt DateTime @default(now())
+  grants MemberGrant[]
+}
+
+model MemberGrant {
+  memberId String
+  app String
+  status String @default("pending")
+  updatedAt DateTime @updatedAt
+  member MemberAccount @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  @@id([memberId, app])
+}
+
+model MemberSession {
+  digest String @id
+  principal String
+  app String
+  expiresAt DateTime
+  @@index([principal, app])
+}
+
+model MemberState {
+  principal String
+  app String
+  payload Json
+  revision Int @default(1)
+  updatedAt DateTime @updatedAt
+  @@id([principal, app])
+}
+
+model AccessThrottle {
+  key String @id
+  attempts Int @default(1)
+  expiresAt DateTime
+}

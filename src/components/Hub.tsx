@@ -87,7 +87,7 @@ type CommandItem = {
 };
 
 const assetPath = (path: string) => `${process.env.NEXT_PUBLIC_ARTX_BASE_PATH ?? ""}${path}`;
-const memberApi = "https://sistema-videos.vercel.app/api/members";
+const memberApi = "/api/contas";
 
 async function memberRequest(action: string, data: Record<string, unknown> = {}, token = "", app: "hub" | MemberWorkspace = "hub") {
   const response = await fetch(memberApi, { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ ...data, action, app }), signal: AbortSignal.timeout(20000) });

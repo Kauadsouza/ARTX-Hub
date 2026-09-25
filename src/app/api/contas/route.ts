@@ -1,0 +1,282 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import {
+  SISTEMAS,
+  SISTEMAS_DE_PESSOA,
+  digest,
+  hashPassword,
+  issueMemberSession,
+  matchesPassword,
+  memberIdentity,
+  requireHubOwner,
+  sistema,
+  throttle,
+} from "@/lib/contas-auth";
+
+/**
+ * O serviço de contas.
+ *
+ * Um endereço só, no Hub, para todos os sistemas. Cada sistema fala com este
+ * serviço e com mais nenhum outro — o de vídeos não sabe que o de idiomas
+ * existe, e vice-versa. Quem decide quem entra em quê é o dono, aqui.
+ *
+ * Este arquivo veio do sistema de vídeos, onde o serviço morava. O contrato de
+ * rede é o mesmo de lá, de propósito: os sistemas só trocaram o endereço para
+ * onde mandam, sem mudar o que mandam — ninguém é deslogado na mudança.
+ */
+
+export const runtime = "nodejs";
+
+/* Um endereço a mais aqui é um sistema a mais que pode pedir login. A lista é
+   fechada; qualquer outra origem leva 403 antes de o corpo ser lido. */
+const permitidas = new Set([
+  "https://artx-hub.vercel.app",
+  "https://sistema-videos.vercel.app",
+  "https://sat-simulado.vercel.app",
+  "https://university-path-six.vercel.app",
+  "https://cursos-artx.vercel.app",
+]);
+
+function cabecalhos(request: Request) {
+  const origem = request.headers.get("origin");
+  if (origem && origem !== new URL(request.url).origin && !permitidas.has(origem)) {
+    throw new Error("Origem não permitida.");
+  }
+  return {
+    "Cache-Control": "no-store",
+    Vary: "Origin",
+    ...(origem ? { "Access-Control-Allow-Origin": origem } : {}),
+  };
+}
+
+export function OPTIONS(request: Request) {
+  try {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        ...cabecalhos(request),
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      },
+    });
+  } catch {
+    return new Response(null, { status: 403 });
+  }
+}
+
+/** Lê o corpo com teto de tamanho: um pedido gigante não pode virar memória. */
+async function ler(request: Request) {
+  if (!request.headers.get("content-type")?.startsWith("application/json")) throw new Error("Envie JSON.");
+  const leitor = request.body?.getReader();
+  if (!leitor) throw new Error("Pedido vazio.");
+  const partes: Uint8Array[] = [];
+  let tamanho = 0;
+  for (;;) {
+    const { done, value } = await leitor.read();
+    if (done) break;
+    tamanho += value.length;
+    if (tamanho > 2_000_000) {
+      await leitor.cancel();
+      throw new Error("Pedido muito grande.");
+    }
+    partes.push(value);
+  }
+  return JSON.parse(Buffer.concat(partes).toString("utf8")) as Record<string, unknown>;
+}
+
+export async function POST(request: Request) {
+  let headers: Record<string, string>;
+  try {
+    headers = cabecalhos(request);
+  } catch {
+    return NextResponse.json({ error: "Origem não permitida." }, { status: 403 });
+  }
+
+  try {
+    const body = await ler(request);
+    const action = body.action;
+    const token = request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
+    let result: unknown = { ok: true };
+
+    if (action === "admin-list" || action === "admin-decide" || action === "admin-decide-all" || action === "admin-configure") {
+      await requireHubOwner(token);
+
+      if (action === "admin-list") {
+        result = await prisma.memberGrant.findMany({
+          select: { app: true, status: true, memberId: true, updatedAt: true, member: { select: { username: true, createdAt: true } } },
+          orderBy: { updatedAt: "desc" },
+          take: 500,
+        });
+      } else if (action === "admin-decide-all" || action === "admin-configure") {
+        const memberId = String(body.memberId ?? "");
+        const conta = await prisma.memberAccount.findUnique({ where: { id: memberId }, select: { id: true } });
+        if (!conta) throw new Error("Conta não encontrada.");
+
+        if (action === "admin-decide-all") {
+          if (!["approved", "rejected", "revoked"].includes(String(body.status))) throw new Error("Decisão inválida.");
+          await prisma.$transaction([
+            prisma.memberGrant.updateMany({ where: { memberId }, data: { status: String(body.status) } }),
+            prisma.memberSession.deleteMany({ where: { principal: memberId } }),
+          ]);
+        } else {
+          if (!Array.isArray(body.apps) || body.apps.some((app) => !SISTEMAS_DE_PESSOA.includes(app as (typeof SISTEMAS_DE_PESSOA)[number]))) {
+            throw new Error("Seleção de sistemas inválida.");
+          }
+          const escolhidos = new Set(body.apps as string[]);
+          await prisma.$transaction(async (tx) => {
+            /*
+              Duas coisas que já deram errado aqui.
+
+              1. O acesso ao Hub não é concedido de tabela. A linha já disse
+                 "hub ou escolhido", e liberar o Vídeo para alguém criava junto
+                 uma conta no Hub — que é o painel do dono. Quem pede acesso a
+                 um sistema recebe aquele sistema, e mais nada.
+
+              2. upsert, não updateMany. O update só mexia em linha que já
+                 existia, então marcar um sistema que a pessoa nunca pediu não
+                 fazia nada: o dono clicava, confirmava, e nada acontecia.
+            */
+            for (const app of SISTEMAS_DE_PESSOA) {
+              const status = escolhidos.has(app) ? "approved" : "revoked";
+              await tx.memberGrant.upsert({
+                where: { memberId_app: { memberId, app } },
+                create: { memberId, app, status },
+                update: { status },
+              });
+            }
+            await tx.memberSession.deleteMany({ where: { principal: memberId } });
+          });
+        }
+      } else {
+        const app = sistema(body.app);
+        const memberId = String(body.memberId ?? "");
+        if (!["approved", "rejected", "revoked"].includes(String(body.status))) throw new Error("Decisão inválida.");
+        await prisma.$transaction(async (tx) => {
+          await tx.memberGrant.update({ where: { memberId_app: { memberId, app } }, data: { status: String(body.status) } });
+          await tx.memberSession.deleteMany({ where: { principal: memberId, app } });
+        });
+      }
+    } else if (action === "owner") {
+      await requireHubOwner(token);
+      const app = sistema(body.app);
+      result = { token: await issueMemberSession("owner", app), principal: "owner", owner: true };
+    } else if (action === "register" || action === "login") {
+      const username = String(body.username ?? "").trim().toLowerCase();
+      const password = String(body.password ?? "");
+      const app = sistema(body.app);
+      if (!/^[a-z0-9][a-z0-9_.-]{2,31}$/.test(username) || password.length < 10 || password.length > 128) {
+        throw new Error("Use um nome de 3–32 caracteres (letras, números, ponto ou traço) e uma senha de 10–128 caracteres.");
+      }
+      const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+      await throttle(`ip:${digest(ip)}`, 30);
+      await throttle(`user:${username}`);
+      const conta = await prisma.memberAccount.findUnique({ where: { username } });
+
+      if (action === "register") {
+        if (conta) throw new Error("Nome indisponível. Se a conta é sua, entre para pedir acesso a este sistema.");
+        const pedidos = app === "hub" ? SISTEMAS : [app];
+        await prisma.memberAccount.create({
+          data: {
+            username,
+            passwordHash: await hashPassword(password),
+            grants: { create: pedidos.map((pedido) => ({ app: pedido, status: "pending" })) },
+          },
+        });
+        result = { pending: true, state: "pending", message: "Conta criada. Aguarde a aprovação do administrador no Hub." };
+      } else {
+        // Mesmo sem conta, gasta o tempo do hash: responder rápido quando o
+        // nome não existe diria a quem está tentando quais nomes existem.
+        if (!conta) {
+          await hashPassword(password);
+          throw new Error("Nome ou senha incorretos.");
+        }
+        if (!(await matchesPassword(password, conta.passwordHash))) throw new Error("Nome ou senha incorretos.");
+        if (app === "hub") {
+          await prisma.memberGrant.createMany({
+            data: SISTEMAS.map((pedido) => ({ memberId: conta.id, app: pedido })),
+            skipDuplicates: true,
+          });
+        }
+        const grant = await prisma.memberGrant.upsert({
+          where: { memberId_app: { memberId: conta.id, app } },
+          create: { memberId: conta.id, app },
+          update: {},
+        });
+
+        if (grant.status !== "approved") {
+          /* "pending" sozinho não separa "ainda não decidiram" de "negaram", e
+             a tela do outro lado precisa dizer coisas opostas nos dois casos. */
+          result = {
+            pending: true,
+            state: grant.status === "pending" ? "pending" : "denied",
+            message:
+              grant.status === "pending"
+                ? "Aguardando aprovação no Hub."
+                : "Seu acesso a este sistema não está liberado. Fale com o administrador.",
+          };
+        } else {
+          const sessao = await issueMemberSession(conta.id, app);
+          const appTokens: Partial<Record<(typeof SISTEMAS_DE_PESSOA)[number], string>> = {};
+          if (app === "hub") {
+            const liberados = await prisma.memberGrant.findMany({
+              where: { memberId: conta.id, app: { in: [...SISTEMAS_DE_PESSOA] }, status: "approved" },
+              select: { app: true },
+            });
+            for (const liberado of liberados) {
+              const chave = sistema(liberado.app);
+              if (chave !== "hub") appTokens[chave] = await issueMemberSession(conta.id, chave);
+            }
+          }
+          result = {
+            token: sessao,
+            principal: conta.id,
+            username: conta.username,
+            owner: false,
+            ...(app === "hub" ? { appTokens } : {}),
+          };
+        }
+      }
+    } else {
+      const app = sistema(body.app);
+      const principal = await memberIdentity(token, app);
+
+      if (action === "session") {
+        const conta = principal === "owner" ? null : await prisma.memberAccount.findUnique({ where: { id: principal }, select: { username: true } });
+        result = { principal, owner: principal === "owner", ...(conta ? { username: conta.username } : {}) };
+      } else if (action === "logout") {
+        await prisma.memberSession.deleteMany({ where: { digest: digest(token) } });
+      } else if (action === "load") {
+        result = await prisma.memberState.findUnique({ where: { principal_app: { principal, app } }, select: { payload: true, revision: true } });
+      } else if (action === "save") {
+        if (!body.payload || typeof body.payload !== "object" || Array.isArray(body.payload) || !Number.isSafeInteger(body.revision)) {
+          throw new Error("Dados inválidos.");
+        }
+        const revision = Number(body.revision);
+        if (revision === 0) {
+          await prisma.memberState.create({ data: { principal, app, payload: body.payload as object } });
+          result = { revision: 1 };
+        } else {
+          /* A revisão é a trava: se outra aba salvou primeiro, o update não
+             acha linha e a gravação é recusada em vez de sobrescrever. */
+          const atualizado = await prisma.memberState.updateMany({
+            where: { principal, app, revision },
+            data: { payload: body.payload as object, revision: { increment: 1 } },
+          });
+          if (!atualizado.count) throw new Error("Outra sessão alterou seus dados. Recarregue antes de salvar.");
+          result = { revision: revision + 1 };
+        }
+      } else {
+        throw new Error("Ação inválida.");
+      }
+    }
+
+    return NextResponse.json(result, { headers });
+  } catch (error) {
+    // Nunca deixar vazar consulta, conexão ou material de credencial.
+    const seguro =
+      error instanceof Error && !/Prisma|prisma|Unique constraint|Invalid `|\n/.test(error.message)
+        ? error.message
+        : "Não foi possível concluir. Seus dados foram preservados; tente novamente.";
+    return NextResponse.json({ error: seguro }, { status: 400, headers });
+  }
+}
