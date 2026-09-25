@@ -98,7 +98,7 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 16px;
-  background: linear-gradient(155deg, color-mix(in srgb, var(--bg) 98%, transparent), color-mix(in srgb, var(--sombra) 98%, transparent));
+  background: linear-gradient(155deg, color-mix(in srgb, var(--bg) 98%, transparent), color-mix(in srgb, var(--bg) 98%, transparent));
   box-shadow: 0 22px 65px color-mix(in srgb, var(--sombra) 20%, transparent);
 }
 .jade-chat-panel > header,
@@ -126,7 +126,7 @@
 .jade-message { display: flex; align-items: flex-end; gap: 8px; max-width: 78%; }
 .jade-message.user { align-self: flex-end; }
 .jade-message p { margin: 0; padding: 11px 13px; border: 1px solid color-mix(in srgb, var(--tinta) 7%, transparent); border-radius: 5px 13px 13px 13px; background: color-mix(in srgb, var(--tinta) 4%, transparent); color: var(--muted); font-size: 11px; line-height: 1.55; }
-.jade-message.user p { border-color: color-mix(in srgb, var(--mint) 30%, transparent); border-radius: 13px 5px 13px 13px; background: linear-gradient(135deg, color-mix(in srgb, var(--mint) 80%, transparent), color-mix(in srgb, var(--mint) 80%, transparent)); color: var(--sobre-acento); }
+.jade-message.user p { border-color: color-mix(in srgb, var(--mint) 30%, transparent); border-radius: 13px 5px 13px 13px; background: linear-gradient(135deg, color-mix(in srgb, var(--mint) 28%, var(--jade-fundo)), var(--jade-fundo)); color: var(--jade-brilho); }
 .jade-avatar { display: grid; width: 27px; height: 27px; flex: 0 0 27px; place-items: center; border: 1px solid color-mix(in srgb, var(--mint) 30%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--mint) 12%, transparent); color: color-mix(in srgb, var(--mint) 45%, var(--text)); font-size: 10px; font-weight: 900; }
 .jade-thinking { display: flex; gap: 4px; }
 .jade-thinking i { width: 5px; height: 5px; border-radius: 50%; background: color-mix(in srgb, var(--blue) 45%, var(--text)); animation: jade-think 1s ease-in-out infinite; }
@@ -139,7 +139,7 @@
 .jade-composer { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 13px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 45%, transparent); }
 .jade-composer input { min-width: 0; padding: 12px 13px; border: 1px solid color-mix(in srgb, var(--tinta) 8%, transparent); border-radius: 10px; outline: 0; background: color-mix(in srgb, var(--tinta) 4%, transparent); color: var(--text); font-size: 11px; }
 .jade-composer input:focus { border-color: color-mix(in srgb, var(--mint) 45%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mint) 8%, transparent); }
-.jade-composer button { display: grid; width: 43px; place-items: center; border: 1px solid color-mix(in srgb, var(--mint) 45%, transparent); border-radius: 10px; background: linear-gradient(135deg, var(--mint), var(--mint)); color: var(--sobre-acento); }
+.jade-composer button { display: grid; width: 43px; place-items: center; border: 1px solid color-mix(in srgb, var(--mint) 45%, transparent); border-radius: 10px; background: linear-gradient(135deg, color-mix(in srgb, var(--mint) 40%, var(--jade-fundo)), color-mix(in srgb, var(--mint) 18%, var(--jade-fundo))); color: var(--jade-brilho); }
 .jade-composer button:disabled { cursor: not-allowed; opacity: .42; }
 .jade-assistant-error { margin: 0; padding: 0 20px 13px; color: var(--amber); font-size: 11px; }
 
@@ -185,13 +185,13 @@
   .jade-suggestions { padding-inline: 14px; }
 
 }
-.jade-header-trigger { display:flex;align-items:center;gap:7px;border:1px solid var(--mint);background:var(--surface-hover);color:color-mix(in srgb, var(--mint) 45%, var(--text));padding:8px 12px;border-radius:9px;font-size:12px;cursor:pointer; }
-.jade-header-trigger.active { background:var(--mint);border-color:var(--mint); }
+.jade-header-trigger { display:flex;align-items:center;gap:7px;border:1px solid color-mix(in srgb, var(--mint) 41%, var(--surface));background:var(--surface-hover);color:color-mix(in srgb, var(--mint) 45%, var(--text));padding:8px 12px;border-radius:9px;font-size:12px;cursor:pointer; }
+.jade-header-trigger.active { background:color-mix(in srgb, var(--mint) 32%, var(--surface));border-color:var(--mint); }
 .jade-origin { display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted); }
 .jade-real-chat { min-width:0;overflow:hidden; }
 .jade-real-chat iframe { display:block;width:100%;height:760px;border:0;background:var(--surface); }
 .jade-connect-panel { padding:46px 38px;background:radial-gradient(ellipse at 80% 0,color-mix(in srgb, var(--mint) 10%, transparent),transparent 65%); }
-.jade-connect-mark { display:grid;place-items:center;width:68px;height:68px;border:1px solid var(--mint);background:var(--surface-hover);color:color-mix(in srgb, var(--mint) 45%, var(--text));border-radius:22px;margin-bottom:30px; }
+.jade-connect-mark { display:grid;place-items:center;width:68px;height:68px;border:1px solid color-mix(in srgb, var(--mint) 55%, var(--surface));background:var(--surface-hover);color:color-mix(in srgb, var(--mint) 45%, var(--text));border-radius:22px;margin-bottom:30px; }
 .jade-connect-panel>small { font-size:10px;letter-spacing:2px;color:var(--muted); }
 .jade-connect-panel h1 { font-size:clamp(30px,3vw,46px);font-weight:500;line-height:1.12;letter-spacing:-1.8px;max-width:450px;margin:18px 0; }
 .jade-connect-panel>p { font-size:14px;line-height:1.8;color:var(--muted);max-width:560px; }
@@ -204,3 +204,12 @@
 .jade-boundary-note { padding:20px;color:var(--muted);font-size:12px;line-height:1.7; }
 .jade-ready-panel>header { display:grid;gap:8px; }
 @media(max-width:760px){.jade-header-trigger{padding:8px}.jade-header-trigger span{display:none}.jade-connect-panel{padding:26px 21px}.jade-real-chat iframe{height:720px}.jade-origin{font-size:10px}}
+
+/* A saudação do chat da aba: a mesma voz do painel do canto. */
+.jade-boas-vindas { display: grid; justify-items: center; gap: 8px; margin: auto; padding: 24px 16px; text-align: center; }
+.jade-boas-vindas .jade-marca { margin-bottom: 4px; filter: drop-shadow(0 6px 14px color-mix(in srgb, var(--mint) 30%, transparent)); }
+.jade-boas-vindas strong { color: var(--text); font-size: 18px; letter-spacing: -.3px; }
+.jade-boas-vindas p { max-width: 42ch; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+/* A forma no lugar da letra, nos avatares e no círculo grande. */
+.jade-avatar { display: grid; place-items: center; }
+.jade-hero-core span { display: grid; place-items: center; }

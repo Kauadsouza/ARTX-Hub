@@ -44,6 +44,7 @@ import { RelatorioKaua } from "@/components/RelatorioKaua";
 import { JadeWorkspace } from "@/components/JadeWorkspace";
 import { AccountApprovals } from "./AccountApprovals";
 import { Configuracoes } from "./Configuracoes";
+import { JadeMarca } from "@/components/JadeMarca";
 import { JadeCanto } from "./JadeCanto";
 import { useI18n, LanguageSwitch } from "./I18n";
 
@@ -724,7 +725,7 @@ export function Hub() {
         <button className="icon-button menu-button" onClick={() => setSidebarOpen(true)} aria-label={t("Abrir menu")}><Menu size={19} /></button>
         <div className="breadcrumb"><span>ARTX</span><ChevronRight size={13} /><strong>{t(page.title)}</strong></div>
         <div className="header-actions"><LanguageSwitch />
-          <button className={`jade-header-trigger${activeView === "jade" ? " active" : ""}`} onClick={() => goTo("jade")} title="Jade" aria-label="Jade" aria-pressed={activeView === "jade"}><Sparkles size={16} /><span>Jade</span></button>
+          <button className={`jade-header-trigger${activeView === "jade" ? " active" : ""}`} onClick={() => goTo("jade")} title="Jade" aria-label="Jade" aria-pressed={activeView === "jade"}><JadeMarca tamanho={16} /><span>Jade</span></button>
           <button className="command-trigger" onClick={() => setCommandOpen(true)}><Search size={16} /><span>{t("Buscar")}</span><kbd>⌘ K</kbd></button>
           <button className="synced sync-status" onClick={() => void loadWorkspace()} title={t("Atualizar dados")} aria-live="polite"><Cloud size={15} /><span>{syncing ? t("Sincronizando…") : syncError ? t("Verificar conexão") : localMode ? "Local" : t("Sincronizado")}</span></button>
           {!localMode && supabase && <button className="icon-button" onClick={() => void supabase.auth.signOut()} title={t("Sair")} aria-label={t("Sair")}><LogOut size={17} /></button>}

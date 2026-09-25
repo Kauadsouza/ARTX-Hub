@@ -71,6 +71,19 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Solicitação inválida." }, { status: 400 });
   }
+
+  /*
+    "Você está ligada?" — respondido sem chamar o modelo.
+
+    O painel pergunta isto ao abrir, para dizer logo de cara quando a chave
+    ainda não foi configurada, em vez de deixar a pessoa escrever uma
+    mensagem inteira e só então descobrir. Sem chave, a resposta já saiu
+    acima como 503; chegar aqui significa que ela existe. Não revela nada
+    além disso, e não gasta nada.
+  */
+  if ((body as { status?: unknown } | null)?.status === true) {
+    return Response.json({ ligada: true });
+  }
   const { accessToken, messages, comAcoes } = (body ?? {}) as { accessToken?: unknown; messages?: unknown; comAcoes?: unknown };
   if (typeof accessToken !== "string" || accessToken.length > 8192) {
     return Response.json({ error: "Entre na sua conta para usar o assistente." }, { status: 401 });

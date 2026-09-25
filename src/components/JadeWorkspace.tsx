@@ -19,8 +19,9 @@
  */
 
 import { useMemo, useRef, useState } from "react";
-import { Check, Circle, Plus, Send, Sparkles } from "lucide-react";
+import { Check, Circle, Plus, Send } from "lucide-react";
 import { useI18n } from "./I18n";
+import { JadeMarca } from "./JadeMarca";
 
 export type JadeActivity = { id: string; title: string; project_slug: string | null; completed: boolean };
 
@@ -86,7 +87,7 @@ function Conversa({ accessToken }: { accessToken: string | null }) {
     return (
       <div className="jade-connect-panel">
         <span className="jade-connect-mark">
-          <Sparkles size={34} />
+          <JadeMarca tamanho={38} />
         </span>
         <small>{en ? "JADE · HUB INTELLIGENCE" : "JADE · INTELIGÊNCIA DO HUB"}</small>
         <h1>{en ? "Not switched on yet." : "Ainda não ligada."}</h1>
@@ -103,19 +104,25 @@ function Conversa({ accessToken }: { accessToken: string | null }) {
     <>
       <div className="jade-messages">
         {!messages.length && (
-          <p className="jade-empty">
-            {en ? "Ask about improving or using the Hub." : "Pergunte sobre melhorar ou usar o Hub."}
-          </p>
+          <div className="jade-boas-vindas">
+            <JadeMarca tamanho={34} />
+            <strong>{en ? "Hi, Kauã." : "Oi, Kauã."}</strong>
+            <p>
+              {en
+                ? "Ask what to improve first, or turn an idea into a task without leaving the conversation."
+                : "Pergunte o que melhorar primeiro, ou transforme uma ideia em atividade sem sair da conversa."}
+            </p>
+          </div>
         )}
         {messages.map((message, index) => (
           <div key={index} className={`jade-message${message.role === "user" ? " user" : ""}`}>
-            {message.role === "assistant" && <span className="jade-avatar">J</span>}
+            {message.role === "assistant" && <span className="jade-avatar"><JadeMarca tamanho={15} /></span>}
             <p>{message.content}</p>
           </div>
         ))}
         {sending && (
           <div className="jade-message">
-            <span className="jade-avatar">J</span>
+            <span className="jade-avatar"><JadeMarca tamanho={15} viva /></span>
             <div className="jade-thinking">
               <i />
               <i />
@@ -194,7 +201,7 @@ export function JadeWorkspace({ accessToken, activities, onCreateActivity, onTog
       <header className="jade-assistant-hero">
         <div>
           <p>
-            <Sparkles size={12} /> {en ? "HUB INTELLIGENCE" : "INTELIGÊNCIA DO HUB"}
+            <JadeMarca tamanho={14} /> {en ? "HUB INTELLIGENCE" : "INTELIGÊNCIA DO HUB"}
           </p>
           <h1>Jade</h1>
           <span>
@@ -204,7 +211,7 @@ export function JadeWorkspace({ accessToken, activities, onCreateActivity, onTog
           </span>
         </div>
         <div className="jade-hero-core" aria-hidden>
-          <span>J</span>
+          <span><JadeMarca tamanho={58} /></span>
           <i />
           <i />
         </div>
@@ -268,7 +275,7 @@ export function JadeWorkspace({ accessToken, activities, onCreateActivity, onTog
             na primeira pergunta de fora. A Jade lê o Hub; não lê o computador.
           */}
           <div className="jade-boundary-note">
-            <Sparkles size={18} />
+            <JadeMarca tamanho={22} />
             <p>
               {en
                 ? "Jade reads this Hub and your account data. She has no access to files on your computer."
