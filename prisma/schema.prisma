@@ -57,6 +57,24 @@ model MemberState {
   @@id([principal, app])
 }
 
+/// Arquivos guardados por conta e por sistema — hoje, os certificados.
+///
+/// O conteúdo mora no banco porque a pergunta era resolver isso sem
+/// configurar mais nada. O teto de tamanho está no código.
+model MemberFile {
+  id String @id @default(uuid())
+  principal String
+  app String
+  chave String
+  nome String
+  tipo String
+  tamanho Int
+  conteudo Bytes
+  criadoEm DateTime @default(now())
+  @@unique([principal, app, chave])
+  @@index([principal, app])
+}
+
 model AccessThrottle {
   key String @id
   attempts Int @default(1)
