@@ -1,158 +1,371 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowUpRight, Bell, BookOpen, CalendarClock, Check, Circle, Cloud, Download, Plus, RefreshCw, Video } from "lucide-react";
-import { PersonalFocus } from "./PersonalFocus";
+/**
+ * A visão geral.
+ *
+ * Era uma página de texto — cartões com frases, listas, um bloco de notas —
+ * e passou a ser uma página de números desenhados. A pergunta que ela
+ * responde é uma só: "em que pé está cada coisa?". Texto responde isso
+ * devagar; uma barra responde de relance.
+ *
+ * O que saiu foi para onde já tinha lugar. As anotações vivem no Relatório,
+ * que já tinha as suas. As atividades continuam na aba da Jade, onde ela
+ * cria e conclui. Aqui fica só o que dá para ver sem ler.
+ *
+ * As cores vêm de variáveis de tema — nenhum gráfico tem cor escrita à mão —
+ * para que trocar o tema troque os gráficos junto.
+ */
+
+import { useEffect, useMemo, useState } from "react";
+import { ArrowUpRight, Bell, CalendarClock, RefreshCw } from "lucide-react";
 import { WeekAhead } from "./WeekAhead";
-import { daysUntil, type RouteSignals } from "@/lib/week-ahead";
+import { type RouteSignals } from "@/lib/week-ahead";
 import { CHAVE, resumoParaOHub } from "@/lib/relatorio";
 import { avisarSePermitido, limparTitulo, marcarTitulo, pedirPermissao, podeOferecer, textoDoAviso } from "@/lib/aviso-titulo";
+import {
+  numerosDeCursos,
+  ordenarCursos,
+  porEtapa,
+  type CursoNoPainel,
+  type VideoNoPainel,
+} from "@/lib/painel";
 import { useI18n } from "./I18n";
 
 type Task = { id: string; title: string; project_slug: string | null; completed: boolean };
-type Note = { id: string; content: string; created_at: string };
-type View = "overview" | "relatorio" | "site" | "videos" | "sat" | "university" | "jade";
-type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
-const labels: Record<string, string> = { geral: "Pessoal", sat: "Idiomas", videos: "KauaArtx Video Studio", site: "Site KauaArtx", university: "University Path", jade: "Jade" };
+type View = "overview" | "relatorio" | "site" | "videos" | "sat" | "university" | "cursos" | "jade";
 
-export function PersonalDashboard({ tasks, notes, systemSignals, routeSignals, syncError, syncing, onOpen, onCreate, onToggle, onNote, onRetry, onBackup }: {
-  tasks: Task[]; notes: Note[]; systemSignals: Partial<Record<string, SystemSignal>>; routeSignals: RouteSignals | null; syncError: string; syncing: boolean;
-  onOpen: (view: View) => void; onCreate: (title: string, project: string) => Promise<boolean>;
-  onToggle: (task: Task) => Promise<void>; onNote: (content: string) => Promise<boolean>; onRetry: () => void; onBackup: () => void;
-}) {
-  const { t, locale } = useI18n();
-  const [title, setTitle] = useState("");
-  const [project, setProject] = useState("videos");
-  const [note, setNote] = useState("");
-  const [pending, setPending] = useState(false);
-  const [notePending, setNotePending] = useState(false);
-  const [filter, setFilter] = useState("open");
-  const [toggling, setToggling] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
-  const [noteSearch, setNoteSearch] = useState("");
-  const open = tasks.filter(task => !task.completed);
-  const visible = tasks.filter(task => (filter === "all" || (filter === "done" ? task.completed : !task.completed)) && (category === "all" || (task.project_slug ?? "geral") === category) && task.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()));
+type Painel = { cursos: CursoNoPainel[] | null; videos: VideoNoPainel[] | null };
 
-  return <div className="overview-page personal-dashboard page-enter">
-    <section className="personal-intro compacto"><div><p className="eyebrow">{t("KAUÃ · SEU ESPAÇO PESSOAL")}</p><h1>{t("Crie. Aprenda.")} <span>{t("Continue de onde parou.")}</span></h1></div><span className="day-label">{new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", timeZone: "Europe/London" }).format(new Date())}</span></section>
-    <HubPulso tasks={tasks} notes={notes} routes={routeSignals} signals={systemSignals} onOpen={onOpen} />
-    <DocumentosVencendo onOpen={onOpen} />
-    <WeekAhead routes={routeSignals} tasks={tasks} onOpen={onOpen} />
-    {syncError && <div className="sync-alert" role="alert"><span>{t(syncError)}</span><button onClick={onRetry}><RefreshCw size={15} />{t(" Tentar novamente")}</button></div>}
-    <section className="priority-grid">
-      <button className="priority-card creator" onClick={() => onOpen("videos")}><div><Video size={23} /><span>{t("01 / CRIAR")}</span><ArrowUpRight size={22} /></div><h2>{t("O próximo vídeo")}<br />{t("começa aqui.")}</h2><p>{t("Ideias, roteiro, gravação e publicação.")}</p><em className="priority-conta">{tasks.filter(item => !item.completed && item.project_slug === "videos").length}{t(" em aberto aqui")}</em><strong>{t("Abrir meu estúdio ")}<ArrowUpRight size={17} /></strong></button>
-      <button className="priority-card learner" onClick={() => onOpen("sat")}><div><BookOpen size={23} /><span>{t("02 / APRENDER")}</span><ArrowUpRight size={22} /></div><h2>{t("Um pouco de inglês.")}<br />{t("Todos os dias.")}</h2><p>{t("Plano diário, leitura, vocabulário e simulados.")}</p><em className="priority-conta">{tasks.filter(item => !item.completed && item.project_slug === "sat").length}{t(" em aberto aqui")}</em><strong>{t("Continuar meus estudos ")}<ArrowUpRight size={17} /></strong></button>
-    </section>
-    <section className="personal-links"><button onClick={() => onOpen("site")}><span>KAUAARTX</span><strong>Site KauaArtx</strong><ArrowUpRight size={18} /></button><button onClick={() => onOpen("university")}><span>UNIVERSITY PATH</span><strong>University Path</strong><ArrowUpRight size={18} /></button></section>
-    <PersonalFocus tasks={tasks} onToggle={onToggle} onOpen={onOpen} />
-    <section className="hub-exportar"><div><p className="eyebrow">{t("CÓPIA DE SEGURANÇA")}</p><strong>{t("Leve o Hub inteiro com você")}</strong></div><button onClick={onBackup}><Download size={15} />{t(" Exportar Hub")}</button></section>
-    <section className="organizer-grid">
-      <article className="organizer-panel"><div className="organizer-heading"><div><p className="eyebrow">{t("PRÓXIMOS PASSOS")}</p><h2>{t("Meu foco ")}<small>{t(open.length)}{t(" em aberto")}</small></h2></div><select aria-label="Filtrar atividades" value={filter} onChange={event => setFilter(event.target.value)}><option value="open">{t("Em aberto")}</option><option value="done">{t("Concluídas")}</option><option value="all">{t("Todas")}</option></select></div>
-        <form className="task-composer" onSubmit={async event => { event.preventDefault(); if (pending) return; setPending(true); try { if (await onCreate(title, project)) setTitle(""); } finally { setPending(false); } }}><label className="sr-only" htmlFor="activity-title">{t("Nova atividade")}</label><input id="activity-title" value={title} onChange={event => setTitle(event.target.value)} maxLength={500} required placeholder={t("Qual é o próximo passo?")} /><div><select aria-label="Projeto da atividade" value={project} onChange={event => setProject(event.target.value)}>{Object.entries(labels).filter(([key]) => key !== "jade").map(([key, label]) => <option key={key} value={key}>{t(label)}</option>)}</select><button type="submit" disabled={pending || !title.trim()}><Plus size={16} />{pending ? t("Salvando…") : t("Adicionar")}</button></div></form>
-        <div className="personal-filters"><input aria-label="Buscar atividades" placeholder={t("Buscar uma atividade…")} value={search} onChange={event => setSearch(event.target.value)} /><select aria-label={t("Filtrar por área")} value={category} onChange={event => setCategory(event.target.value)}><option value="all">{t("Todas as áreas")}</option>{Object.entries(labels).map(([key,label]) => <option key={key} value={key}>{t(label)}</option>)}</select></div><div className="personal-task-list">{visible.map(task => <button disabled={toggling === task.id} className={task.completed ? "done" : ""} key={task.id} onClick={async () => { setToggling(task.id); try { await onToggle(task); } finally { setToggling(null); } }} aria-label={`${task.completed ? "Reabrir" : "Concluir"}: ${task.title}`}>{task.completed ? <Check size={18} /> : <Circle size={18} />}<span>{t(task.title)}</span><small>{t(labels[task.project_slug ?? "geral"]) ?? t("Pessoal")}</small></button>)}{!visible.length && <p className="organizer-empty">{syncing ? t("Carregando suas atividades…") : t("Nenhuma atividade nesta lista. Adicione seu próximo passo acima.")}</p>}</div>
-      </article>
-      <article className="organizer-panel"><div className="organizer-heading"><div><p className="eyebrow">{t("IDEIAS QUE VALEM GUARDAR")}</p><h2>{t("Bloco de notas")}</h2></div><Cloud size={18} /></div><form className="note-composer" onSubmit={async event => { event.preventDefault(); if (notePending) return; setNotePending(true); try { if (await onNote(note)) setNote(""); } finally { setNotePending(false); } }}><label className="sr-only" htmlFor="quick-note">{t("Nova nota")}</label><textarea id="quick-note" maxLength={5000} required value={note} onChange={event => setNote(event.target.value)} placeholder={t("Uma ideia de vídeo, uma palavra nova, algo para lembrar…")} /><button disabled={notePending || !note.trim()}>{notePending ? t("Salvando…") : "Guardar nota"}<Plus size={15} /></button></form><input className="personal-note-search" aria-label="Buscar notas" placeholder={t("Encontrar uma anotação…")} value={noteSearch} onChange={event=>setNoteSearch(event.target.value)} /><div className="personal-note-list">{notes.filter(item=>item.content.toLocaleLowerCase().includes(noteSearch.toLocaleLowerCase())).map(item => <article key={item.id}><p>{t(item.content)}</p><time dateTime={item.created_at}>{new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }).format(new Date(item.created_at))}</time></article>)}{!notes.length && <p className="organizer-empty">{t("Suas notas aparecerão aqui depois de salvas.")}</p>}</div></article>
-    </section>
-  </div>;
-}
+const porcento = (fracao: number) => `${Math.round(fracao * 100)}%`;
 
-/**
- * A tira de pulso.
- *
- * O topo desta tela era três linhas de texto grande e dois cartões que também
- * eram texto. Tudo o que o Hub sabia de verdade — quantas atividades estão
- * abertas, como está cada sistema, quantos dias faltam para o próximo prazo —
- * ficava abaixo da dobra ou não aparecia.
- *
- * Aqui esses dados sobem para o alto e viram número. Nada é inventado: cada
- * valor sai do que já estava carregado, e o que ainda não chegou aparece como
- * traço em vez de zero — zero é uma afirmação, traço é a ausência dela.
- */
-function HubPulso({
+export function PersonalDashboard({
   tasks,
-  notes,
-  routes,
-  signals,
+  routeSignals,
+  syncError,
+  accessToken,
   onOpen,
+  onRetry,
 }: {
   tasks: Task[];
-  notes: Note[];
-  routes: RouteSignals | null;
-  signals: Partial<Record<string, SystemSignal>>;
+  routeSignals: RouteSignals | null;
+  syncError: string;
+  accessToken: string | null;
   onOpen: (view: View) => void;
+  onRetry: () => void;
 }) {
-  const { t } = useI18n();
-  const abertas = tasks.filter(item => !item.completed).length;
+  const { t, locale } = useI18n();
+  const [painel, setPainel] = useState<Painel | null>(null);
+  const [falhou, setFalhou] = useState(false);
+  const [recarregar, setRecarregar] = useState(0);
 
-  /**
-   * Três estados, não dois.
-   *
-   * `routes` nulo significa que os dados do University Path ainda não
-   * chegaram — não que não haja prazo. Dizer "sem prazo próximo" durante o
-   * carregamento seria afirmar algo que ninguém verificou.
-   */
-  const dias = routes?.nextDeadline ? daysUntil(routes.nextDeadline.date) : null;
-  const legendaPrazo = dias !== null ? t("dias até o prazo") : routes ? t("sem prazo próximo") : t("ainda carregando");
+  useEffect(() => {
+    if (!accessToken) return;
+    let vivo = true;
+    fetch("/api/painel", { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" })
+      .then(async (resposta) => {
+        if (!resposta.ok) throw new Error();
+        const dados = (await resposta.json()) as Painel;
+        if (vivo) {
+          setPainel(dados);
+          setFalhou(false);
+        }
+      })
+      .catch(() => {
+        if (vivo) setFalhou(true);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [accessToken, recarregar]);
 
-  const sistemas: Array<[View, string]> = [
-    ["site", "Site KauaArtx"],
-    ["videos", "Video Studio"],
-    ["sat", "Idiomas"],
-    ["university", "University Path"],
-  ];
+  const cursos = useMemo(() => (painel?.cursos ? ordenarCursos(painel.cursos) : null), [painel]);
+  const videos = painel?.videos ?? null;
+  const numeros = cursos ? numerosDeCursos(cursos) : null;
+  const emProducao = videos ? videos.filter((video) => video.etapa !== "POSTADO").length : null;
+  const publicados = videos ? videos.filter((video) => video.etapa === "POSTADO").length : null;
+  const abertas = tasks.filter((task) => !task.completed).length;
+  const feitas = tasks.length - abertas;
 
   return (
-    <section className="hub-pulso" aria-label={t("Estado de hoje")}>
-      <div className="pulso-numeros">
-        <button onClick={() => onOpen("overview")}>
-          <strong>{abertas}</strong>
-          <small>{t("em aberto")}</small>
-        </button>
-        <button onClick={() => onOpen("university")} className={dias !== null && dias <= 30 ? "urgente" : ""}>
-          <strong>{dias ?? "—"}</strong>
-          <small>{legendaPrazo}</small>
-        </button>
-        <button onClick={() => onOpen("university")}>
-          <strong>{routes?.chosenUniversities ?? "—"}</strong>
-          <small>{t("universidades")}</small>
-        </button>
-        <button onClick={() => onOpen("overview")}>
-          <strong>{notes.length}</strong>
-          <small>{t("notas guardadas")}</small>
-        </button>
+    <div className="overview-page painel page-enter">
+      <header className="painel-topo">
+        <div>
+          <p className="eyebrow">{t("VISÃO GERAL")}</p>
+          <h1>{t("Em que pé está cada coisa.")}</h1>
+        </div>
+        <div className="painel-topo-acoes">
+          <span className="day-label">
+            {new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", timeZone: "Europe/London" }).format(new Date())}
+          </span>
+          <button className="icon-button" onClick={() => setRecarregar((n) => n + 1)} title={t("Atualizar os números")} aria-label={t("Atualizar os números")}>
+            <RefreshCw size={15} />
+          </button>
+        </div>
+      </header>
+
+      {syncError && (
+        <div className="sync-alert" role="alert">
+          <span>{t(syncError)}</span>
+          <button onClick={onRetry}><RefreshCw size={15} />{t(" Tentar novamente")}</button>
+        </div>
+      )}
+
+      <DocumentosVencendo onOpen={onOpen} />
+
+      {/* Os números que abrem a página. Um por cartão, sem frase em volta. */}
+      <section className="painel-numeros" aria-label={t("Resumo")}>
+        <Numero rotulo={t("Cursos em andamento")} valor={numeros?.emAndamento} onClick={() => onOpen("cursos")} />
+        <Numero rotulo={t("Aulas concluídas")} valor={numeros?.aulasFeitas} onClick={() => onOpen("cursos")} />
+        <Numero rotulo={t("Vídeos em produção")} valor={emProducao} onClick={() => onOpen("videos")} />
+        <Numero rotulo={t("Vídeos publicados")} valor={publicados} onClick={() => onOpen("videos")} />
+      </section>
+
+      {falhou && (
+        <p className="painel-aviso" role="status">
+          {t("Não consegui buscar os números agora.")}{" "}
+          <button onClick={() => setRecarregar((n) => n + 1)}>{t("Tentar de novo")}</button>
+        </p>
+      )}
+
+      <div className="painel-grade">
+        <GraficoCursos cursos={cursos} carregando={!painel && !falhou} onOpen={() => onOpen("cursos")} />
+        <GraficoVideos videos={videos} carregando={!painel && !falhou} onOpen={() => onOpen("videos")} />
+        <FunilDeProducao videos={videos} carregando={!painel && !falhou} />
+        <GraficoAtividades feitas={feitas} abertas={abertas} onOpen={() => onOpen("jade")} />
       </div>
 
-      <div className="pulso-sistemas">
-        {sistemas.map(([key, label]) => {
-          const signal = signals[key];
-          return (
-            <button
-              key={key}
-              className={signal?.state ?? "unknown"}
-              onClick={() => onOpen(key)}
-              title={signal ? `${signal.title} — ${signal.detail}` : t("Abrir para verificar")}
-            >
-              <i aria-hidden />
-              <span>{t(label)}</span>
-            </button>
-          );
-        })}
-      </div>
-    </section>
+      <WeekAhead routes={routeSignals} tasks={tasks} onOpen={onOpen} />
+    </div>
+  );
+}
+
+// ── Peças ─────────────────────────────────────────────────────────────
+
+/** Um número grande com o que ele mede embaixo. Sem número ainda, um traço. */
+function Numero({ rotulo, valor, onClick }: { rotulo: string; valor: number | null | undefined; onClick: () => void }) {
+  return (
+    <button className="painel-numero" onClick={onClick}>
+      <strong>{valor ?? "—"}</strong>
+      <span>{rotulo}</span>
+    </button>
   );
 }
 
 /**
- * Documento da Espanha vencendo, visto da Visão geral.
- *
- * O aviso existia só dentro da aba do relatório, o que é onde ele menos serve:
- * quem abre aquela aba já foi olhar os documentos. Aqui ele aparece onde a
- * pessoa passa todo dia — e some quando não há nada a dizer, em vez de ocupar
- * espaço com "está tudo certo".
- *
- * Lê do mesmo cofre local, sem escrever nada.
+ * Uma barra de progresso de verdade: trilho do mesmo tom, preenchimento com
+ * ponta arredondada, e o valor ao lado — nunca dentro, onde não caberia.
  */
+function Medidor({ fracao, rotulo }: { fracao: number; rotulo: string }) {
+  const largura = Math.max(0, Math.min(1, fracao)) * 100;
+  return (
+    <span className="medidor" role="img" aria-label={rotulo}>
+      <span className="medidor-trilho">
+        <span className="medidor-cheio" style={{ width: `${largura}%` }} />
+      </span>
+    </span>
+  );
+}
+
+function Cartao({
+  titulo,
+  subtitulo,
+  acao,
+  children,
+  numeros,
+}: {
+  titulo: string;
+  subtitulo?: string;
+  acao?: () => void;
+  children: React.ReactNode;
+  numeros?: React.ReactNode;
+}) {
+  const { t } = useI18n();
+  return (
+    <article className="painel-cartao">
+      <header>
+        <div>
+          <h2>{titulo}</h2>
+          {subtitulo && <p>{subtitulo}</p>}
+        </div>
+        {acao && (
+          <button className="painel-abrir" onClick={acao} aria-label={`${t("Abrir")} ${titulo}`}>
+            <ArrowUpRight size={15} />
+          </button>
+        )}
+      </header>
+      {children}
+      {/* A tabela é o caminho de quem não enxerga a barra — e de quem quer o número exato. */}
+      {numeros && (
+        <details className="painel-tabela">
+          <summary>{t("Ver os números")}</summary>
+          {numeros}
+        </details>
+      )}
+    </article>
+  );
+}
+
+function Vazio({ children }: { children: React.ReactNode }) {
+  return <p className="painel-vazio">{children}</p>;
+}
+
+// ── Cursos ────────────────────────────────────────────────────────────
+
+function GraficoCursos({ cursos, carregando, onOpen }: { cursos: CursoNoPainel[] | null; carregando: boolean; onOpen: () => void }) {
+  const { t } = useI18n();
+  const visiveis = cursos?.slice(0, 7) ?? [];
+  const resto = cursos ? cursos.length - visiveis.length : 0;
+  const n = cursos ? numerosDeCursos(cursos) : null;
+
+  return (
+    <Cartao
+      titulo={t("Cursos")}
+      subtitulo={n ? `${n.emAndamento} ${t("em andamento")} · ${n.concluidos} ${t("concluídos")} · ${n.naoIniciados} ${t("por começar")}` : undefined}
+      acao={onOpen}
+      numeros={cursos && cursos.length > 0 && (
+        <table>
+          <thead><tr><th>{t("Curso")}</th><th>{t("Aulas")}</th><th>%</th></tr></thead>
+          <tbody>{cursos.map((c) => <tr key={c.id}><td>{c.titulo}</td><td>{c.feitas} / {c.total}</td><td>{porcento(c.feitas / c.total)}</td></tr>)}</tbody>
+        </table>
+      )}
+    >
+      {carregando ? <Vazio>{t("Buscando…")}</Vazio>
+        : cursos === null ? <Vazio>{t("Não consegui ler os cursos agora.")}</Vazio>
+        : cursos.length === 0 ? <Vazio>{t("Abra o sistema de cursos uma vez e o avanço de cada um aparece aqui.")}</Vazio>
+        : (
+          <ul className="painel-linhas">
+            {visiveis.map((curso) => {
+              const fracao = curso.feitas / curso.total;
+              const rotulo = `${curso.titulo}: ${curso.feitas} ${t("de")} ${curso.total} ${t("aulas")} (${porcento(fracao)})`;
+              return (
+                <li key={curso.id} title={rotulo} className={curso.feitas === 0 ? "parado" : ""}>
+                  <span className="painel-linha-nome">{curso.titulo}</span>
+                  <Medidor fracao={fracao} rotulo={rotulo} />
+                  <span className="painel-linha-valor">{porcento(fracao)}</span>
+                </li>
+              );
+            })}
+            {resto > 0 && <li className="painel-resto">{t("e mais")} {resto}</li>}
+          </ul>
+        )}
+    </Cartao>
+  );
+}
+
+// ── Vídeos ────────────────────────────────────────────────────────────
+
+function GraficoVideos({ videos, carregando, onOpen }: { videos: VideoNoPainel[] | null; carregando: boolean; onOpen: () => void }) {
+  const { t } = useI18n();
+  /* Os publicados já não pedem nada; o que interessa é o que ainda está
+     andando. Eles voltam a aparecer só se não houver nenhum em produção. */
+  const andando = videos?.filter((video) => video.etapa !== "POSTADO") ?? [];
+  const lista = (andando.length ? andando : videos ?? []).slice(0, 7);
+
+  return (
+    <Cartao
+      titulo={t("Vídeos")}
+      subtitulo={videos ? `${andando.length} ${t("em produção")}` : undefined}
+      acao={onOpen}
+      numeros={videos && videos.length > 0 && (
+        <table>
+          <thead><tr><th>{t("Vídeo")}</th><th>{t("Etapa")}</th><th>%</th></tr></thead>
+          <tbody>{videos.map((v) => <tr key={v.id}><td>{v.titulo}</td><td>{t(v.rotulo)}</td><td>{porcento(v.progresso)}</td></tr>)}</tbody>
+        </table>
+      )}
+    >
+      {carregando ? <Vazio>{t("Buscando…")}</Vazio>
+        : videos === null ? <Vazio>{t("Não consegui ler os vídeos agora.")}</Vazio>
+        : videos.length === 0 ? <Vazio>{t("Nenhum vídeo ainda. O primeiro aparece aqui assim que for criado.")}</Vazio>
+        : (
+          <ul className="painel-linhas">
+            {lista.map((video) => {
+              const rotulo = `${video.titulo}: ${t(video.rotulo)}, ${porcento(video.progresso)} ${t("do vídeo")}`;
+              return (
+                <li key={video.id} title={rotulo}>
+                  <span className="painel-linha-nome">
+                    {video.titulo}
+                    <small>{t(video.rotulo)}</small>
+                  </span>
+                  <Medidor fracao={video.progresso} rotulo={rotulo} />
+                  <span className="painel-linha-valor">{porcento(video.progresso)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+    </Cartao>
+  );
+}
+
+/**
+ * Onde a produção empilha.
+ *
+ * Uma cor só para as oito colunas: a ordem das etapas já está na posição, e
+ * oito tons do mesmo roxo não se distinguem entre si — o validador de paleta
+ * reprovou a rampa, então ela não entrou. A contagem fica no topo de cada
+ * coluna, e a etapa vazia aparece vazia, porque um funil com buraco esconde
+ * justamente onde as coisas travam.
+ */
+function FunilDeProducao({ videos, carregando }: { videos: VideoNoPainel[] | null; carregando: boolean }) {
+  const { t } = useI18n();
+  const etapas = videos ? porEtapa(videos) : [];
+  const maior = Math.max(1, ...etapas.map((e) => e.total));
+
+  return (
+    <Cartao
+      titulo={t("Onde os vídeos estão")}
+      subtitulo={t("Quantos vídeos em cada etapa da produção")}
+      numeros={videos && videos.length > 0 && (
+        <table>
+          <thead><tr><th>{t("Etapa")}</th><th>{t("Vídeos")}</th></tr></thead>
+          <tbody>{etapas.map((e) => <tr key={e.etapa}><td>{t(e.rotulo)}</td><td>{e.total}</td></tr>)}</tbody>
+        </table>
+      )}
+    >
+      {carregando ? <Vazio>{t("Buscando…")}</Vazio>
+        : !videos || videos.length === 0 ? <Vazio>{t("O funil aparece quando houver vídeos.")}</Vazio>
+        : (
+          <div className="funil" role="img" aria-label={etapas.map((e) => `${t(e.rotulo)}: ${e.total}`).join(", ")}>
+            {etapas.map((etapa) => (
+              <div key={etapa.etapa} className="funil-coluna" title={`${t(etapa.rotulo)}: ${etapa.total}`}>
+                {/* O número mora em cima da própria coluna, e não no topo do
+                    gráfico: solto lá em cima, ele se separa da barra dele. */}
+                <span className="funil-barra-area">
+                  {etapa.total > 0 && <span className="funil-valor">{etapa.total}</span>}
+                  {/* Etapa vazia não ganha tracinho: um risco de 2px lê como
+                      "um pouco", e zero é zero. A linha de base já mostra que
+                      a etapa existe. */}
+                  {etapa.total > 0 && <span className="funil-barra" style={{ height: `${(etapa.total / maior) * 100}%` }} />}
+                </span>
+                <span className="funil-rotulo">{t(etapa.rotulo)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+    </Cartao>
+  );
+}
+
+// ── Atividades ────────────────────────────────────────────────────────
+
+function GraficoAtividades({ feitas, abertas, onOpen }: { feitas: number; abertas: number; onOpen: () => void }) {
+  const { t } = useI18n();
+  const total = feitas + abertas;
+  const fracao = total ? feitas / total : 0;
+
+  return (
+    <Cartao titulo={t("Atividades")} subtitulo={t("Criadas e concluídas pela Jade")} acao={onOpen}>
+      {total === 0 ? <Vazio>{t("Nenhuma atividade ainda. Peça uma para a Jade.")}</Vazio> : (
+        <div className="painel-meta">
+          <strong>{porcento(fracao)}</strong>
+          <Medidor fracao={fracao} rotulo={`${feitas} ${t("de")} ${total} ${t("atividades concluídas")}`} />
+          <p>{feitas} {t("concluídas")} · {abertas} {t("em aberto")}</p>
+        </div>
+      )}
+    </Cartao>
+  );
+}
+
 function DocumentosVencendo({ onOpen }: { onOpen: (view: View) => void }) {
   const { t } = useI18n();
   const [resumo, setResumo] = useState<ReturnType<typeof resumoParaOHub> | null>(null);

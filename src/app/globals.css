@@ -748,3 +748,101 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 .approval-actions .approval-apagar { margin-left: auto; padding: 9px 15px; border: 1px solid rgba(217, 112, 153, .45); border-radius: 9px; background: transparent; color: #d97099; font-size: 12.5px; }
 .approval-actions .approval-apagar:hover:not(:disabled) { border-color: #d97099; background: rgba(217, 112, 153, .1); }
 .approval-actions .approval-apagar:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ══ Visão geral em gráficos ════════════════════════════════════════════
+   Nenhuma cor escrita à mão aqui: tudo vem de variável, para que trocar o
+   tema troque os gráficos junto. O dado é a única coisa que pode gritar —
+   trilho, grade e rótulos ficam em voz baixa. */
+
+:root {
+  --grafico-1: var(--violet);
+  /* O trilho é o mesmo tom, bem mais fraco: assim a barra lê como "quanto
+     de um todo", e não como um bloco solto. */
+  --grafico-trilho: color-mix(in srgb, var(--grafico-1) 15%, transparent);
+}
+
+.painel { display: grid; gap: 22px; }
+
+.painel-topo { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; flex-wrap: wrap; padding-top: 6px; }
+.painel-topo h1 { margin: 6px 0 0; font-size: clamp(26px, 3.2vw, 38px); letter-spacing: -1.1px; line-height: 1.1; }
+.painel-topo-acoes { display: flex; align-items: center; gap: 10px; }
+.painel-topo .day-label { border: 1px solid var(--line-strong); border-radius: 30px; padding: 9px 15px; background: var(--surface); color: var(--muted); font-size: 12px; }
+
+/* ── Os números que abrem a página ── */
+.painel-numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.painel-numero { display: grid; gap: 6px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--text); text-align: left; transition: border-color .15s, transform .15s; }
+.painel-numero:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+/* Número grande em algarismo proporcional: tabular deixa "11" frouxo. */
+.painel-numero strong { font-size: 34px; font-weight: 650; letter-spacing: -1px; line-height: 1; }
+.painel-numero span { color: var(--muted); font-size: 12px; }
+
+.painel-aviso { margin: 0; color: var(--amber); font-size: 12.5px; }
+.painel-aviso button { padding: 0; border: 0; background: none; color: inherit; text-decoration: underline; }
+
+/* ── Os cartões ── */
+.painel-grade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.painel-cartao { display: grid; align-content: start; gap: 16px; min-width: 0; padding: 20px 22px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
+.painel-cartao > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.painel-cartao h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.2px; }
+.painel-cartao > header p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+.painel-abrir { display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; border: 1px solid var(--line-strong); border-radius: 9px; background: transparent; color: var(--muted); }
+.painel-abrir:hover { color: var(--text); border-color: var(--grafico-1); }
+.painel-vazio { margin: 6px 0; color: var(--subtle); font-size: 12.5px; line-height: 1.6; }
+
+/* ── Linhas com medidor ── */
+.painel-linhas { display: grid; gap: 13px; margin: 0; padding: 0; list-style: none; }
+.painel-linhas li { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) 42px; align-items: center; gap: 14px; }
+.painel-linhas li.parado .painel-linha-nome { color: var(--muted); }
+.painel-linha-nome { display: grid; gap: 2px; min-width: 0; font-size: 12.5px; }
+.painel-linha-nome, .painel-linha-nome small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.painel-linha-nome small { color: var(--subtle); font-size: 11px; }
+/* A coluna de valores alinha na vertical: aqui, sim, algarismo tabular. */
+.painel-linha-valor { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+.painel-resto { display: block !important; color: var(--subtle); font-size: 11.5px; }
+
+.medidor { display: block; min-width: 0; }
+.medidor-trilho { display: block; height: 7px; border-radius: 4px; background: var(--grafico-trilho); overflow: hidden; }
+/* Cresce da base: canto reto à esquerda, ponta arredondada no dado. */
+.medidor-cheio { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--grafico-1); transition: width .5s cubic-bezier(.2, .8, .2, 1); }
+
+/* ── O funil ── */
+/* Sem vão entre colunas: é o que deixa a linha de base contínua embaixo das barras. */
+.funil { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); align-items: end; height: 190px; padding-top: 4px; }
+.funil-coluna { display: grid; grid-template-rows: 1fr auto; justify-items: center; height: 100%; min-width: 0; padding: 0 3px; }
+.funil-valor { margin-bottom: 5px; color: var(--text); font-size: 12px; font-weight: 600; line-height: 1; }
+/* Coluna de baixo para cima: o número vem logo acima da barra, qualquer que seja a altura dela.
+   A borda de baixo, somada entre colunas, é a linha de base — rente às barras, não aos nomes. */
+.funil-barra-area { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; width: calc(100% + 6px); height: 100%; min-height: 0; margin: 0 -3px; border-bottom: 1px solid var(--line-strong); }
+/* No máximo 24px: a coluna não enche a faixa, o que sobra é respiro. */
+.funil-barra { display: block; flex-shrink: 0; width: min(24px, 70%); max-height: calc(100% - 18px); border-radius: 4px 4px 0 0; background: var(--grafico-1); transition: height .5s cubic-bezier(.2, .8, .2, 1); }
+.funil-rotulo { max-width: 100%; margin-top: 8px; padding-bottom: 2px; overflow: hidden; color: var(--muted); font-size: 10.5px; text-align: center; white-space: nowrap; text-overflow: ellipsis; }
+
+/* ── A meta das atividades ── */
+.painel-meta { display: grid; gap: 12px; }
+.painel-meta strong { font-size: 40px; font-weight: 650; letter-spacing: -1.2px; line-height: 1; }
+.painel-meta .medidor-trilho { height: 10px; }
+.painel-meta p { margin: 0; color: var(--muted); font-size: 12px; }
+
+/* ── A tabela de apoio ── */
+.painel-tabela { border-top: 1px solid var(--line); padding-top: 10px; }
+.painel-tabela summary { color: var(--subtle); font-size: 11.5px; cursor: pointer; }
+.painel-tabela summary:hover { color: var(--muted); }
+.painel-tabela table { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: 12px; }
+.painel-tabela th { padding: 6px 4px; border-bottom: 1px solid var(--line); color: var(--subtle); font-weight: 500; text-align: left; }
+.painel-tabela td { padding: 6px 4px; border-bottom: 1px solid var(--line); color: var(--muted); font-variant-numeric: tabular-nums; }
+.painel-tabela td:first-child { color: var(--text); }
+
+@media (max-width: 900px) {
+  .painel-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .painel-grade { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .painel-linhas li { grid-template-columns: minmax(0, 1fr) 42px; }
+  .painel-linhas li .medidor { grid-column: 1 / -1; grid-row: 2; }
+  .funil { height: 160px; }
+  .funil-rotulo { font-size: 9.5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .medidor-cheio, .funil-barra { transition: none; }
+}

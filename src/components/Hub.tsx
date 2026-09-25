@@ -720,7 +720,7 @@ export function Hub() {
       </header>
 
       {activeView === "relatorio" && <RelatorioKaua />}
-      {activeView === "overview" && <PersonalDashboard tasks={tasks} notes={notes} systemSignals={systemSignals} routeSignals={routeSignals} syncing={syncing} syncError={syncError} onOpen={goTo} onCreate={createActivity} onToggle={toggleTask} onNote={createNote} onRetry={() => void loadWorkspace()} onBackup={downloadHubBackup} />}
+      {activeView === "overview" && <PersonalDashboard tasks={tasks} routeSignals={routeSignals} syncError={syncError} accessToken={hubAccessToken} onOpen={goTo} onRetry={() => void loadWorkspace()} />}
       {activeView === "approvals" && <AccountApprovals token={hubAccessToken} />}
       {activeView === "config" && <Configuracoes
         email={sessionEmail}
