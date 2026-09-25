@@ -461,7 +461,9 @@ select { min-width: 0; border: 1px solid var(--line); border-radius: 8px; backgr
 @media(prefers-reduced-motion:reduce){.relatorio-barra>span{transition:none}}
 
 .relatorio-docs{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:7px}
-.relatorio-docs>li{display:flex;align-items:center;gap:8px;padding:4px 6px 4px 0;border-bottom:1px solid var(--line)}
+/* A linha quebra: o nome ocupa a fileira de cima e a observação desce para baixo dele, recuada
+   sob a caixinha. Sem quebrar, os dois pediam 100% da largura e espremiam o nome em três linhas. */
+.relatorio-docs>li{display:flex;flex-wrap:wrap;align-items:center;gap:0 8px;padding:4px 6px 4px 0;border-bottom:1px solid var(--line)}
 .relatorio-marcar{display:flex;align-items:center;gap:11px;flex:1;min-width:0;padding:11px 4px;border:0;background:transparent;color:var(--text);font-size:13px;text-align:left;cursor:pointer}
 .relatorio-marcar>svg{flex-shrink:0;color:var(--muted)}
 .relatorio-docs>li.feito .relatorio-marcar>svg{color:color-mix(in srgb, var(--mint) 45%, var(--text))}
