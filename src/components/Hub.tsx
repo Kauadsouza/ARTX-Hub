@@ -45,6 +45,7 @@ import { JadeWorkspace } from "@/components/JadeWorkspace";
 import { AccountApprovals } from "./AccountApprovals";
 import { Configuracoes } from "./Configuracoes";
 import { JadeMarca } from "@/components/JadeMarca";
+import { CHAVE as CHAVE_RELATORIO, anotarNoRelatorio } from "@/lib/relatorio";
 import { JadeCanto } from "./JadeCanto";
 import { useI18n, LanguageSwitch } from "./I18n";
 
@@ -58,7 +59,6 @@ type Task = {
 
 type View = "approvals" | "config" | "overview" | "relatorio" | "site" | "videos" | "sat" | "university" | "cursos" | "jade";
 type ProjectKey = "site" | "videos" | "sat" | "university" | "cursos" | "jade" | "geral";
-type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
 type MemberWorkspace = "videos" | "study" | "university" | "cursos";
 type MemberHubSession = { token: string; principal: string; owner: false; username: string; appTokens: Partial<Record<MemberWorkspace, string>> };
 
@@ -270,7 +270,6 @@ export function Hub() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [notes, setNotes] = useState<Array<{ id: string; content: string; created_at: string }>>([]);
   const [syncError, setSyncError] = useState("");
   const [syncing, setSyncing] = useState(true);
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
@@ -294,7 +293,6 @@ export function Hub() {
       vivo = false;
     };
   }, [sessionUserId, supabase]);
-  const [systemSignals, setSystemSignals] = useState<Partial<Record<ProjectKey, SystemSignal>>>({});
   // O University Path publica o proprio resumo de prazos. O Hub so consome:
   // duplicar o calendario de cada pais aqui criaria dois que divergem sozinhos.
   const [routeSignals, setRouteSignals] = useState<RouteSignals | null>(null);
@@ -322,15 +320,13 @@ export function Hub() {
       return;
     }
     if (!supabase) return;
-    const [taskResult, noteResult, routeResult] = await Promise.all([
+    const [taskResult, routeResult] = await Promise.all([
       supabase.from("hub_tasks").select("id,title,project_slug,completed,created_at").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("hub_notes").select("id,content,created_at").order("created_at", { ascending: false }).limit(100),
       supabase.from("hub_app_state").select("payload").eq("app", "university").maybeSingle(),
     ]);
     if (!isCurrent()) return;
-    if (taskResult.error || noteResult.error) throw new Error("sync_failed");
+    if (taskResult.error) throw new Error("sync_failed");
     setTasks((taskResult.data as Task[]) ?? []);
-    setNotes(noteResult.data ?? []);
     // O resumo de rotas e complementar: se a tabela falhar, o painel some sem
     // derrubar o carregamento do resto.
     setRouteSignals(routeResult.error ? null : parseRouteSignals(routeResult.data?.payload));
@@ -365,7 +361,7 @@ export function Hub() {
       const nextOwner = session?.user.id ?? null;
       if (sessionIdentity.current !== nextOwner) {
         ++loadVersion.current;
-        setTasks([]); setNotes([]); setSyncError("");
+        setTasks([]); setSyncError("");
       }
       sessionIdentity.current = nextOwner;
       setSessionUserId(nextOwner);
@@ -373,7 +369,7 @@ export function Hub() {
       setSessionName(nomeDaSessao(session?.user));
       setSignedIn(Boolean(session));
       setHubAccessToken(session?.access_token ?? null);
-      if (!session) { setTasks([]); setNotes([]); }
+      if (!session) { setTasks([]); }
       if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
     });
     return () => { window.clearTimeout(authTimeout); listener.subscription.unsubscribe(); };
@@ -396,16 +392,13 @@ export function Hub() {
   useEffect(() => {
     const savedState = window.localStorage.getItem("artx-sidebar-collapsed");
     setSidebarCollapsed(savedState === "true");
-    try { setSystemSignals(JSON.parse(window.localStorage.getItem("artx-system-signals") ?? "{}")); } catch { setSystemSignals({}); }
+    // O "pulso" dos sistemas saiu da Visão geral; o que ele guardava não serve mais.
+    try { window.localStorage.removeItem("artx-system-signals"); } catch { /* sem armazenamento */ }
   }, []);
 
   useEffect(() => {
     window.localStorage.setItem("artx-sidebar-collapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
-
-  useEffect(() => {
-    window.localStorage.setItem("artx-system-signals", JSON.stringify(systemSignals));
-  }, [systemSignals]);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -555,15 +548,6 @@ export function Hub() {
     return true;
   }
 
-  async function createNote(content: string) {
-    if (!supabase || !content.trim() || content.length > 5000) return false;
-    try {
-      const { data, error } = await supabase.from("hub_notes").insert({ content: content.trim() }).select("id,content,created_at").single();
-      if (error || !data) throw new Error("save_failed");
-      setNotes(current => [data, ...current]); notify("Nota salva"); return true;
-    } catch { notify("Não foi possível salvar. Sua nota continua no campo de texto."); return false; }
-  }
-
   async function toggleTask(task: Task) {
     const completed = !task.completed;
     if (localMode) {
@@ -592,10 +576,6 @@ export function Hub() {
     setSidebarOpen(false);
   }
 
-  function registerSystemSignal(project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) {
-    setSystemSignals(current => ({ ...current, [project]: { ...signal, updatedAt: new Date().toISOString() } }));
-  }
-
   /**
    * O que a Jade faz, de verdade.
    *
@@ -621,8 +601,18 @@ export function Hub() {
     }
 
     if (acao.tipo === "criar-nota") {
-      const ok = await createNote(acao.conteudo);
-      return ok ? "Guardei a nota." : "Não consegui guardar a nota agora.";
+      /* A nota vai para o Relatório, que é onde as notas vivem desde que o
+         bloco de notas saiu da Visão geral. Antes ia para uma tabela que
+         nenhuma tela mostrava mais: dava para criar e não dava para ver. */
+      try {
+        const feita = anotarNoRelatorio(localStorage.getItem(CHAVE_RELATORIO), acao.conteudo);
+        if (!feita) return "A nota veio vazia — não guardei nada.";
+        localStorage.setItem(CHAVE_RELATORIO, JSON.stringify(feita.relatorio));
+        notify("Nota guardada no Relatório");
+        return "Guardei no Relatório. As anotações de lá ficam por sete dias, e dá para estender.";
+      } catch {
+        return "Não consegui guardar a nota neste navegador.";
+      }
     }
 
     // Concluir: acha pelo texto, porque é assim que ela foi pedida. Sem achar,
@@ -633,7 +623,7 @@ export function Hub() {
     if (!alvo) return `Não achei uma atividade em aberto com "${acao.titulo}".`;
     await toggleTask(alvo);
     return `Marquei "${alvo.title}" como concluída.`;
-    // `createActivity`, `createNote` e `toggleTask` sao funcoes normais do
+    // `createActivity` e `toggleTask` sao funcoes normais do
     // componente, recriadas a cada render; incluí-las aqui refaria o callback
     // toda vez e nao acrescentaria nada.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -672,7 +662,6 @@ export function Hub() {
       uma vez, e fica bem acima do uso real.
     */
     ...tasks.slice(0, 300).map(task => ({ id: `task-${task.id}`, group: "Atividades", label: task.title, icon: CheckCircle2, run: () => goTo("overview") })),
-    ...notes.slice(0, 300).map(note => ({ id: `note-${note.id}`, group: "Notas", label: note.content.slice(0, 90), icon: Command, run: () => goTo("overview") })),
     ...itensRelatorio.map(item => ({ id: item.id, group: item.grupo, label: `${item.texto} · ${item.detalhe}`, icon: NotebookPen, run: () => goTo("relatorio") })),
   ];
 
@@ -772,7 +761,6 @@ export function Hub() {
         refreshKey={refreshKey}
         previewMode={previewMode}
         onPreviewMode={setPreviewMode}
-        onStatus={registerSystemSignal}
         onOpenJade={() => goTo("jade")}
         onRefresh={() => { setRefreshKey((key) => key + 1); notify("Preview atualizado"); }}
       />}
@@ -821,14 +809,13 @@ function EmptyState({ label, compact = false }: { label: string; compact?: boole
   return <div className={`empty-state ${compact ? "compact" : ""}`}><CheckCircle2 size={16} /><span>{t(label)}</span></div>;
 }
 
-function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh, onStatus, onOpenJade }: {
+function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onPreviewMode, onRefresh, onOpenJade }: {
   workspace: Workspace;
   hubAccessToken: string | null;
   refreshKey: number;
   previewMode: "desktop" | "mobile";
   onPreviewMode: (mode: "desktop" | "mobile") => void;
   onRefresh: () => void;
-  onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void;
   onOpenJade: () => void;
 }) {
   const { t } = useI18n();
@@ -865,13 +852,13 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
           <button className="frame-action focus-action" onClick={() => setFocusMode((current) => !current)} aria-pressed={focusMode} title={focusMode ? t("Sair da tela ampla") : t("Abrir em tela ampla")}>{focusMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}<span>{focusMode ? t("Voltar ao Hub") : t("Tela ampla")}</span></button>
           <a href={workspace.url} target="_blank" rel="noreferrer" title={t("Abrir em outra aba")}><ExternalLink size={16} /></a>
         </div></div>
-        <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} onStatus={onStatus} onOpenJade={onOpenJade} /></div>
+        <div className="frame-stage"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={hubAccessToken} refreshKey={refreshKey} onOpenJade={onOpenJade} /></div>
       </article>
     </section>
   </div>;
 }
 
-function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, refreshKey, onStatus, onOpenJade }: { workspace: Workspace; accessToken: string | null; memberAccessToken?: string; refreshKey: number; onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void; onOpenJade?: () => void }) {
+function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, refreshKey, onOpenJade }: { workspace: Workspace; accessToken: string | null; memberAccessToken?: string; refreshKey: number; onOpenJade?: () => void }) {
   const { t, language } = useI18n();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const usesHubSession =
@@ -901,15 +888,12 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, ref
       // pela checagem de origem acima, entao aqui nao ha o que validar alem do
       // tipo — e o pedido so navega, nunca executa nada.
       if (event.data?.type === "UNIVERSITY_PATH_OPEN_JADE") onOpenJade?.();
-      if (event.data?.type === "ARTX_SYSTEM_STATUS" && event.data.system === workspace.project && ["ready", "syncing", "attention"].includes(event.data.state) && typeof event.data.title === "string" && typeof event.data.detail === "string") {
-        onStatus(workspace.project, { state: event.data.state, title: event.data.title.slice(0, 100), detail: event.data.detail.slice(0, 180) });
-      }
     }
     window.addEventListener("message", onWorkspaceReady);
     return () => {
       window.removeEventListener("message", onWorkspaceReady);
     };
-  }, [accessToken, appOrigin, onOpenJade, onStatus, sendHubSession, usesHubSession, workspace.project]);
+  }, [accessToken, appOrigin, onOpenJade, sendHubSession, usesHubSession, workspace.project]);
 
   // Status messages update the parent. They must not restart authentication.
   useEffect(() => {
@@ -953,7 +937,7 @@ function MemberHub({ session, onLogout }: { session: MemberHubSession; onLogout:
     {!workspace && <section className="member-home"><p className="eyebrow">SEU ESPAÇO</p><h1>Olá, {session.username}.</h1><p>Escolha um sistema. Seu conteúdo começa vazio e fica separado de todas as outras contas.</p><div className="member-app-grid">
       {(["videos", "sat", "university", "cursos"] as const).map(key => { const item = workspaces[key]; const Icon = item.icon; const accessKey: MemberWorkspace = key === "sat" ? "study" : key; const enabled = Boolean(session.appTokens?.[accessKey]); return <button key={key} disabled={!enabled} onClick={() => setActive(key)}><img src={item.logo} alt="" /><span><small>{item.eyebrow}</small><strong>{item.label}</strong><em>{enabled ? "Abrir meu espaço" : "Aguardando liberação"}</em></span><Icon size={20} /></button>; })}
     </div></section>}
-    {workspace && token && <section className="member-workspace"><div className="member-workspace-bar"><button className="command-trigger" onClick={() => setActive(null)}><ChevronRight className="member-back" size={16} /> Voltar</button><div><img src={workspace.logo} alt="" /><strong>{workspace.label}</strong></div><button className="command-trigger" onClick={() => setRefreshKey(value => value + 1)}><RefreshCw size={15} /> Atualizar</button></div><div className="member-frame"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={null} memberAccessToken={token} refreshKey={refreshKey} onStatus={() => undefined} /></div></section>}
+    {workspace && token && <section className="member-workspace"><div className="member-workspace-bar"><button className="command-trigger" onClick={() => setActive(null)}><ChevronRight className="member-back" size={16} /> Voltar</button><div><img src={workspace.logo} alt="" /><strong>{workspace.label}</strong></div><button className="command-trigger" onClick={() => setRefreshKey(value => value + 1)}><RefreshCw size={15} /> Atualizar</button></div><div className="member-frame"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={null} memberAccessToken={token} refreshKey={refreshKey} /></div></section>}
   </main>;
 }
 

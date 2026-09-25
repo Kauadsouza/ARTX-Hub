@@ -47,7 +47,7 @@ export function descreverAcao(acao: Acao): string {
     case "criar-atividade":
       return `Criar a atividade "${acao.titulo}"${acao.projeto ? ` em ${acao.projeto}` : ""}?`;
     case "criar-nota":
-      return `Guardar esta nota: "${acao.conteudo.slice(0, 80)}"?`;
+      return `Guardar no Relatório: "${acao.conteudo.slice(0, 80)}"?`;
     case "concluir-atividade":
       return `Marcar "${acao.titulo}" como concluída?`;
     case "abrir":
@@ -142,5 +142,7 @@ texto e acrescente NO FIM um bloco com o comando:
 Regras:
 - Um bloco por resposta, no máximo. Sem bloco quando a pergunta não pede ação.
 - Nunca invente o que a pessoa não pediu.
+- Nota vai para as anotações do Relatório, que duram sete dias e podem ser
+  estendidas. Diga isso quando guardar uma, para ela saber onde encontrar.
 - O texto antes do bloco é o que ela lê: escreva como se o bloco não existisse.
 `.trim();

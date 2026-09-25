@@ -8,36 +8,6 @@
 .jade-workspace button,
 .jade-workspace input { font: inherit; }
 
-.jade-workspace-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 64px;
-  margin-bottom: 14px;
-  padding: 10px 14px;
-  border: 1px solid var(--line);
-  border-radius: 15px;
-  background: color-mix(in srgb, var(--bg) 84%, transparent);
-  box-shadow: 0 18px 50px color-mix(in srgb, var(--sombra) 18%, transparent);
-}
-
-.jade-identity { display: flex; align-items: center; gap: 10px; }
-.jade-identity > span {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--mint) 28%, transparent);
-  border-radius: 11px;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--mint) 13%, transparent), color-mix(in srgb, var(--mint) 13%, transparent));
-  color: color-mix(in srgb, var(--blue) 45%, var(--text));
-}
-.jade-identity > div { display: grid; gap: 2px; }
-.jade-identity small { color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: 1.15px; }
-.jade-identity strong { font-size: 14px; }
-
-.jade-presence i,
-
 .jade-assistant-hero {
   position: relative;
   display: grid;
@@ -120,7 +90,6 @@
 .jade-ready-panel header strong { font-size: 12px; }
 .jade-chat-panel header small,
 .jade-ready-panel header small { color: var(--muted); font-size: 9px; }
-.jade-chat-panel .jade-live { display: flex; grid-auto-flow: column; align-items: center; gap: 6px; color: var(--mint); font-size: 8px; font-weight: 800; letter-spacing: 1px; }
 
 .jade-messages { display: flex; min-height: 295px; max-height: 430px; flex-direction: column; gap: 13px; overflow-y: auto; padding: 23px 20px; }
 .jade-message { display: flex; align-items: flex-end; gap: 8px; max-width: 78%; }
@@ -143,7 +112,6 @@
 .jade-composer button:disabled { cursor: not-allowed; opacity: .42; }
 .jade-assistant-error { margin: 0; padding: 0 20px 13px; color: var(--amber); font-size: 11px; }
 
-.jade-next-action small,
 .jade-activity-list { display: grid; gap: 5px; padding: 0 14px 14px; }
 .jade-activity-list button { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 10px; border: 1px solid transparent; border-radius: 9px; background: color-mix(in srgb, var(--tinta) 2%, transparent); color: var(--muted); text-align: left; }
 .jade-activity-list button:hover { border-color: color-mix(in srgb, var(--mint) 18%, transparent); background: color-mix(in srgb, var(--mint) 6%, transparent); }
@@ -164,7 +132,6 @@
   .jade-ready-panel { display: grid; grid-template-columns: 1fr 1fr; }
   .jade-ready-panel > header { grid-column: 1 / -1; }
 
-  .jade-overview-button { grid-column: 1 / -1; }
 }
 
 @media (max-width: 720px) {
@@ -178,8 +145,7 @@
 }
 
 @media (max-width: 480px) {
-  .jade-workspace-header { min-height: 56px; }
-  .jade-presence { font-size: 8px; }
+
   .jade-messages { min-height: 260px; padding: 18px 14px; }
   .jade-message { max-width: 92%; }
   .jade-suggestions { padding-inline: 14px; }
@@ -187,7 +153,7 @@
 }
 .jade-header-trigger { display:flex;align-items:center;gap:7px;border:1px solid color-mix(in srgb, var(--mint) 41%, var(--surface));background:var(--surface-hover);color:color-mix(in srgb, var(--mint) 45%, var(--text));padding:8px 12px;border-radius:9px;font-size:12px;cursor:pointer; }
 .jade-header-trigger.active { background:color-mix(in srgb, var(--mint) 32%, var(--surface));border-color:var(--mint); }
-.jade-origin { display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted); }
+
 .jade-real-chat { min-width:0;overflow:hidden; }
 .jade-real-chat iframe { display:block;width:100%;height:760px;border:0;background:var(--surface); }
 .jade-connect-panel { padding:46px 38px;background:radial-gradient(ellipse at 80% 0,color-mix(in srgb, var(--mint) 10%, transparent),transparent 65%); }
@@ -195,7 +161,7 @@
 .jade-connect-panel>small { font-size:10px;letter-spacing:2px;color:var(--muted); }
 .jade-connect-panel h1 { font-size:clamp(30px,3vw,46px);font-weight:500;line-height:1.12;letter-spacing:-1.8px;max-width:450px;margin:18px 0; }
 .jade-connect-panel>p { font-size:14px;line-height:1.8;color:var(--muted);max-width:560px; }
-.jade-connect-panel .jade-launch-help { font-size:11px;max-width:450px; }
+
 .jade-task-form { padding:20px;border-top:1px solid var(--line); }
 .jade-task-form label { display:block;font-size:12px;color:var(--muted);margin-bottom:10px; }
 .jade-task-form input { width:100%;padding:11px;background:color-mix(in srgb, var(--bg) 15%, transparent);border:1px solid var(--line);border-radius:9px;color:inherit; }
@@ -203,7 +169,7 @@
 .jade-task-form p { font-size:12px;color:var(--muted); }
 .jade-boundary-note { padding:20px;color:var(--muted);font-size:12px;line-height:1.7; }
 .jade-ready-panel>header { display:grid;gap:8px; }
-@media(max-width:760px){.jade-header-trigger{padding:8px}.jade-header-trigger span{display:none}.jade-connect-panel{padding:26px 21px}.jade-real-chat iframe{height:720px}.jade-origin{font-size:10px}}
+@media(max-width:760px){.jade-header-trigger{padding:8px}.jade-header-trigger span{display:none}.jade-connect-panel{padding:26px 21px}.jade-real-chat iframe{height:720px}}
 
 /* A saudação do chat da aba: a mesma voz do painel do canto. */
 .jade-boas-vindas { display: grid; justify-items: center; gap: 8px; margin: auto; padding: 24px 16px; text-align: center; }

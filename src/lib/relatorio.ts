@@ -436,3 +436,21 @@ export function unir(atual: Relatorio, importado: Relatorio): { relatorio: Relat
     novas,
   };
 }
+
+/**
+ * Uma anotação nova, gravada direto no Relatório guardado neste navegador.
+ *
+ * É por aqui que a Jade guarda uma nota. O bloco de notas da Visão geral saiu
+ * — as notas vivem no Relatório —, e a nota da Jade ia para uma tabela que
+ * nenhuma tela mostrava mais: dava para criar e não dava para ver.
+ *
+ * Grava no mesmo lugar em que o Relatório lê. Da próxima vez que ele abrir,
+ * junta esta anotação com a cópia da conta e sobe as duas, como faz com
+ * qualquer anotação escrita offline.
+ */
+export function anotarNoRelatorio(bruto: string | null, titulo: string, agora = new Date()): { relatorio: Relatorio; anotacao: Anotacao } | null {
+  const anotacao = criarAnotacao(titulo, "", agora);
+  if (!anotacao) return null;
+  const atual = ler(bruto);
+  return { relatorio: { ...atual, anotacoes: [anotacao, ...atual.anotacoes] }, anotacao };
+}

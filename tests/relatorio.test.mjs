@@ -746,3 +746,29 @@ test('nunca dispara nem pede permissão sem que tenha sido concedida', async () 
   assert.equal(avisarSePermitido('x'), false);
   assert.equal(podeOferecer(), false);
 });
+
+// ══════════════ A nota da Jade vai para o Relatório ══════════════
+
+import { anotarNoRelatorio } from '../src/lib/relatorio.ts';
+
+test('a nota da Jade entra no topo das anotações do Relatório', () => {
+  const r = anotarNoRelatorio(null, 'Ideia de vídeo: setup 2026');
+  assert.ok(r);
+  assert.equal(r.relatorio.anotacoes[0].titulo, 'Ideia de vídeo: setup 2026');
+});
+
+test('as anotações que já existiam continuam lá', () => {
+  const primeira = anotarNoRelatorio(null, 'Primeira');
+  const segunda = anotarNoRelatorio(JSON.stringify(primeira.relatorio), 'Segunda');
+  assert.deepEqual(segunda.relatorio.anotacoes.map(a => a.titulo), ['Segunda', 'Primeira']);
+});
+
+test('os documentos não são tocados por uma anotação nova', () => {
+  const antes = anotarNoRelatorio(null, 'x').relatorio;
+  const depois = anotarNoRelatorio(JSON.stringify(antes), 'y').relatorio;
+  assert.deepEqual(depois.documentos, antes.documentos);
+});
+
+test('nota sem texto não vira anotação em branco', () => {
+  assert.equal(anotarNoRelatorio(null, '   '), null);
+});
