@@ -54,10 +54,10 @@ type Task = {
   created_at?: string;
 };
 
-type View = "approvals" | "config" | "overview" | "relatorio" | "site" | "videos" | "sat" | "university" | "jade";
-type ProjectKey = "site" | "videos" | "sat" | "university" | "jade" | "geral";
+type View = "approvals" | "config" | "overview" | "relatorio" | "site" | "videos" | "sat" | "university" | "cursos" | "jade";
+type ProjectKey = "site" | "videos" | "sat" | "university" | "cursos" | "jade" | "geral";
 type SystemSignal = { state: "ready" | "syncing" | "attention"; title: string; detail: string; updatedAt: string };
-type MemberWorkspace = "videos" | "study" | "university";
+type MemberWorkspace = "videos" | "study" | "university" | "cursos";
 type MemberHubSession = { token: string; principal: string; owner: false; username: string; appTokens: Partial<Record<MemberWorkspace, string>> };
 
 type LocalHubSnapshot = {
@@ -132,6 +132,18 @@ const workspaces: Record<Exclude<View, "overview" | "approvals" | "config" | "re
     status: "Web",
     statusTone: "blue",
   },
+  cursos: {
+    label: "Cursos",
+    eyebrow: "ESTUDOS",
+    description: "Assista às aulas e acompanhe seu avanço sem sair da sua central.",
+    url: "https://cursos-artx.vercel.app",
+    logo: assetPath("/brand/artx-hub.svg"),
+    project: "cursos",
+    icon: Award,
+    accent: "mint",
+    status: "Integrado",
+    statusTone: "violet",
+  },
   videos: {
     label: "KauaArtx Video Studio",
     eyebrow: "PRODUÇÃO DE CONTEÚDO",
@@ -190,6 +202,7 @@ const pageMeta: Record<View, { eyebrow: string; title: string }> = {
   videos: { eyebrow: workspaces.videos.eyebrow, title: workspaces.videos.label },
   sat: { eyebrow: workspaces.sat.eyebrow, title: workspaces.sat.label },
   university: { eyebrow: workspaces.university.eyebrow, title: workspaces.university.label },
+  cursos: { eyebrow: workspaces.cursos.eyebrow, title: workspaces.cursos.label },
   jade: { eyebrow: workspaces.jade.eyebrow, title: workspaces.jade.label },
 };
 
@@ -544,11 +557,6 @@ export function Hub() {
     notify(completed ? "Atividade concluída" : "Atividade reaberta");
   }
 
-  /** Cursos é outro sistema, em outro endereço, com aprovação própria no Hub. */
-  function abrirCursos() {
-    window.open("https://cursos-artx.vercel.app", "_blank", "noopener,noreferrer");
-  }
-
   function goTo(view: View) {
     setActiveView(view);
     setSidebarOpen(false);
@@ -629,7 +637,7 @@ export function Hub() {
     { id: "site", group: "Sistemas", label: "Abrir Site KauaArtx", icon: Compass, run: () => goTo("site") },
     { id: "videos", group: "Sistemas", label: "Abrir KauaArtx Video Studio", icon: Video, run: () => goTo("videos") },
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
-    { id: "cursos", group: "Estudos", label: "Abrir Cursos", icon: Award, run: abrirCursos },
+    { id: "cursos", group: "Estudos", label: "Abrir Cursos", icon: Award, run: () => goTo("cursos") },
     { id: "approvals", group: "Segurança", label: "Aprovação de contas", icon: Award, run: () => goTo("approvals") },
     { id: "config", group: "Conta", label: "Abrir configurações", icon: Settings2, run: () => goTo("config") },
 
@@ -673,9 +681,10 @@ export function Hub() {
       </SidebarGroup>
       <SidebarGroup label="Estudos">
         <NavButton active={activeView === "university"} icon={GraduationCap} logo={workspaces.university.logo} label="University Path" onClick={() => goTo("university")} />
-        {/* Cursos virou sistema próprio, com deploy e contas separadas. Aqui
-            fica só a porta — como qualquer outro sistema que não mora no Hub. */}
-        <NavButton active={false} icon={Award} label={t("Cursos")} onClick={abrirCursos} />
+        {/* Cursos é sistema próprio, com deploy e contas separadas — e mesmo
+            assim se abre aqui dentro, como os outros. O link para fora fica na
+            barra do quadro, ao lado do botão de tela ampla. */}
+        <NavButton active={activeView === "cursos"} icon={Award} logo={workspaces.cursos.logo} label={t("Cursos")} onClick={() => goTo("cursos")} />
         <NavButton active={activeView === "approvals"} icon={Award} label="Aprovação de contas" onClick={() => goTo("approvals")} />
         <NavButton active={activeView === "config"} icon={Settings2} label={t("Configurações")} onClick={() => goTo("config")} />
       </SidebarGroup>
@@ -842,8 +851,15 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
 function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, refreshKey, onStatus, onOpenJade }: { workspace: Workspace; accessToken: string | null; memberAccessToken?: string; refreshKey: number; onStatus: (project: ProjectKey, signal: Omit<SystemSignal, "updatedAt">) => void; onOpenJade?: () => void }) {
   const { t, language } = useI18n();
   const frameRef = useRef<HTMLIFrameElement>(null);
-  const usesHubSession = workspace.project === "videos" || workspace.project === "university" || workspace.project === "sat";
-  const sourceUrl = usesHubSession ? `${workspace.url}/embed` : workspace.url!;
+  const usesHubSession =
+    workspace.project === "videos" ||
+    workspace.project === "university" ||
+    workspace.project === "sat" ||
+    workspace.project === "cursos";
+
+  /* O sistema de cursos não tem rota /embed: a tela dele já é a tela inteira,
+     e o cabeçalho de conta some sozinho quando a sessão vem do Hub. */
+  const sourceUrl = usesHubSession && workspace.project !== "cursos" ? `${workspace.url}/embed` : workspace.url!;
   const appOrigin = new URL(workspace.url!).origin;
 
   const sendHubSession = useCallback(() => {
@@ -856,7 +872,7 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, ref
   useEffect(() => {
     function onWorkspaceReady(event: MessageEvent) {
       if (event.source !== frameRef.current?.contentWindow || event.origin !== appOrigin) return;
-      const expectedMessage = workspace.project === "videos" ? "ARTX_VIDEO_EMBED_READY" : workspace.project === "sat" ? "ARTX_STUDY_EMBED_READY" : "UNIVERSITY_PATH_EMBED_READY";
+      const expectedMessage = workspace.project === "videos" ? "ARTX_VIDEO_EMBED_READY" : workspace.project === "sat" ? "ARTX_STUDY_EMBED_READY" : workspace.project === "cursos" ? "ARTX_CURSOS_EMBED_READY" : "UNIVERSITY_PATH_EMBED_READY";
       if (usesHubSession && event.data?.type === expectedMessage) sendHubSession();
       // O app embarcado pede a aba da Jade. Quem pode pedir ja foi filtrado
       // pela checagem de origem acima, entao aqui nao ha o que validar alem do
@@ -904,7 +920,7 @@ function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boo
 }
 
 function MemberHub({ session, onLogout }: { session: MemberHubSession; onLogout: () => Promise<void> }) {
-  const [active, setActive] = useState<"videos" | "sat" | "university" | null>(null);
+  const [active, setActive] = useState<"videos" | "sat" | "university" | "cursos" | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const workspace = active ? workspaces[active] : null;
   const tokenKey: MemberWorkspace | null = active === "sat" ? "study" : active;
@@ -912,7 +928,7 @@ function MemberHub({ session, onLogout }: { session: MemberHubSession; onLogout:
   return <main className="member-hub">
     <header className="member-header"><button className="brand" onClick={() => setActive(null)}><img className="brand-logo" src={assetPath("/brand/artx-hub.svg")} alt="" /><span className="brand-copy"><strong>ARTX Hub</strong><small>Espaço de {session.username}</small></span></button><button className="command-trigger" onClick={() => void onLogout()}><LogOut size={16} /> Sair</button></header>
     {!workspace && <section className="member-home"><p className="eyebrow">SEU ESPAÇO</p><h1>Olá, {session.username}.</h1><p>Escolha um sistema. Seu conteúdo começa vazio e fica separado de todas as outras contas.</p><div className="member-app-grid">
-      {(["videos", "sat", "university"] as const).map(key => { const item = workspaces[key]; const Icon = item.icon; const accessKey: MemberWorkspace = key === "sat" ? "study" : key; const enabled = Boolean(session.appTokens?.[accessKey]); return <button key={key} disabled={!enabled} onClick={() => setActive(key)}><img src={item.logo} alt="" /><span><small>{item.eyebrow}</small><strong>{item.label}</strong><em>{enabled ? "Abrir meu espaço" : "Aguardando liberação"}</em></span><Icon size={20} /></button>; })}
+      {(["videos", "sat", "university", "cursos"] as const).map(key => { const item = workspaces[key]; const Icon = item.icon; const accessKey: MemberWorkspace = key === "sat" ? "study" : key; const enabled = Boolean(session.appTokens?.[accessKey]); return <button key={key} disabled={!enabled} onClick={() => setActive(key)}><img src={item.logo} alt="" /><span><small>{item.eyebrow}</small><strong>{item.label}</strong><em>{enabled ? "Abrir meu espaço" : "Aguardando liberação"}</em></span><Icon size={20} /></button>; })}
     </div></section>}
     {workspace && token && <section className="member-workspace"><div className="member-workspace-bar"><button className="command-trigger" onClick={() => setActive(null)}><ChevronRight className="member-back" size={16} /> Voltar</button><div><img src={workspace.logo} alt="" /><strong>{workspace.label}</strong></div><button className="command-trigger" onClick={() => setRefreshKey(value => value + 1)}><RefreshCw size={15} /> Atualizar</button></div><div className="member-frame"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={null} memberAccessToken={token} refreshKey={refreshKey} onStatus={() => undefined} /></div></section>}
   </main>;

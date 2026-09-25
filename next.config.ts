@@ -15,7 +15,7 @@ const contentSecurityPolicy = [
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
   "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://sistema-videos.vercel.app",
-  "frame-src https://kauaartx.vercel.app https://sistema-videos.vercel.app https://sat-simulado.vercel.app https://university-path-six.vercel.app",
+  "frame-src https://kauaartx.vercel.app https://sistema-videos.vercel.app https://sat-simulado.vercel.app https://university-path-six.vercel.app https://cursos-artx.vercel.app",
   "manifest-src 'self'",
   "upgrade-insecure-requests",
 ].join("; ");
