@@ -18,6 +18,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   acoesDoEstado,
   agrupar,
+  agruparPorEstado,
+  sistemasPedidos,
   contarSelecionados,
   decididoEm,
   estadoDaConta,
@@ -25,7 +27,6 @@ import {
   podeAplicar,
   estadoDoSistema,
   idsDaConta,
-  rotuloDoEstado,
   rotuloDoSistema,
   selecoesDoServidor,
   type AppKey,
@@ -39,6 +40,15 @@ const apps: Array<{ key: AppKey; label: string; detail: string }> = [
   { key: 'study', label: 'Inglês', detail: 'Aulas, exercícios e progresso' },
   { key: 'university', label: 'Universidades', detail: 'Pesquisa e planejamento acadêmico' },
   { key: 'cursos', label: 'Cursos', detail: 'Catálogo, trilha e progresso' },
+];
+
+const nomeDoSistema = (key: AppKey) => apps.find((app) => app.key === key)?.label ?? key;
+
+/** Os três grupos, na ordem em que pedem atenção. */
+const GRUPOS: Array<{ estado: 'aguardando' | 'ativa' | 'bloqueada'; titulo: string }> = [
+  { estado: 'aguardando', titulo: 'Aguardando você' },
+  { estado: 'ativa', titulo: 'Com acesso' },
+  { estado: 'bloqueada', titulo: 'Bloqueadas' },
 ];
 
 /** Data curta, ou traço quando o valor não dá para ler. */
@@ -185,112 +195,138 @@ export function AccountApprovals({ token }: { token: string | null }) {
     }
   }
 
+  const grupos = agruparPorEstado(accounts);
+
+  /* A conta aberta mostra as caixas dos sistemas. As outras ficam numa linha
+     só: com várias contas, uma parede de cartões iguais escondia o pedido
+     novo no meio das contas já resolvidas. */
+  const [aberta, setAberta] = useState<string | null>(null);
+
   return (
-    <section className="approval-page">
-      <p className="eyebrow">ADMINISTRAÇÃO</p>
-      <h1>Aprovação de contas</h1>
-      <p>
-        As pessoas criam conta dentro do sistema que querem usar. Aqui você decide quem entra em quê — e o Hub
-        continua só seu: aprovar um sistema não dá acesso a este painel.
-      </p>
+    <section className="aprovacao">
+      <header className="aprovacao-topo">
+        <div>
+          <p className="eyebrow">ADMINISTRAÇÃO</p>
+          <h1>Aprovação de contas</h1>
+          <p>Quem pede acesso a um sistema aparece aqui. Aprovar um sistema não dá acesso a este painel.</p>
+        </div>
+        <button className="aprovacao-atualizar" disabled={busy} onClick={() => void refresh()}>
+          {busy ? "Salvando…" : "Atualizar"}
+        </button>
+      </header>
 
-      <button className="quick-create" disabled={busy} onClick={() => void refresh()}>Atualizar pedidos</button>
-      <p role="status" className="approval-notice">{busy ? 'Salvando…' : notice}</p>
-      {!busy && !notice && !accounts.length && <p>Nenhum pedido por enquanto.</p>}
+      {notice && <p role="status" className="aprovacao-recado">{notice}</p>}
+      {!busy && !notice && !accounts.length && <p className="aprovacao-vazio">Nenhum pedido por enquanto.</p>}
 
-      <div className="approval-grid">
-        {accounts.map(account => {
-          const estado = estadoDaConta(account);
-          const acoes = acoesDoEstado(estado);
-          const marcados = contarSelecionados(selections, account.key);
+      {GRUPOS.map(({ estado, titulo }) => {
+        const contas = grupos[estado];
+        if (!contas.length) return null;
+        return (
+          <section key={estado} className={`aprovacao-grupo ${estado}`}>
+            <h2>{titulo} <span>{contas.length}</span></h2>
+            <ul>
+              {contas.map((account) => {
+                const acoes = acoesDoEstado(estado);
+                const aberto = aberta === account.key;
+                const pedidos = sistemasPedidos(account);
+                const liberados = apps.filter((app) => estadoDoSistema(account, app.key) === "liberado");
+                const resumo =
+                  estado === "aguardando"
+                    ? `pediu ${pedidos.map(nomeDoSistema).join(", ")}`
+                    : liberados.length
+                      ? liberados.map((app) => app.label).join(" · ")
+                      : "sem nenhum sistema";
+                const marcados = contarSelecionados(selections, account.key);
 
-          return (
-            <article key={account.key} className={`approval-account ${estado}`}>
-              <header>
-                <div>
-                  <span className={`approval-status ${estado}`}>{rotuloDoEstado[estado]}</span>
-                  <h2>{account.username}</h2>
-                  <p>
-                    {marcados
-                      ? `${marcados} sistema${marcados > 1 ? 's' : ''} marcado${marcados > 1 ? 's' : ''} — salve para valer`
-                      : 'Escolha o que esta pessoa poderá acessar'}
-                  </p>
+                return (
+                  <li key={account.key} className={`aprovacao-conta ${aberto ? "aberta" : ""}`}>
+                    <div className="aprovacao-linha">
+                      <button
+                        className="aprovacao-quem"
+                        onClick={() => setAberta(aberto ? null : account.key)}
+                        aria-expanded={aberto}
+                      >
+                        <span className="aprovacao-inicial" aria-hidden>
+                          {account.username.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="aprovacao-nome">
+                          <strong>{account.username}</strong>
+                          <small>
+                            {resumo} · {formatarData(account.createdAt)}
+                          </small>
+                        </span>
+                      </button>
 
-                  {/* O que a pessoa pediu, e quando — o dono decide melhor sabendo disso. */}
-                  <dl className="approval-ficha">
-                    <div>
-                      <dt>Pediu em</dt>
-                      <dd>{formatarData(account.createdAt)}</dd>
+                      <div className="aprovacao-acoes">
+                        {/* Pedido novo tem o botão à mão: aprovar é a decisão mais comum. */}
+                        {estado === "aguardando" && !aberto && (
+                          <button className="aprovacao-principal" disabled={busy} onClick={() => void save(account)}>
+                            Aprovar
+                          </button>
+                        )}
+                        <button
+                          className="aprovacao-mais"
+                          onClick={() => setAberta(aberto ? null : account.key)}
+                          aria-label={aberto ? `Fechar ${account.username}` : `Detalhes de ${account.username}`}
+                        >
+                          {aberto ? "−" : "···"}
+                        </button>
+                      </div>
                     </div>
-                    {decididoEm(account) && (
-                      <div>
-                        <dt>Última decisão</dt>
-                        <dd>{formatarData(decididoEm(account)!)}</dd>
+
+                    {aberto && (
+                      <div className="aprovacao-detalhe">
+                        <div className="aprovacao-sistemas">
+                          {apps.map((app) => {
+                            const marcado = Boolean(selections[account.key]?.[app.key]);
+                            const situacao = estadoDoSistema(account, app.key);
+                            return (
+                              <label key={app.key} className={`aprovacao-sistema ${marcado ? "marcado" : ""}`}>
+                                <input
+                                  type="checkbox"
+                                  checked={marcado}
+                                  disabled={busy}
+                                  onChange={(evento) => toggle(account.key, app.key, evento.target.checked)}
+                                />
+                                <span>
+                                  <strong>{app.label}</strong>
+                                  <small className={situacao}>{rotuloDoSistema[situacao]}</small>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+
+                        <p className="aprovacao-ficha">
+                          Pediu em {formatarData(account.createdAt)}
+                          {decididoEm(account) && <> · última decisão em {formatarData(decididoEm(account)!)}</>}
+                          {" · "}
+                          {marcados} marcado{marcados === 1 ? "" : "s"}
+                        </p>
+
+                        <div className="aprovacao-botoes">
+                          <button className="aprovacao-principal" disabled={busy} onClick={() => void save(account)}>
+                            {acoes.principal}
+                          </button>
+                          {acoes.podeBloquear && (
+                            <button className="aprovacao-secundario" disabled={busy} onClick={() => void block(account)}>
+                              Bloquear
+                            </button>
+                          )}
+                          {/* Separado e sem preenchimento: bloquear tem volta, apagar não. */}
+                          <button className="aprovacao-apagar" disabled={busy} onClick={() => void apagar(account)}>
+                            Apagar conta
+                          </button>
+                        </div>
                       </div>
                     )}
-                    <div>
-                      <dt>Pedidos</dt>
-                      <dd>{account.grants.filter(g => g.app !== 'hub').length}</dd>
-                    </div>
-                  </dl>
-                </div>
-              </header>
-
-              <div className="approval-apps">
-                {apps.map(app => {
-                  const checked = Boolean(selections[account.key]?.[app.key]);
-                  return (
-                    <label key={app.key} className={checked ? 'selected' : ''}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={busy}
-                        onChange={event => toggle(account.key, app.key, event.target.checked)}
-                      />
-                      <span>
-                        <strong>{app.label}</strong>
-                        <small>{app.detail}</small>
-                        <em className={`approval-sistema ${estadoDoSistema(account, app.key)}`}>
-                          {rotuloDoSistema[estadoDoSistema(account, app.key)]}
-                        </em>
-                      </span>
-                      <i aria-hidden="true">{checked ? '✓' : ''}</i>
-                    </label>
-                  );
-                })}
-              </div>
-
-              {/*
-                Só o que faz sentido no estado.
-
-                Antes havia "Bloquear conta" numa conta já bloqueada — um botão
-                que pedia confirmação para não fazer nada — e a ação de
-                desbloquear se chamava "Aprovar conta", o que ninguém liga a
-                desbloquear.
-              */}
-              <div className="approval-actions">
-                <button className="quick-create" disabled={busy} onClick={() => void save(account)}>
-                  {acoes.principal}
-                </button>
-                {acoes.podeBloquear && (
-                  <button className="command-trigger" disabled={busy} onClick={() => void block(account)}>
-                    Bloquear conta
-                  </button>
-                )}
-                {/* Separado dos outros: bloquear tem volta, apagar não. */}
-                <button className="approval-apagar" disabled={busy} onClick={() => void apagar(account)}>
-                  Apagar conta
-                </button>
-              </div>
-            </article>
-          );
-        })}
-      </div>
-
-      <p className="approval-footnote">
-        Aprovar um sistema não cria conta no Hub. Os sistemas não selecionados permanecem bloqueados, os dados
-        continuam separados, e a pessoa vê a sua decisão ao entrar no sistema que pediu.
-      </p>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })}
     </section>
   );
 }

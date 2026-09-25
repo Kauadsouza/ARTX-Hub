@@ -192,12 +192,6 @@ export function decididoEm(conta: Conta): string | null {
   return datas.length ? datas.sort().at(-1)! : null;
 }
 
-export const rotuloDoEstado: Record<EstadoConta, string> = {
-  ativa: "Conta ativa",
-  aguardando: "Aguardando você",
-  bloqueada: "Conta bloqueada",
-};
-
 /**
  * Quais botões cada estado merece.
  *
@@ -220,4 +214,24 @@ export function contarSelecionados(selecoes: Selecoes, key: string): number {
 /** Os ids de membro da conta, sem repetir. */
 export function idsDaConta(conta: Conta): string[] {
   return [...new Set(conta.grants.map((grant) => grant.memberId))];
+}
+
+/**
+ * As contas em três grupos, na ordem em que pedem atenção.
+ *
+ * A tela era uma parede de cartões iguais, e o pedido novo se perdia no meio
+ * das contas que já estavam resolvidas. Separar pelo estado faz o que pede
+ * decisão aparecer primeiro, e o resolvido ficar quieto embaixo.
+ */
+export function agruparPorEstado(contas: Conta[]): Record<EstadoConta, Conta[]> {
+  const grupos: Record<EstadoConta, Conta[]> = { aguardando: [], ativa: [], bloqueada: [] };
+  for (const conta of contas) grupos[estadoDaConta(conta)].push(conta);
+  return grupos;
+}
+
+/** Os sistemas que a pessoa pediu e ainda esperam decisão — é o que a linha resume. */
+export function sistemasPedidos(conta: Conta): AppKey[] {
+  return conta.grants
+    .filter((grant) => grant.app !== "hub" && grant.status === "pending")
+    .map((grant) => grant.app as AppKey);
 }

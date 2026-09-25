@@ -257,3 +257,30 @@ test('apagar é uma ação à parte: não se confunde com bloquear', () => {
   assert.equal(acoesDoEstado(estadoDaConta(bloqueada)).podeBloquear, false);
   assert.ok(exclusaoDaConta(bloqueada).aviso.length > 0);
 });
+
+// ══════════════ Agrupar para a tela ══════════════
+
+import { agruparPorEstado, sistemasPedidos } from '../src/lib/aprovacoes.ts';
+
+test('as contas se separam pelo que pedem de atenção', () => {
+  const contas = agrupar([
+    grant('m1', 'cursos', 'pending', 'nova'),
+    grant('m2', 'videos', 'approved', 'ativa'),
+    grant('m3', 'videos', 'revoked', 'bloqueada'),
+  ]);
+  const grupos = agruparPorEstado(contas);
+  assert.deepEqual(grupos.aguardando.map(c => c.key), ['nova']);
+  assert.deepEqual(grupos.ativa.map(c => c.key), ['ativa']);
+  assert.deepEqual(grupos.bloqueada.map(c => c.key), ['bloqueada']);
+});
+
+test('nenhuma conta some ao agrupar', () => {
+  const contas = agrupar([grant('m1', 'cursos', 'pending', 'a'), grant('m2', 'videos', 'approved', 'b')]);
+  const g = agruparPorEstado(contas);
+  assert.equal(g.aguardando.length + g.ativa.length + g.bloqueada.length, contas.length);
+});
+
+test('a linha resume só o que ainda espera decisão', () => {
+  const conta = agrupar([grant('m1', 'cursos', 'pending'), grant('m1', 'videos', 'approved'), grant('m1', 'hub', 'pending')])[0];
+  assert.deepEqual(sistemasPedidos(conta), ['cursos'], 'nem o que já foi liberado, nem o Hub');
+});
