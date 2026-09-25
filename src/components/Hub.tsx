@@ -137,7 +137,7 @@ const workspaces: Record<Exclude<View, "overview" | "approvals" | "config" | "re
     eyebrow: "ESTUDOS",
     description: "Assista às aulas e acompanhe seu avanço sem sair da sua central.",
     url: "https://cursos-artx.vercel.app",
-    logo: assetPath("/brand/artx-hub.svg"),
+    logo: assetPath("/brand/cursos.svg"),
     project: "cursos",
     icon: Award,
     accent: "mint",
@@ -208,8 +208,16 @@ const pageMeta: Record<View, { eyebrow: string; title: string }> = {
 
 
 
+/**
+ * Esta view tem um espaço próprio?
+ *
+ * A resposta vem do próprio `workspaces`, e não de uma lista repetida aqui.
+ * A lista existia, eu acrescentei o sistema de cursos em todo lugar menos
+ * nela, e o resultado foi uma aba que abria em branco — sem erro, sem aviso,
+ * só vazia. Derivar do objeto faz o próximo espaço aparecer sozinho.
+ */
 function isWorkspaceView(view: View): view is keyof typeof workspaces {
-  return view === "site" || view === "videos" || view === "sat" || view === "university" || view === "jade";
+  return view in workspaces;
 }
 
 export function Hub() {
