@@ -6,6 +6,7 @@ import {
   agrupar,
   contarSelecionados,
   estadoDaConta,
+  exclusaoDaConta,
   idsDaConta,
   podeAplicar,
   selecoesDoServidor,
@@ -218,4 +219,41 @@ test('o caminho completo do bug: conta nova, aprovar, e o acesso sai liberado', 
   const escolhidos = Object.entries(selecoes[conta.key]).filter(([, marcado]) => marcado).map(([app]) => app);
   assert.equal(podeAplicar(estadoDaConta(conta), escolhidos.length).ok, true);
   assert.deepEqual(escolhidos, ['cursos'], 'aprovar tem que liberar justamente o que foi pedido');
+});
+
+// ══════════════ Apagar conta ══════════════
+
+test('conta que nunca foi aprovada se apaga com uma confirmação só', () => {
+  const conta = agrupar([grant('m1', 'cursos', 'pending')])[0];
+  const regra = exclusaoDaConta(conta);
+  assert.equal(regra.confirmacao, 'simples');
+  assert.match(regra.aviso, /não dá para desfazer/i);
+});
+
+test('conta bloqueada também: não há nada guardado para perder', () => {
+  const conta = agrupar([grant('m1', 'videos', 'revoked')])[0];
+  assert.equal(exclusaoDaConta(conta).confirmacao, 'simples');
+});
+
+test('conta em uso exige o nome digitado, porque leva os dados junto', () => {
+  const conta = agrupar([grant('m1', 'videos', 'approved')])[0];
+  const regra = exclusaoDaConta(conta);
+  assert.equal(regra.confirmacao, 'digitar-nome');
+  assert.match(regra.aviso, /progresso/i, 'o aviso precisa dizer o que se perde');
+  assert.ok(regra.aviso.includes(conta.username), 'e qual nome digitar');
+});
+
+test('o aviso sempre nomeia a pessoa, para não apagar a conta errada', () => {
+  for (const status of ['pending', 'approved', 'revoked']) {
+    const conta = agrupar([grant('m1', 'videos', status, 'fulano')])[0];
+    assert.ok(exclusaoDaConta(conta).aviso.includes('fulano'), status);
+  }
+});
+
+test('apagar é uma ação à parte: não se confunde com bloquear', () => {
+  // Bloquear deixa a conta lá e some do botão quando ela já está bloqueada.
+  // Apagar vale em qualquer estado, e é por isso que precisa da confirmação.
+  const bloqueada = agrupar([grant('m1', 'videos', 'revoked')])[0];
+  assert.equal(acoesDoEstado(estadoDaConta(bloqueada)).podeBloquear, false);
+  assert.ok(exclusaoDaConta(bloqueada).aviso.length > 0);
 });

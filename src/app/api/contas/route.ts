@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     const token = request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
     let result: unknown = { ok: true };
 
-    if (action === "admin-list" || action === "admin-decide" || action === "admin-decide-all" || action === "admin-configure") {
+    if (action === "admin-list" || action === "admin-decide" || action === "admin-decide-all" || action === "admin-configure" || action === "admin-delete") {
       await requireHubOwner(token);
 
       if (action === "admin-list") {
@@ -106,6 +106,24 @@ export async function POST(request: Request) {
           select: { app: true, status: true, memberId: true, updatedAt: true, member: { select: { username: true, createdAt: true } } },
           orderBy: { updatedAt: "desc" },
           take: 500,
+        });
+      } else if (action === "admin-delete") {
+        /*
+          Apagar de verdade, não esconder.
+
+          As concessões saem por cascata junto da conta, mas sessão e estado
+          guardado não: as duas se ligam à pessoa por um texto, não por chave
+          estrangeira. Se ficassem, a próxima conta a receber o mesmo id
+          herdaria dados de outra pessoa — e uma sessão viva continuaria
+          entrando numa conta que já não existe.
+        */
+        const memberId = String(body.memberId ?? "");
+        const conta = await prisma.memberAccount.findUnique({ where: { id: memberId }, select: { id: true } });
+        if (!conta) throw new Error("Conta não encontrada.");
+        await prisma.$transaction(async (tx) => {
+          await tx.memberSession.deleteMany({ where: { principal: memberId } });
+          await tx.memberState.deleteMany({ where: { principal: memberId } });
+          await tx.memberAccount.delete({ where: { id: memberId } });
         });
       } else if (action === "admin-decide-all" || action === "admin-configure") {
         const memberId = String(body.memberId ?? "");

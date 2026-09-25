@@ -21,6 +21,7 @@ import {
   contarSelecionados,
   decididoEm,
   estadoDaConta,
+  exclusaoDaConta,
   podeAplicar,
   estadoDoSistema,
   idsDaConta,
@@ -149,6 +150,41 @@ export function AccountApprovals({ token }: { token: string | null }) {
     }
   }
 
+  /**
+   * Apagar de vez.
+   *
+   * Bloquear deixa a conta lá, sem acesso, e dá para voltar atrás. Isto não
+   * volta: leva a conta, os acessos e tudo o que a pessoa guardou. Por isso a
+   * confirmação depende do que se perde — uma conta que nunca foi aprovada
+   * não guardou nada, e pedir cerimônia para remover um pedido de teste só
+   * faz o dono parar de limpar a lista.
+   */
+  async function apagar(account: Conta) {
+    const regra = exclusaoDaConta(account);
+
+    if (regra.confirmacao === 'digitar-nome') {
+      const digitado = window.prompt(regra.aviso);
+      if (digitado === null) return;
+      if (digitado.trim().toLowerCase() !== account.username.trim().toLowerCase()) {
+        setNotice('O nome não confere. Nada foi apagado.');
+        return;
+      }
+    } else if (!window.confirm(regra.aviso)) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await Promise.all(idsDaConta(account).map(memberId => request('admin-delete', { memberId })));
+      await refresh();
+      setNotice(`Conta de ${account.username} apagada.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível apagar.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="approval-page">
       <p className="eyebrow">ADMINISTRAÇÃO</p>
@@ -241,6 +277,10 @@ export function AccountApprovals({ token }: { token: string | null }) {
                     Bloquear conta
                   </button>
                 )}
+                {/* Separado dos outros: bloquear tem volta, apagar não. */}
+                <button className="approval-apagar" disabled={busy} onClick={() => void apagar(account)}>
+                  Apagar conta
+                </button>
               </div>
             </article>
           );

@@ -99,6 +99,49 @@ export function podeAplicar(estado: EstadoConta, escolhidos: number): { ok: true
 export type EstadoConta = "ativa" | "aguardando" | "bloqueada";
 
 /**
+ * Apagar uma conta: o que vai junto, e quanto cuidado a confirmação precisa.
+ *
+ * Bloquear é reversível — a conta continua lá, sem acesso. Apagar não é: leva
+ * a conta, os acessos e tudo o que a pessoa guardou nos sistemas liberados.
+ *
+ * Por isso o cuidado é proporcional ao que se perde. Uma conta que nunca foi
+ * aprovada não guardou nada em lugar nenhum, e exigir cerimônia para remover
+ * um pedido de teste só faz o dono parar de limpar. Uma conta em uso tem
+ * progresso de curso, planejamento, anotações — essa pede o nome digitado,
+ * porque um clique errado ali não tem volta.
+ */
+export type Exclusao = {
+  confirmacao: "simples" | "digitar-nome";
+  aviso: string;
+};
+
+export function exclusaoDaConta(conta: Conta): Exclusao {
+  const nome = conta.username;
+
+  if (estadoDaConta(conta) === "ativa") {
+    return {
+      confirmacao: "digitar-nome",
+      aviso: [
+        `A conta de ${nome} está em uso.`,
+        "",
+        "Apagar remove a conta, os acessos e tudo o que ela guardou nos sistemas — progresso, planejamento, anotações. Não dá para desfazer.",
+        "",
+        `Se é isso mesmo, digite o nome de usuário: ${nome}`,
+      ].join("\n"),
+    };
+  }
+
+  return {
+    confirmacao: "simples",
+    aviso: [
+      `Apagar a conta de ${nome}?`,
+      "",
+      "Ela nunca teve acesso liberado, então não há nada guardado para perder. Ainda assim, não dá para desfazer.",
+    ].join("\n"),
+  };
+}
+
+/**
  * Em que pé a conta está.
  *
  * O estado vem dos SISTEMAS, não do Hub.

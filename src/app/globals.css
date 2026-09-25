@@ -742,3 +742,9 @@ kbd { border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: r
 .jade-canto form button:disabled { opacity: .45; cursor: not-allowed; }
 
 @media (max-width: 560px) { .jade-canto { right: 10px; left: 10px; bottom: 10px; width: auto; } .jade-bolha { right: 16px; bottom: 16px; } }
+
+/* Apagar conta fica à parte: bloquear tem volta, isto não. A cor é aviso, não
+   convite — por isso só a borda e o texto, sem preenchimento. */
+.approval-actions .approval-apagar { margin-left: auto; padding: 9px 15px; border: 1px solid rgba(217, 112, 153, .45); border-radius: 9px; background: transparent; color: #d97099; font-size: 12.5px; }
+.approval-actions .approval-apagar:hover:not(:disabled) { border-color: #d97099; background: rgba(217, 112, 153, .1); }
+.approval-actions .approval-apagar:disabled { opacity: .45; cursor: not-allowed; }
