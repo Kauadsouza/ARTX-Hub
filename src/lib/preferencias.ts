@@ -1,96 +1,89 @@
 /**
  * Preferências de aparência.
  *
- * Ficam neste navegador, como a escolha de idioma que já existia. Não vão para
- * a conta de propósito: são preferência de tela, e ninguém quer que mudar a cor
- * no computador mude a cor no celular.
+ * Ficam neste navegador, como a escolha de idioma. Não vão para a conta de
+ * propósito: é preferência de tela, e ninguém quer que o tema do computador
+ * mude o do celular.
  *
- * SOBRE A COR
+ * SOBRE OS TEMAS
  *
- * O Hub usa um roxo como cor de ação: botão principal, item ativo do menu,
- * destaque de foco. Ele vive em três variáveis — a cor, uma versão clara para
- * hover e uma transparente para fundo. Trocar as três de uma vez é o que faz a
- * mudança parecer intencional em vez de remendada.
+ * Até aqui havia uma cor de destaque, e um tema claro era impossível: o CSS
+ * tinha 453 cores escritas direto nas regras. Elas viraram variáveis — cada
+ * uma classificada pelo papel que cumpre, não pelo tom — e agora um tema troca
+ * só as cores de base; linhas, realces, painéis e gráficos derivam delas. Por
+ * isso um tema muda o Hub inteiro sem precisar conhecer nenhuma tela.
  *
- * SOBRE O TEMA CLARO
- *
- * Não está aqui, e não é esquecimento. O CSS do Hub tem cerca de 500 cores
- * escritas direto na regra, contra 19 em variável — um tema claro exigiria
- * reescrever quase todas. Meio feito, ficaria pior que não ter: texto escuro
- * sobre caixa escura em metade das telas. É um trabalho próprio, não um
- * interruptor.
+ * O seletor de cor saiu, e não só da tela: ele escrevia a cor direto no
+ * <html> como estilo, e estilo direto passa por cima de qualquer regra do
+ * CSS. Com ele ligado, nenhum tema conseguiria trocar o acento.
  */
 
-const CHAVE_COR = "artx-cor-acento";
+export const CHAVE_TEMA = "artx-tema";
 
-export type Acento = {
-  id: string;
+export type Tema = {
+  id: "noite" | "oceano" | "claro" | "areia";
   nome: string;
-  /** A cor cheia: botões e itens ativos. */
-  cor: string;
-  /** Uma versão mais clara, para hover. */
-  clara: string;
-  /** A mesma cor transparente, para fundos e anéis de foco. */
-  suave: string;
+  descricao: string;
+  /** As três cores que representam o tema na amostra: fundo, superfície, acento. */
+  amostra: [string, string, string];
 };
 
 /**
  * As opções.
  *
- * Cada uma foi escolhida medindo o contraste do texto branco por cima dela —
- * que é o que se lê no botão principal — e não pelo tom ter ficado bonito.
- * Todas passam de 4,5:1, o mínimo para leitura.
- *
- * O violeta original do Hub dava 3,69:1 e reprovava: o botão mais clicado do
- * sistema tinha o texto mais difícil de ler. Este é o mesmo violeta, um pouco
- * mais fundo, agora em 4,53:1.
+ * O acento de cada uma foi conferido com o validador de paleta contra o
+ * próprio fundo, e o texto em cima do botão principal passa de 4,5:1 em
+ * todas. O de Oceano é um ciano claro demais para texto branco, então lá o
+ * texto do botão é escuro — é para isso que a variável `--sobre-acento` existe.
  */
-export const acentos: Acento[] = [
-  { id: "violeta", nome: "Violeta", cor: "#7c60e3", clara: "#9775ff", suave: "rgba(124, 96, 227, 0.16)" },
-  { id: "verde", nome: "Verde", cor: "#27845e", clara: "#30a173", suave: "rgba(39, 132, 94, 0.16)" },
-  { id: "azul", nome: "Azul", cor: "#3676c5", clara: "#4290f0", suave: "rgba(54, 118, 197, 0.16)" },
-  { id: "ambar", nome: "Âmbar", cor: "#9c6d1a", clara: "#be8520", suave: "rgba(156, 109, 26, 0.16)" },
-  { id: "rosa", nome: "Rosa", cor: "#bc527b", clara: "#e56496", suave: "rgba(188, 82, 123, 0.16)" },
-  { id: "grafite", nome: "Grafite", cor: "#5c6478", clara: "#707a92", suave: "rgba(92, 100, 120, 0.16)" },
+export const temas: Tema[] = [
+  { id: "noite", nome: "Noite", descricao: "Escuro, com roxo. O de sempre.", amostra: ["#07080d", "#151823", "#7c60e3"] },
+  { id: "oceano", nome: "Oceano", descricao: "Azul-marinho fundo, com ciano.", amostra: ["#050e19", "#101f31", "#1b9ad6"] },
+  { id: "claro", nome: "Claro", descricao: "Branco e limpo, para o dia.", amostra: ["#f3f5f9", "#ffffff", "#6547dc"] },
+  { id: "areia", nome: "Areia", descricao: "Claro e quente, com índigo.", amostra: ["#f4eee3", "#fffcf6", "#4e43c4"] },
 ];
 
-export const acentoPadrao = acentos[0];
+export const temaPadrao = temas[0];
 
-export function acentoPorId(id: string | null): Acento {
-  return acentos.find((item) => item.id === id) ?? acentoPadrao;
+export function temaPorId(id: string | null): Tema {
+  return temas.find((item) => item.id === id) ?? temaPadrao;
+}
+
+/** Aplica o tema: o CSS lê `data-tema` no <html> e troca as cores de base. */
+export function aplicarTema(tema: Tema): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.dataset.tema = tema.id;
+}
+
+export function lerTemaGuardado(): Tema {
+  if (typeof window === "undefined") return temaPadrao;
+  try {
+    return temaPorId(localStorage.getItem(CHAVE_TEMA));
+  } catch {
+    return temaPadrao;
+  }
+}
+
+export function guardarTema(tema: Tema): void {
+  try {
+    localStorage.setItem(CHAVE_TEMA, tema.id);
+    // A cor de destaque antiga não serve mais para nada. Fica sem dono se
+    // não for limpa.
+    localStorage.removeItem("artx-cor-acento");
+  } catch {
+    // Navegação privada: o tema vale nesta sessão e não é guardado.
+  }
 }
 
 /**
- * Aplica a cor escolhida.
+ * O script que aplica o tema antes da primeira pintura.
  *
- * Escreve nas mesmas variáveis que o CSS já lê, então toda tela muda junto sem
- * precisar conhecer esta escolha.
+ * Sem ele, a página abre no tema padrão e troca um instante depois — um
+ * clarão escuro toda vez que o Hub carrega no tema claro. Ele roda no <head>,
+ * antes de qualquer coisa aparecer, e é curto de propósito: um erro aqui
+ * derrubaria a página inteira, então tudo fica dentro de um try.
  */
-export function aplicarAcento(acento: Acento): void {
-  if (typeof document === "undefined") return;
-  const raiz = document.documentElement.style;
-  raiz.setProperty("--violet", acento.cor);
-  raiz.setProperty("--violet-bright", acento.clara);
-  raiz.setProperty("--violet-soft", acento.suave);
-}
-
-export function lerAcentoGuardado(): Acento {
-  if (typeof window === "undefined") return acentoPadrao;
-  try {
-    return acentoPorId(localStorage.getItem(CHAVE_COR));
-  } catch {
-    return acentoPadrao;
-  }
-}
-
-export function guardarAcento(acento: Acento): void {
-  try {
-    localStorage.setItem(CHAVE_COR, acento.id);
-  } catch {
-    // Navegação privada: a cor vale nesta sessão e não é guardada. Melhor que
-    // impedir a troca por causa da gravação.
-  }
-}
+export const scriptDoTema = `try{var t=localStorage.getItem("${CHAVE_TEMA}");if(t==="noite"||t==="oceano"||t==="claro"||t==="areia")document.documentElement.dataset.tema=t}catch(e){}`;
 
 /* ── Validação dos campos da conta ─────────────────────────────────────── */
 

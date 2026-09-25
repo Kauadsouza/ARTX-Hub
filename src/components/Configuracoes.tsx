@@ -1,28 +1,35 @@
 "use client";
 
 /**
- * Configurações.
+ * O perfil.
  *
- * A aba anterior se chamava Segurança e era um formulário de senha, só. Isto
- * reúne o que é seu: a conta, a aparência e os dados.
+ * Era "Configurações": um formulário de nome, e-mail e senha, uma cor de
+ * destaque e um botão de exportar. Virou o lugar de quem você é no Hub —
+ * foto, nome, conta — e de como ele se parece para você.
  *
- * Cada bloco salva sozinho e diz o que aconteceu. Um formulário único com um
- * botão "salvar tudo" faria uma falha de e-mail derrubar a troca de senha
- * junto, e ninguém saberia qual das duas passou.
+ * O tema substitui a cor de destaque, e não por gosto: a cor trocava só o
+ * roxo dos botões, e o tema troca o Hub inteiro. As duas coisas juntas nem
+ * funcionariam — a cor era aplicada como estilo direto no <html> e passaria
+ * por cima de qualquer tema.
+ *
+ * Exportar saiu a pedido. Cada bloco continua salvando sozinho: um formulário
+ * único faria uma falha de e-mail derrubar a troca de senha junto.
  */
 
-import { useEffect, useState } from "react";
-import { AtSign, Check, Download, KeyRound, Languages, Palette, User } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { AtSign, Camera, Check, KeyRound, Languages, Palette, User } from "lucide-react";
 
+import { enviarAvatar, removerAvatar } from "@/lib/avatar";
 import {
-  acentos,
-  aplicarAcento,
-  guardarAcento,
-  lerAcentoGuardado,
+  aplicarTema,
+  guardarTema,
+  lerTemaGuardado,
+  temas,
   validarEmail,
   validarNome,
   validarSenha,
-  type Acento,
+  type Tema,
 } from "@/lib/preferencias";
 import { useI18n } from "./I18n";
 
@@ -36,49 +43,71 @@ export function Configuracoes({
   email,
   nome,
   salvar,
-  onBackup,
+  supabase,
+  avatar,
+  onAvatar,
 }: {
   email: string;
   nome: string;
   salvar: Salvar;
-  onBackup: () => void;
+  supabase: SupabaseClient | null;
+  avatar: string | null;
+  onAvatar: (dataUrl: string | null) => void;
 }) {
   const { language, setLanguage } = useI18n();
+  const [tema, setTema] = useState<Tema>(() => lerTemaGuardado());
 
-  const [acento, setAcento] = useState<Acento>(() => lerAcentoGuardado());
-  useEffect(() => { aplicarAcento(acento); }, [acento]);
-
-  function escolherCor(novo: Acento) {
-    setAcento(novo);
-    guardarAcento(novo);
+  function escolherTema(novo: Tema) {
+    setTema(novo);
+    aplicarTema(novo);
+    guardarTema(novo);
   }
 
   return (
-    <section className="config-page">
-      <p className="eyebrow">CONTA E PREFERÊNCIAS</p>
-      <h1>Configurações</h1>
-      <p className="config-intro">
-        Tudo o que é seu num lugar só. Cada bloco salva por conta própria — se um falhar, os outros não caem junto.
-      </p>
+    <section className="perfil">
+      <FotoDePerfil nome={nome} email={email} supabase={supabase} avatar={avatar} onAvatar={onAvatar} />
 
-      <div className="config-grid">
-        {/* ── Conta ─────────────────────────────────────────────────── */}
+      {/* ── Tema ─────────────────────────────────────────────────────── */}
+      <Bloco icone={<Palette size={17} />} titulo="Tema" detalhe="Muda o Hub inteiro — fundo, cartões, textos e gráficos.">
+        <div className="perfil-temas" role="radiogroup" aria-label="Tema">
+          {temas.map((item) => {
+            const escolhido = tema.id === item.id;
+            const [fundo, superficie, acento] = item.amostra;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="radio"
+                aria-checked={escolhido}
+                className={`perfil-tema ${escolhido ? "escolhido" : ""}`}
+                onClick={() => escolherTema(item)}
+              >
+                {/* Uma miniatura do próprio Hub naquele tema, e não uma bolinha
+                    de cor: dá para ver como fica antes de escolher. */}
+                <span className="perfil-tema-miniatura" style={{ background: fundo }} aria-hidden>
+                  <span className="perfil-tema-lateral" style={{ background: superficie }} />
+                  <span className="perfil-tema-cartao" style={{ background: superficie }}>
+                    <span style={{ background: acento }} />
+                  </span>
+                </span>
+                <span className="perfil-tema-texto">
+                  <strong>{item.nome}</strong>
+                  <small>{item.descricao}</small>
+                </span>
+                {escolhido && <Check className="perfil-tema-marca" size={15} />}
+              </button>
+            );
+          })}
+        </div>
+      </Bloco>
+
+      <div className="perfil-grade">
+        {/* ── Conta ───────────────────────────────────────────────────── */}
         <Bloco icone={<User size={17} />} titulo="Nome de exibição" detalhe="Como você aparece no Hub.">
-          <CampoUnico
-            rotulo="Nome"
-            valorInicial={nome}
-            tipo="text"
-            validar={validarNome}
-            aoSalvar={salvar.nome}
-            textoBotao="Salvar nome"
-          />
+          <CampoUnico rotulo="Nome" valorInicial={nome} tipo="text" validar={validarNome} aoSalvar={salvar.nome} textoBotao="Salvar nome" />
         </Bloco>
 
-        <Bloco
-          icone={<AtSign size={17} />}
-          titulo="E-mail da conta"
-          detalhe="É por ele que você entra e recupera o acesso."
-        >
+        <Bloco icone={<AtSign size={17} />} titulo="E-mail da conta" detalhe="É por ele que você entra e recupera o acesso.">
           <CampoUnico
             rotulo="E-mail"
             valorInicial={email}
@@ -94,73 +123,109 @@ export function Configuracoes({
           <CampoSenha aoSalvar={salvar.senha} />
         </Bloco>
 
-        {/* ── Aparência ─────────────────────────────────────────────── */}
-        <Bloco icone={<Palette size={17} />} titulo="Cor de destaque" detalhe="Botões, menu ativo e foco.">
-          <div className="config-cores">
-            {acentos.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`config-cor ${acento.id === item.id ? "escolhida" : ""}`}
-                style={{ background: item.cor }}
-                onClick={() => escolherCor(item)}
-                aria-pressed={acento.id === item.id}
-                aria-label={item.nome}
-                title={item.nome}
-              >
-                {acento.id === item.id && <Check size={14} />}
-              </button>
-            ))}
-          </div>
-          <p className="config-nota">
-            Cada cor foi escolhida medindo o contraste do texto branco por cima dela, não pelo tom. Todas passam do
-            mínimo de leitura.
-          </p>
-        </Bloco>
-
         <Bloco icone={<Languages size={17} />} titulo="Idioma" detalhe="Vale neste navegador.">
           <div className="btn-grupo">
-            <button
-              type="button"
-              className={`config-opcao ${language === "pt" ? "ativa" : ""}`}
-              onClick={() => setLanguage("pt")}
-              aria-pressed={language === "pt"}
-            >
+            <button type="button" className={`config-opcao ${language === "pt" ? "ativa" : ""}`} onClick={() => setLanguage("pt")} aria-pressed={language === "pt"}>
               Português
             </button>
-            <button
-              type="button"
-              className={`config-opcao ${language === "en" ? "ativa" : ""}`}
-              onClick={() => setLanguage("en")}
-              aria-pressed={language === "en"}
-            >
+            <button type="button" className={`config-opcao ${language === "en" ? "ativa" : ""}`} onClick={() => setLanguage("en")} aria-pressed={language === "en"}>
               English
             </button>
           </div>
         </Bloco>
-
-        {/* ── Dados ─────────────────────────────────────────────────── */}
-        <Bloco icone={<Download size={17} />} titulo="Seus dados" detalhe="Uma cópia para guardar fora daqui.">
-          <button type="button" className="quick-create" onClick={onBackup}>
-            <Download size={15} /> Exportar o Hub
-          </button>
-          <p className="config-nota">
-            Leva atividades, notas e progresso de cursos. Os anexos do Relatório têm cópia própria na sua conta e
-            botão de baixar em cada arquivo.
-          </p>
-        </Bloco>
       </div>
-
-      {/*
-        O tema claro não está aqui, e dizer por quê é melhor que deixar a pessoa
-        procurando um interruptor que não existe.
-      */}
-      <p className="config-rodape">
-        Tema claro ainda não: o CSS do Hub tem cerca de 500 cores escritas direto na regra contra 19 em variável, e um
-        tema claro exigiria reescrever quase todas. Meio feito ficaria pior que não ter — texto escuro sobre caixa
-        escura em metade das telas. É um trabalho próprio, e me peça quando quiser que eu encare.
-      </p>
     </section>
+  );
+}
+
+/**
+ * A foto, o nome e o e-mail no topo — o que o perfil é, antes do que se
+ * configura nele.
+ */
+function FotoDePerfil({
+  nome,
+  email,
+  supabase,
+  avatar,
+  onAvatar,
+}: {
+  nome: string;
+  email: string;
+  supabase: SupabaseClient | null;
+  avatar: string | null;
+  onAvatar: (dataUrl: string | null) => void;
+}) {
+  const entrada = useRef<HTMLInputElement>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [recado, setRecado] = useState("");
+  const inicial = (nome || email || "?").trim().slice(0, 1).toUpperCase();
+
+  async function trocar(evento: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = evento.target.files?.[0];
+    evento.target.value = "";
+    if (!arquivo) return;
+    setOcupado(true);
+    setRecado("");
+    try {
+      onAvatar(await enviarAvatar(supabase, arquivo));
+      setRecado("Foto atualizada.");
+    } catch (erro) {
+      setRecado(erro instanceof Error ? erro.message : "Não consegui trocar a foto.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function tirar() {
+    if (!window.confirm("Tirar a foto de perfil?")) return;
+    setOcupado(true);
+    setRecado("");
+    try {
+      await removerAvatar(supabase);
+      onAvatar(null);
+      setRecado("Foto removida.");
+    } catch (erro) {
+      setRecado(erro instanceof Error ? erro.message : "Não consegui tirar a foto.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  return (
+    <header className="perfil-topo">
+      <button
+        type="button"
+        className="perfil-foto"
+        onClick={() => entrada.current?.click()}
+        disabled={ocupado}
+        aria-label={avatar ? "Trocar a foto de perfil" : "Colocar uma foto de perfil"}
+      >
+        {avatar ? (
+          <img src={avatar} alt="" />
+        ) : (
+          <span className="perfil-inicial" aria-hidden>{inicial}</span>
+        )}
+        <span className="perfil-foto-camera" aria-hidden><Camera size={15} /></span>
+      </button>
+      <input ref={entrada} type="file" accept="image/*" hidden onChange={(evento) => void trocar(evento)} />
+
+      <div className="perfil-quem">
+        <p className="eyebrow">PERFIL</p>
+        <h1>{nome || "Seu perfil"}</h1>
+        <p>{email}</p>
+        <div className="perfil-foto-acoes">
+          <button type="button" onClick={() => entrada.current?.click()} disabled={ocupado}>
+            {ocupado ? "Enviando…" : avatar ? "Trocar foto" : "Colocar foto"}
+          </button>
+          {avatar && (
+            <button type="button" className="perfil-tirar" onClick={() => void tirar()} disabled={ocupado}>
+              Tirar
+            </button>
+          )}
+        </div>
+        {recado && <p role="status" className="perfil-recado">{recado}</p>}
+      </div>
+    </header>
   );
 }
 

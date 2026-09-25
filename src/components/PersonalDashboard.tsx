@@ -61,7 +61,7 @@ export function PersonalDashboard({
   useEffect(() => {
     if (!accessToken) return;
     let vivo = true;
-    fetch("/api/painel", { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" })
+    fetch("/api/painel", { method: "POST", headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" })
       .then(async (resposta) => {
         if (!resposta.ok) throw new Error();
         const dados = (await resposta.json()) as Painel;

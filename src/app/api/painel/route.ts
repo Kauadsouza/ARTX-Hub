@@ -83,7 +83,17 @@ async function videosDoDono(): Promise<VideoNoPainel[] | null> {
   }
 }
 
-export async function GET(request: Request) {
+/*
+  POST, e não GET, embora só leia.
+
+  O Hub também é montado como site estático para o aplicativo do Windows, e
+  nesse modo uma rota GET precisa ser pré-gerada no build — o que não faz
+  sentido para números que mudam a cada minuto. Rotas POST passam pela
+  exportação sem exigir isso, como as de contas e da Jade. Na versão estática
+  a rota simplesmente não responde, e a visão geral diz que não conseguiu
+  buscar os números em vez de quebrar.
+*/
+export async function POST(request: Request) {
   const token = request.headers.get("authorization")?.replace(/^Bearer /, "") ?? "";
   try {
     await requireHubOwner(token);

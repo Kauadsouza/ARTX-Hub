@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./jade.css";
 import { I18nProvider } from "@/components/I18n";
+import { scriptDoTema } from "@/lib/preferencias";
 
 const basePath = process.env.HUB_LOCAL_BUILD === "1" ? "/hub" : "";
 
@@ -23,5 +24,15 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="pt-BR"><body><I18nProvider>{children}</I18nProvider></body></html>;
+  return (
+    // `suppressHydrationWarning` só no <html>: o script abaixo escreve o tema nele
+    // antes do React chegar, e a diferença é proposital, não um erro.
+    <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        {/* Antes de qualquer pintura, senão o tema claro abre com um clarão escuro. */}
+        <script dangerouslySetInnerHTML={{ __html: scriptDoTema }} />
+      </head>
+      <body><I18nProvider>{children}</I18nProvider></body>
+    </html>
+  );
 }

@@ -26,7 +26,7 @@ import {
   RefreshCw,
   Search,
   NotebookPen,
-  Settings2,
+  UserRound,
   Smartphone,
   Sparkles,
   Video,
@@ -36,7 +36,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { parseRouteSignals, type RouteSignals } from "@/lib/week-ahead";
 import { itensParaBusca } from "@/lib/relatorio";
-import { aplicarAcento, lerAcentoGuardado } from "@/lib/preferencias";
+import { aplicarTema, lerTemaGuardado } from "@/lib/preferencias";
+import { avatarLocal, baixarAvatar } from "@/lib/avatar";
 import { destinos, type Acao } from "@/lib/jade-acoes";
 import { PersonalDashboard } from "@/components/PersonalDashboard";
 import { RelatorioKaua } from "@/components/RelatorioKaua";
@@ -195,7 +196,7 @@ const workspaces: Record<Exclude<View, "overview" | "approvals" | "config" | "re
 
 const pageMeta: Record<View, { eyebrow: string; title: string }> = {
   approvals: { eyebrow: "ADMINISTRAÇÃO", title: "Aprovação de contas" },
-  config: { eyebrow: "CONTA E PREFERÊNCIAS", title: "Configurações" },
+  config: { eyebrow: "VOCÊ NO HUB", title: "Perfil" },
   overview: { eyebrow: "CENTRAL DE COMANDO", title: "Visão geral" },
   relatorio: { eyebrow: "SÓ SEU", title: "Relatório do Kauã" },
   site: { eyebrow: workspaces.site.eyebrow, title: workspaces.site.label },
@@ -245,7 +246,9 @@ export function Hub() {
 
   // A cor guardada vale desde a abertura: entrar nas Configurações para a
   // escolha aparecer seria a escolha não valer.
-  useEffect(() => { aplicarAcento(lerAcentoGuardado()); }, []);
+  // O script do <head> já aplicou o tema antes da pintura; isto só garante
+  // que ele continue certo se o armazenamento mudar em outra aba.
+  useEffect(() => { aplicarTema(lerTemaGuardado()); }, []);
 
   /**
    * O Relatório entra na busca.
@@ -272,6 +275,24 @@ export function Hub() {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [sessionEmail, setSessionEmail] = useState("");
   const [sessionName, setSessionName] = useState("");
+
+  /* A foto de perfil. Começa pela cópia deste navegador, para aparecer na
+     hora, e é conferida com o cofre da conta assim que a sessão existe — foi
+     trocada em outro aparelho, é a do cofre que vale. */
+  const [avatar, setAvatar] = useState<string | null>(null);
+  useEffect(() => {
+    queueMicrotask(() => setAvatar(avatarLocal()));
+  }, []);
+  useEffect(() => {
+    if (!sessionUserId || !supabase) return;
+    let vivo = true;
+    void baixarAvatar(supabase).then((foto) => {
+      if (vivo && foto) setAvatar(foto);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [sessionUserId, supabase]);
   const [systemSignals, setSystemSignals] = useState<Partial<Record<ProjectKey, SystemSignal>>>({});
   // O University Path publica o proprio resumo de prazos. O Hub so consome:
   // duplicar o calendario de cada pais aqui criaria dois que divergem sozinhos.
@@ -574,17 +595,6 @@ export function Hub() {
     setSystemSignals(current => ({ ...current, [project]: { ...signal, updatedAt: new Date().toISOString() } }));
   }
 
-  function downloadHubBackup() {
-    const blob = new Blob([JSON.stringify({ version: 4, exportedAt: new Date().toISOString(), tasks, notes, systemSignals }, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `artx-hub-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    notify("Backup do Hub exportado");
-  }
-
   /**
    * O que a Jade faz, de verdade.
    *
@@ -647,10 +657,9 @@ export function Hub() {
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
     { id: "cursos", group: "Estudos", label: "Abrir Cursos", icon: Award, run: () => goTo("cursos") },
     { id: "approvals", group: "Segurança", label: "Aprovação de contas", icon: Award, run: () => goTo("approvals") },
-    { id: "config", group: "Conta", label: "Abrir configurações", icon: Settings2, run: () => goTo("config") },
+    { id: "config", group: "Conta", label: "Abrir o perfil", icon: UserRound, run: () => goTo("config") },
 
     { id: "activity", group: "Pessoal", label: "Criar uma atividade", icon: Sparkles, run: () => goTo("overview") },
-    { id: "backup", group: "Segurança", label: "Exportar backup do Hub", icon: Cloud, run: downloadHubBackup },
     { id: "relatorio", group: "Pessoal", label: "Abrir Relatório do Kauã", icon: NotebookPen, run: () => goTo("relatorio") },
 
     /*
@@ -694,13 +703,17 @@ export function Hub() {
             barra do quadro, ao lado do botão de tela ampla. */}
         <NavButton active={activeView === "cursos"} icon={Award} logo={workspaces.cursos.logo} label={t("Cursos")} onClick={() => goTo("cursos")} />
         <NavButton active={activeView === "approvals"} icon={Award} label="Aprovação de contas" onClick={() => goTo("approvals")} />
-        <NavButton active={activeView === "config"} icon={Settings2} label={t("Configurações")} onClick={() => goTo("config")} />
+        <NavButton active={activeView === "config"} icon={UserRound} label={t("Perfil")} onClick={() => goTo("config")} />
       </SidebarGroup>
 
       <div className="sidebar-bottom">
         <a className="desktop-download" href={assetPath("/download")}><ArrowUpRight size={16} /><span>{t("Baixar aplicativo Windows")}</span></a>
-        <button className="sidebar-profile" onClick={() => setCommandOpen(true)} title={t("Abrir comandos")}>
-          <span>K</span><div><strong>Kauã</strong><small>{t("Espaço privado")}</small></div>
+        {/* Leva ao perfil, que é onde a foto e o nome se trocam. */}
+        <button className="sidebar-profile" onClick={() => goTo("config")} title={t("Abrir o perfil")}>
+          {avatar
+            ? <img className="sidebar-avatar" src={avatar} alt="" />
+            : <span>{(sessionName || "K").slice(0, 1).toUpperCase()}</span>}
+          <div><strong>{sessionName || "Kauã"}</strong><small>{t("Meu perfil")}</small></div>
         </button>
       </div>
     </aside>
@@ -713,7 +726,6 @@ export function Hub() {
         <div className="header-actions"><LanguageSwitch />
           <button className={`jade-header-trigger${activeView === "jade" ? " active" : ""}`} onClick={() => goTo("jade")} title="Jade" aria-label="Jade" aria-pressed={activeView === "jade"}><Sparkles size={16} /><span>Jade</span></button>
           <button className="command-trigger" onClick={() => setCommandOpen(true)}><Search size={16} /><span>{t("Buscar")}</span><kbd>⌘ K</kbd></button>
-          <button className="quick-create" onClick={() => goTo("overview")}><Sparkles size={16} /><span>{t("Meu foco")}</span></button>
           <button className="synced sync-status" onClick={() => void loadWorkspace()} title={t("Atualizar dados")} aria-live="polite"><Cloud size={15} /><span>{syncing ? t("Sincronizando…") : syncError ? t("Verificar conexão") : localMode ? "Local" : t("Sincronizado")}</span></button>
           {!localMode && supabase && <button className="icon-button" onClick={() => void supabase.auth.signOut()} title={t("Sair")} aria-label={t("Sair")}><LogOut size={17} /></button>}
         </div>
@@ -725,7 +737,9 @@ export function Hub() {
       {activeView === "config" && <Configuracoes
         email={sessionEmail}
         nome={sessionName}
-        onBackup={downloadHubBackup}
+        supabase={supabase}
+        avatar={avatar}
+        onAvatar={setAvatar}
         salvar={{
           nome: async (valor) => {
             if (!supabase) throw new Error("Conta não configurada neste ambiente.");
