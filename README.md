@@ -22,6 +22,7 @@ The Hub is an **orchestration layer**. Each product keeps its own deployment, it
 | [Video Studio](https://github.com/Kauadsouza/KauaArtx-Video-Studio) | YouTube ideas, scripts and publishing | Embedded, with the Hub session |
 | [Idiomas](https://github.com/Kauadsouza/SAT-simulado) | English and Spanish: daily study and exams | Embedded, with the Hub session |
 | [University Path](https://github.com/Kauadsouza/University-Path) | UK undergraduate application planning | Embedded, with the Hub session |
+| Cursos | Free courses with the lessons embedded, progress per lesson and attached certificates | Embedded, with the Hub session |
 
 ## Windows application
 
@@ -43,6 +44,7 @@ The owner signs in with a Supabase account. Everyone else creates an account and
 - **Hardened Electron:** sandbox, context isolation, and fuses disabling `runAsNode`, CLI inspection and loading outside the asar.
 - **Releases with provenance.** The build verifies that the tag matches the version, generates SHA256SUMS and emits a GitHub build-provenance attestation. The installer is not yet Authenticode-signed — that is stated in the release itself rather than hidden.
 - **Recovery documented honestly**, including what signing in does *not* bring back.
+- **Functions next to the data.** Vercel Functions are pinned to `pdx1` (Portland) in `vercel.json`, the same region as the Supabase database; the default Washington region added a cross-country round trip to every query.
 
 ## Tech stack
 
