@@ -30,3 +30,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS "MemberFile_principal_app_chave_key"
 
 CREATE INDEX IF NOT EXISTS "MemberFile_principal_app_idx"
   ON public."MemberFile"(principal, app);
+
+-- Fechada para a API pública do Supabase, como as outras tabelas de conta:
+-- só o servidor, com a credencial do banco, lê e grava. Sem isto, a chave
+-- publicável abriria os certificados de todo mundo.
+ALTER TABLE public."MemberFile" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public."MemberFile" FROM anon, authenticated;

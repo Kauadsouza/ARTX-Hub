@@ -88,8 +88,7 @@ async function ler(request: Request) {
 /**
  * A tabela de arquivos existe?
  *
- * Ela é criada à mão enquanto o banco ainda mora no sistema de vídeos. Sem
- * esta conferência, a ausência dela aparece como a mensagem genérica de
+ * Sem esta conferência, a ausência dela aparece como a mensagem genérica de
  * falha — que não diz o que fazer. Com ela, diz.
  */
 async function temTabelaDeArquivos(): Promise<boolean> {
@@ -100,6 +99,43 @@ async function temTabelaDeArquivos(): Promise<boolean> {
 }
 
 const SEM_TABELA = "O lugar de guardar arquivos ainda não foi criado no banco. Rode a migração MemberFile.";
+
+/**
+ * Garante a tabela de arquivos, fechada, antes do primeiro uso.
+ *
+ * O banco é compartilhado com o sistema de vídeos, e nenhum deploy do Hub
+ * roda migração; a tabela dependia de alguém colar o SQL no Supabase. Agora
+ * o próprio Hub a cria na primeira vez que um arquivo é pedido — os mesmos
+ * comandos de prisma/migrations/…_member_files, todos idempotentes. RLS e
+ * REVOKE rodam sempre, inclusive numa tabela criada à mão antes: é o que a
+ * mantém fora da API pública do Supabase. Uma vez por instância.
+ */
+let tabelaGarantida: Promise<void> | null = null;
+function garantirTabelaDeArquivos(): Promise<void> {
+  tabelaGarantida ??= (async () => {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS public."MemberFile" (
+        id TEXT PRIMARY KEY,
+        principal TEXT NOT NULL,
+        app TEXT NOT NULL CHECK (app IN ('hub', 'videos', 'study', 'university', 'cursos')),
+        chave TEXT NOT NULL,
+        nome TEXT NOT NULL,
+        tipo TEXT NOT NULL,
+        tamanho INTEGER NOT NULL,
+        conteudo BYTEA NOT NULL,
+        "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`);
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "MemberFile_principal_app_chave_key" ON public."MemberFile"(principal, app, chave)`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "MemberFile_principal_app_idx" ON public."MemberFile"(principal, app)`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE public."MemberFile" ENABLE ROW LEVEL SECURITY`);
+    await prisma.$executeRawUnsafe(`REVOKE ALL ON public."MemberFile" FROM anon, authenticated`);
+  })().catch((erro) => {
+    // Falhou (sem permissão, banco fora): tenta de novo no próximo pedido.
+    tabelaGarantida = null;
+    throw erro;
+  });
+  return tabelaGarantida;
+}
 
 export async function POST(request: Request) {
   let headers: Record<string, string>;
@@ -318,7 +354,7 @@ export async function POST(request: Request) {
           result = { revision: revision + 1 };
         }
       } else if (action === "file-put" || action === "file-list" || action === "file-get" || action === "file-delete") {
-        if (!(await temTabelaDeArquivos())) throw new Error(SEM_TABELA);
+        await garantirTabelaDeArquivos().catch(() => { throw new Error(SEM_TABELA); });
         result = await arquivos(action, principal, app, body);
       } else {
         throw new Error("Ação inválida.");

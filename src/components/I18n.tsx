@@ -33,14 +33,6 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     // chave, nunca achava "{0}", e todo texto com número dentro ficava sem valor.
     return translate(text, language).replace(/\{(\d+)\}/g, (match, index: string) => Number(index) < values.length ? String(values[Number(index)]) : match) as T;
   }, [language]);
-  useEffect(() => {
-    function receive(event: MessageEvent) {
-      if (event.source !== window.parent || event.origin !== "https://artx-hub.vercel.app" || event.data?.type !== "ARTX_HUB_LANGUAGE" || !["pt", "en"].includes(event.data.language)) return;
-      setLanguage(event.data.language);
-    }
-    window.addEventListener("message", receive);
-    return () => window.removeEventListener("message", receive);
-  }, [setLanguage]);
   useEffect(() => { document.documentElement.lang = language === "en" ? "en" : "pt-BR"; }, [language]);
   const value = useMemo(() => ({ language, locale: language === "en" ? "en-GB" : "pt-BR", t, setLanguage }), [language, t, setLanguage]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

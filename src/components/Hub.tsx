@@ -950,7 +950,7 @@ function WorkspaceView({ workspace, hubAccessToken, refreshKey, previewMode, onP
 }
 
 function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, refreshKey, onOpenJade }: { workspace: Workspace; accessToken: string | null; memberAccessToken?: string; refreshKey: number; onOpenJade?: () => void }) {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const usesHubSession =
     workspace.project === "videos" ||
@@ -964,14 +964,13 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, ref
   const appOrigin = new URL(workspace.url!).origin;
 
   const sendHubSession = useCallback(() => {
-    if (usesHubSession) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_LANGUAGE", language }, appOrigin);
     /* O tema vai junto: um sistema escuro dentro do Hub no tema claro parece
        outro site. Quem não conhece a mensagem simplesmente a ignora. */
     if (usesHubSession) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_TEMA", tema: document.documentElement.dataset.tema || "noite" }, appOrigin);
     if (!usesHubSession) return;
     if (memberAccessToken) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_MEMBER_AUTH", token: memberAccessToken }, appOrigin);
     else if (accessToken) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_AUTH", accessToken }, appOrigin);
-  }, [accessToken, appOrigin, usesHubSession, language, memberAccessToken]);
+  }, [accessToken, appOrigin, usesHubSession, memberAccessToken]);
 
   useEffect(() => {
     function onWorkspaceReady(event: MessageEvent) {
