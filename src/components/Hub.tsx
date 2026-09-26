@@ -965,6 +965,9 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, ref
 
   const sendHubSession = useCallback(() => {
     if (usesHubSession) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_LANGUAGE", language }, appOrigin);
+    /* O tema vai junto: um sistema escuro dentro do Hub no tema claro parece
+       outro site. Quem não conhece a mensagem simplesmente a ignora. */
+    if (usesHubSession) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_TEMA", tema: document.documentElement.dataset.tema || "noite" }, appOrigin);
     if (!usesHubSession) return;
     if (memberAccessToken) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_MEMBER_AUTH", token: memberAccessToken }, appOrigin);
     else if (accessToken) frameRef.current?.contentWindow?.postMessage({ type: "ARTX_HUB_AUTH", accessToken }, appOrigin);
