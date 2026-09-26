@@ -111,3 +111,53 @@ test('a ordem é a de "o que eu faço agora": andamento, concluído, não começ
   ]).map(c => c.id);
   assert.deepEqual(ordem, ['quase', 'comecando', 'feito', 'parado']);
 });
+
+// ══════════════ Ritmo e linha do tempo ══════════════
+
+import { acontecimentos, aulasNosUltimos, haQuanto, lerEstudo, ultimosDias } from '../src/lib/painel.ts';
+
+test('o ritmo lido do banco descarta o que vier torto', () => {
+  const e = lerEstudo({ estudo: { sequencia: 3, porDia: { '2026-09-26': 2, 'lixo': 5, '2026-09-25': -1 }, recentes: [{ curso: 'CS50x', aula: 'C', numero: 3, quando: '2026-09-26T10:00:00Z' }, { curso: 'x' }] } });
+  assert.deepEqual(e.porDia, { '2026-09-26': 2 });
+  assert.equal(e.recentes.length, 1);
+  assert.equal(e.sequencia, 3);
+});
+
+test('sem ritmo gravado ainda, é nulo — não um erro', () => {
+  assert.equal(lerEstudo(null), null);
+  assert.equal(lerEstudo({ resumo: [] }), null);
+});
+
+test('os últimos dias vêm todos, inclusive os vazios, em ordem', () => {
+  const agora = new Date('2026-09-26T12:00:00Z');
+  const dias = ultimosDias({ '2026-09-26': 2, '2026-09-24': 1 }, 3, agora);
+  assert.deepEqual(dias, [{ dia: '2026-09-24', aulas: 1 }, { dia: '2026-09-25', aulas: 0 }, { dia: '2026-09-26', aulas: 2 }]);
+  assert.equal(aulasNosUltimos({ '2026-09-26': 2, '2026-09-24': 1 }, 7, agora), 3);
+});
+
+test('a linha do tempo mistura as três origens, a mais recente primeiro', () => {
+  const lista = acontecimentos({
+    estudo: { sequencia: 1, porDia: {}, recentes: [{ curso: 'CS50x', aula: 'C', numero: 3, quando: '2026-09-26T10:00:00Z' }] },
+    videos: [{ id: 'v', titulo: 'Vlog', etapa: 'GRAVACAO', rotulo: 'Gravação', progresso: 0.29, atualizadoEm: '2026-09-26T12:00:00Z' }],
+    pedidos: [{ usuario: 'maria', sistemas: ['Cursos'], quando: '2026-09-26T11:00:00Z' }],
+  });
+  assert.deepEqual(lista.map(a => a.tipo), ['video', 'pedido', 'aula']);
+  assert.equal(lista[2].titulo, 'Aula 3 — C');
+  assert.equal(lista[0].etapa, 'Gravação');
+  assert.equal(lista[0].progresso, 0.29);
+  assert.deepEqual(lista[1].sistemas, ['Cursos']);
+});
+
+test('data inválida fica fora da linha do tempo em vez de ir para o topo', () => {
+  const lista = acontecimentos({ estudo: null, videos: null, pedidos: [{ usuario: 'x', sistemas: [], quando: 'ontem à noite' }] });
+  assert.deepEqual(lista, []);
+});
+
+test('o tempo relativo fala como gente', () => {
+  const agora = new Date('2026-09-26T12:00:00Z');
+  assert.equal(haQuanto('2026-09-26T11:59:30Z', agora), 'agora');
+  assert.equal(haQuanto('2026-09-26T11:55:00Z', agora), 'há 5 min');
+  assert.equal(haQuanto('2026-09-26T09:00:00Z', agora), 'há 3 h');
+  assert.equal(haQuanto('2026-09-25T10:00:00Z', agora), 'ontem');
+  assert.equal(haQuanto('2026-09-22T12:00:00Z', agora), 'há 4 dias');
+});

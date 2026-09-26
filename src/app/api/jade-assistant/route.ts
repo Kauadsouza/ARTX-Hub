@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   if ((body as { status?: unknown } | null)?.status === true) {
     return Response.json({ ligada: true });
   }
-  const { accessToken, messages, comAcoes } = (body ?? {}) as { accessToken?: unknown; messages?: unknown; comAcoes?: unknown };
+  const { accessToken, messages, comAcoes, idioma } = (body ?? {}) as { accessToken?: unknown; messages?: unknown; comAcoes?: unknown; idioma?: unknown };
   if (typeof accessToken !== "string" || accessToken.length > 8192) {
     return Response.json({ error: "Entre na sua conta para usar o assistente." }, { status: 401 });
   }
@@ -118,7 +118,9 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: "claude-sonnet-5",
         max_tokens: 1024,
-        system: comAcoes === true ? PROMPT_COM_ACOES : SYSTEM_PROMPT,
+        /* Responde no idioma da tela. O prompt manda português; com a tela em
+           inglês, a conversa seria a única parte do Hub que não mudou. */
+        system: (comAcoes === true ? PROMPT_COM_ACOES : SYSTEM_PROMPT) + (idioma === "en" ? "\n\nThe interface is in English: answer in English." : ""),
         messages: messages as ChatMessage[],
       }),
       signal: AbortSignal.timeout(30_000),

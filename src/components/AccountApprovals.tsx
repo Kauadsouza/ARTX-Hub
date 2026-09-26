@@ -34,12 +34,13 @@ import {
   type Conta,
   type Selecoes,
 } from '@/lib/aprovacoes';
+import { useI18n } from './I18n';
 
-const apps: Array<{ key: AppKey; label: string; detail: string }> = [
-  { key: 'videos', label: 'Vídeos', detail: 'Ideias, roteiros e produção' },
-  { key: 'study', label: 'Inglês', detail: 'Aulas, exercícios e progresso' },
-  { key: 'university', label: 'Universidades', detail: 'Pesquisa e planejamento acadêmico' },
-  { key: 'cursos', label: 'Cursos', detail: 'Catálogo, trilha e progresso' },
+const apps: Array<{ key: AppKey; label: string }> = [
+  { key: 'videos', label: 'Vídeos' },
+  { key: 'study', label: 'Inglês' },
+  { key: 'university', label: 'Universidades' },
+  { key: 'cursos', label: 'Cursos' },
 ];
 
 const nomeDoSistema = (key: AppKey) => apps.find((app) => app.key === key)?.label ?? key;
@@ -52,13 +53,14 @@ const GRUPOS: Array<{ estado: 'aguardando' | 'ativa' | 'bloqueada'; titulo: stri
 ];
 
 /** Data curta, ou traço quando o valor não dá para ler. */
-function formatarData(iso: string): string {
+function formatarData(iso: string, locale = 'pt-BR'): string {
   const data = new Date(iso);
   if (Number.isNaN(data.getTime())) return '—';
-  return data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+  return data.toLocaleDateString(locale, { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 export function AccountApprovals({ token }: { token: string | null }) {
+  const { t, locale } = useI18n();
   const [rows, setRows] = useState<Concessao[]>([]);
   const [selections, setSelections] = useState<Selecoes>({});
   const [notice, setNotice] = useState('');
@@ -67,7 +69,7 @@ export function AccountApprovals({ token }: { token: string | null }) {
   const accounts = useMemo(() => agrupar(rows), [rows]);
 
   const request = useCallback(async (action: string, data: Record<string, unknown> = {}) => {
-    if (!token) throw new Error('Entre na conta proprietária do Hub.');
+    if (!token) throw new Error(t('Entre na conta proprietária do Hub.'));
     // Mesma origem: o serviço de contas é do Hub.
     const response = await fetch('/api/contas', {
       method: 'POST',
@@ -76,9 +78,9 @@ export function AccountApprovals({ token }: { token: string | null }) {
       signal: AbortSignal.timeout(20000),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || 'Falha ao consultar pedidos.');
+    if (!response.ok) throw new Error(result.error || t('Falha ao consultar pedidos.'));
     return result;
-  }, [token]);
+  }, [token, t]);
 
   /**
    * Recarrega e assume a verdade do servidor.
@@ -95,11 +97,11 @@ export function AccountApprovals({ token }: { token: string | null }) {
       setSelections(selecoesDoServidor(nextRows));
       setNotice('');
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Falha de conexão.');
+      setNotice(error instanceof Error ? error.message : t('Falha de conexão.'));
     } finally {
       setBusy(false);
     }
-  }, [request]);
+  }, [request, t]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -109,12 +111,12 @@ export function AccountApprovals({ token }: { token: string | null }) {
 
   async function save(account: Conta) {
     const escolhidos = apps.filter(app => selections[account.key]?.[app.key]);
-    const resumo = escolhidos.length ? escolhidos.map(app => app.label).join(', ') : 'nenhum sistema';
+    const resumo = escolhidos.length ? escolhidos.map(app => t(app.label)).join(', ') : t('nenhum sistema');
     const estado = estadoDaConta(account);
 
     // O botão diz "Aprovar" ou "Desbloquear". Mandar seleção vazia dali faria o
     // contrário, então ele recusa em vez de pedir confirmação para o oposto.
-    const permitido = podeAplicar(estado, escolhidos.length);
+    const permitido = podeAplicar(estado, escolhidos.length, t);
     if (!permitido.ok) {
       setNotice(permitido.motivo);
       return;
@@ -124,10 +126,10 @@ export function AccountApprovals({ token }: { token: string | null }) {
     // Salvar sem nada marcado revoga tudo. A confirmação precisa dizer isso: é
     // a mesma ação com um efeito oposto ao que o botão sugere.
     const pergunta = !escolhidos.length
-      ? `Nenhum sistema marcado. Isso vai retirar todos os acessos de ${account.username}. Continuar?`
+      ? t('Nenhum sistema marcado. Isso vai retirar todos os acessos de {0}. Continuar?', [account.username])
       : desbloqueando
-        ? `Desbloquear a conta de ${account.username} e liberar ${resumo}?`
-        : `Liberar ${resumo} para ${account.username}?`;
+        ? t('Desbloquear a conta de {0} e liberar {1}?', [account.username, resumo])
+        : t('Liberar {0} para {1}?', [resumo, account.username]);
     if (!window.confirm(pergunta)) return;
 
     setBusy(true);
@@ -136,25 +138,25 @@ export function AccountApprovals({ token }: { token: string | null }) {
         request('admin-configure', { memberId, apps: escolhidos.map(app => app.key) })));
       await refresh();
       setNotice(desbloqueando
-        ? `Conta de ${account.username} desbloqueada: ${resumo}.`
-        : `Acessos de ${account.username} atualizados: ${resumo}.`);
+        ? t('Conta de {0} desbloqueada: {1}.', [account.username, resumo])
+        : t('Acessos de {0} atualizados: {1}.', [account.username, resumo]));
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Não foi possível salvar.');
+      setNotice(error instanceof Error ? error.message : t('Não foi possível salvar.'));
     } finally {
       setBusy(false);
     }
   }
 
   async function block(account: Conta) {
-    if (!window.confirm(`Bloquear completamente a conta de ${account.username}?`)) return;
+    if (!window.confirm(t('Bloquear completamente a conta de {0}?', [account.username]))) return;
     setBusy(true);
     try {
       await Promise.all(idsDaConta(account).map(memberId =>
         request('admin-decide-all', { memberId, status: 'revoked' })));
       await refresh();
-      setNotice(`Conta de ${account.username} bloqueada.`);
+      setNotice(t('Conta de {0} bloqueada.', [account.username]));
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Não foi possível bloquear.');
+      setNotice(error instanceof Error ? error.message : t('Não foi possível bloquear.'));
     } finally {
       setBusy(false);
     }
@@ -170,13 +172,13 @@ export function AccountApprovals({ token }: { token: string | null }) {
    * faz o dono parar de limpar a lista.
    */
   async function apagar(account: Conta) {
-    const regra = exclusaoDaConta(account);
+    const regra = exclusaoDaConta(account, t);
 
     if (regra.confirmacao === 'digitar-nome') {
       const digitado = window.prompt(regra.aviso);
       if (digitado === null) return;
       if (digitado.trim().toLowerCase() !== account.username.trim().toLowerCase()) {
-        setNotice('O nome não confere. Nada foi apagado.');
+        setNotice(t('O nome não confere. Nada foi apagado.'));
         return;
       }
     } else if (!window.confirm(regra.aviso)) {
@@ -187,9 +189,9 @@ export function AccountApprovals({ token }: { token: string | null }) {
     try {
       await Promise.all(idsDaConta(account).map(memberId => request('admin-delete', { memberId })));
       await refresh();
-      setNotice(`Conta de ${account.username} apagada.`);
+      setNotice(t('Conta de {0} apagada.', [account.username]));
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Não foi possível apagar.');
+      setNotice(error instanceof Error ? error.message : t('Não foi possível apagar.'));
     } finally {
       setBusy(false);
     }
@@ -206,24 +208,24 @@ export function AccountApprovals({ token }: { token: string | null }) {
     <section className="aprovacao">
       <header className="aprovacao-topo">
         <div>
-          <p className="eyebrow">ADMINISTRAÇÃO</p>
-          <h1>Aprovação de contas</h1>
-          <p>Quem pede acesso a um sistema aparece aqui. Aprovar um sistema não dá acesso a este painel.</p>
+          <p className="eyebrow">{t("ADMINISTRAÇÃO")}</p>
+          <h1>{t("Aprovação de contas")}</h1>
+          <p>{t("Quem pede acesso a um sistema aparece aqui. Aprovar um sistema não dá acesso a este painel.")}</p>
         </div>
         <button className="aprovacao-atualizar" disabled={busy} onClick={() => void refresh()}>
-          {busy ? "Salvando…" : "Atualizar"}
+          {busy ? t("Salvando…") : t("Atualizar")}
         </button>
       </header>
 
       {notice && <p role="status" className="aprovacao-recado">{notice}</p>}
-      {!busy && !notice && !accounts.length && <p className="aprovacao-vazio">Nenhum pedido por enquanto.</p>}
+      {!busy && !notice && !accounts.length && <p className="aprovacao-vazio">{t("Nenhum pedido por enquanto.")}</p>}
 
       {GRUPOS.map(({ estado, titulo }) => {
         const contas = grupos[estado];
         if (!contas.length) return null;
         return (
           <section key={estado} className={`aprovacao-grupo ${estado}`}>
-            <h2>{titulo} <span>{contas.length}</span></h2>
+            <h2>{t(titulo)} <span>{contas.length}</span></h2>
             <ul>
               {contas.map((account) => {
                 const acoes = acoesDoEstado(estado);
@@ -232,10 +234,10 @@ export function AccountApprovals({ token }: { token: string | null }) {
                 const liberados = apps.filter((app) => estadoDoSistema(account, app.key) === "liberado");
                 const resumo =
                   estado === "aguardando"
-                    ? `pediu ${pedidos.map(nomeDoSistema).join(", ")}`
+                    ? `${t("pediu")} ${pedidos.map((key) => t(nomeDoSistema(key))).join(", ")}`
                     : liberados.length
-                      ? liberados.map((app) => app.label).join(" · ")
-                      : "sem nenhum sistema";
+                      ? liberados.map((app) => t(app.label)).join(" · ")
+                      : t("sem nenhum sistema");
                 const marcados = contarSelecionados(selections, account.key);
 
                 return (
@@ -252,7 +254,7 @@ export function AccountApprovals({ token }: { token: string | null }) {
                         <span className="aprovacao-nome">
                           <strong>{account.username}</strong>
                           <small>
-                            {resumo} · {formatarData(account.createdAt)}
+                            {resumo} · {formatarData(account.createdAt, locale)}
                           </small>
                         </span>
                       </button>
@@ -261,13 +263,13 @@ export function AccountApprovals({ token }: { token: string | null }) {
                         {/* Pedido novo tem o botão à mão: aprovar é a decisão mais comum. */}
                         {estado === "aguardando" && !aberto && (
                           <button className="aprovacao-principal" disabled={busy} onClick={() => void save(account)}>
-                            Aprovar
+                            {t("Aprovar")}
                           </button>
                         )}
                         <button
                           className="aprovacao-mais"
                           onClick={() => setAberta(aberto ? null : account.key)}
-                          aria-label={aberto ? `Fechar ${account.username}` : `Detalhes de ${account.username}`}
+                          aria-label={aberto ? t('Fechar {0}', [account.username]) : t('Detalhes de {0}', [account.username])}
                         >
                           {aberto ? "−" : "···"}
                         </button>
@@ -289,8 +291,8 @@ export function AccountApprovals({ token }: { token: string | null }) {
                                   onChange={(evento) => toggle(account.key, app.key, evento.target.checked)}
                                 />
                                 <span>
-                                  <strong>{app.label}</strong>
-                                  <small className={situacao}>{rotuloDoSistema[situacao]}</small>
+                                  <strong>{t(app.label)}</strong>
+                                  <small className={situacao}>{t(rotuloDoSistema[situacao])}</small>
                                 </span>
                               </label>
                             );
@@ -298,24 +300,24 @@ export function AccountApprovals({ token }: { token: string | null }) {
                         </div>
 
                         <p className="aprovacao-ficha">
-                          Pediu em {formatarData(account.createdAt)}
-                          {decididoEm(account) && <> · última decisão em {formatarData(decididoEm(account)!)}</>}
+                          {t("Pediu em")} {formatarData(account.createdAt, locale)}
+                          {decididoEm(account) && <> · {t("última decisão em")} {formatarData(decididoEm(account)!, locale)}</>}
                           {" · "}
-                          {marcados} marcado{marcados === 1 ? "" : "s"}
+                          {t(marcados === 1 ? "{0} marcado" : "{0} marcados", [marcados])}
                         </p>
 
                         <div className="aprovacao-botoes">
                           <button className="aprovacao-principal" disabled={busy} onClick={() => void save(account)}>
-                            {acoes.principal}
+                            {t(acoes.principal)}
                           </button>
                           {acoes.podeBloquear && (
                             <button className="aprovacao-secundario" disabled={busy} onClick={() => void block(account)}>
-                              Bloquear
+                              {t("Bloquear")}
                             </button>
                           )}
                           {/* Separado e sem preenchimento: bloquear tem volta, apagar não. */}
                           <button className="aprovacao-apagar" disabled={busy} onClick={() => void apagar(account)}>
-                            Apagar conta
+                            {t("Apagar conta")}
                           </button>
                         </div>
                       </div>

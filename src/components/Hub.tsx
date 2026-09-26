@@ -36,7 +36,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { parseRouteSignals, type RouteSignals } from "@/lib/week-ahead";
 import { itensParaBusca } from "@/lib/relatorio";
-import { aplicarTema, lerTemaGuardado } from "@/lib/preferencias";
+import { aplicarTema, guardarPendentes, guardarTema, juntarPreferencias, lerPendentes, lerPreferencias, lerTemaGuardado, semConfirmadas, temaPorId, type Preferencias } from "@/lib/preferencias";
 import { avatarLocal, baixarAvatar } from "@/lib/avatar";
 import { destinos, type Acao } from "@/lib/jade-acoes";
 import { PersonalDashboard } from "@/components/PersonalDashboard";
@@ -223,7 +223,7 @@ function isWorkspaceView(view: View): view is keyof typeof workspaces {
 }
 
 export function Hub() {
-  const { t } = useI18n();
+  const { t, language, setLanguage } = useI18n();
   const supabase = useMemo(() => createClient(), []);
   const [sessionReady, setSessionReady] = useState(false);
   const [memberReady, setMemberReady] = useState(false);
@@ -261,11 +261,11 @@ export function Hub() {
   useEffect(() => {
     if (!commandOpen) return;
     try {
-      setItensRelatorio(itensParaBusca(localStorage.getItem("artx-relatorio-kaua-v1")));
+      setItensRelatorio(itensParaBusca(localStorage.getItem("artx-relatorio-kaua-v1"), new Date(), t));
     } catch {
       setItensRelatorio([]);
     }
-  }, [commandOpen]);
+  }, [commandOpen, t]);
   const [commandQuery, setCommandQuery] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
@@ -275,6 +275,63 @@ export function Hub() {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [sessionEmail, setSessionEmail] = useState("");
   const [sessionName, setSessionName] = useState("");
+
+  /*
+    Tema e idioma guardados na conta.
+
+    Ficavam só neste navegador: limpar os dados, abrir em outro aparelho ou
+    no aplicativo do Windows perdia a escolha. Agora a conta é quem guarda, e
+    o navegador fica com uma cópia só para aplicar o tema antes da primeira
+    pintura. Ao entrar, a escolha da conta vale e atualiza a cópia; ao
+    trocar, grava nas duas.
+
+    `null` enquanto a conta não foi lida: gravar antes disso poderia
+    sobrescrever a escolha da conta com o padrão do navegador.
+
+    A conta é lida uma vez por pessoa, ao entrar. Reler a cada evento de
+    sessão (a renovação do token, a própria gravação) devolvia o tema de
+    uma gravação anterior que chegasse atrasada — o tema "voltava sozinho".
+  */
+  const preferenciasDaConta = useRef<(Preferencias & { uid: string }) | null>(null);
+  const [contaLida, setContaLida] = useState<string | null>(null);
+
+  /* As gravações vão em fila, uma depois da outra: duas trocas rápidas não
+     podem chegar à conta fora de ordem e deixar lá a penúltima. */
+  const filaDaConta = useRef<Promise<unknown>>(Promise.resolve());
+  const salvarNaConta = useCallback((campos: Preferencias) => {
+    const conta = preferenciasDaConta.current;
+    if (!conta || !supabase || localMode) return;
+    const uid = conta.uid;
+    guardarPendentes(uid, { ...lerPendentes(uid), ...campos });
+    filaDaConta.current = filaDaConta.current
+      .then(() => supabase.auth.updateUser({ data: campos }))
+      .then(({ error }) => { if (!error) guardarPendentes(uid, semConfirmadas(lerPendentes(uid), campos)); })
+      .catch(() => { /* fica pendente e vai de novo na próxima abertura */ });
+  }, [supabase, localMode]);
+
+  const aplicarDaConta = useCallback((user: { id: string; user_metadata?: Record<string, unknown> } | null | undefined) => {
+    if (!user) {
+      preferenciasDaConta.current = null;
+      setContaLida(null);
+      return;
+    }
+    if (preferenciasDaConta.current?.uid === user.id) return;
+    const pendentes = lerPendentes(user.id);
+    const valem = juntarPreferencias(lerPreferencias(user.user_metadata), pendentes);
+    preferenciasDaConta.current = { uid: user.id, ...valem };
+    const tema = valem.tema ? temaPorId(valem.tema) : null;
+    if (tema && tema.id !== lerTemaGuardado().id) {
+      aplicarTema(tema);
+      guardarTema(tema);
+    }
+    if (valem.idioma) setLanguage(valem.idioma);
+    // O que ficou pendente da última vez vai agora; e a conta que ainda não
+    // tem tema passa a ter o deste navegador.
+    const falta: Preferencias = { ...pendentes };
+    if (!valem.tema) falta.tema = lerTemaGuardado().id;
+    if (falta.tema || falta.idioma) salvarNaConta(falta);
+    setContaLida(user.id);
+  }, [setLanguage, salvarNaConta]);
 
   /* A foto de perfil. Começa pela cópia deste navegador, para aparecer na
      hora, e é conferida com o cofre da conta assim que a sessão existe — foi
@@ -353,6 +410,7 @@ export function Hub() {
       setSessionUserId(sessionIdentity.current);
       setSessionEmail(data.session?.user.email ?? "");
       setSessionName(nomeDaSessao(data.session?.user));
+      aplicarDaConta(data.session?.user);
       setSignedIn(Boolean(data.session));
       setHubAccessToken(data.session?.access_token ?? null);
       setSessionReady(true);
@@ -367,13 +425,30 @@ export function Hub() {
       setSessionUserId(nextOwner);
       setSessionEmail(session?.user.email ?? "");
       setSessionName(nomeDaSessao(session?.user));
+      aplicarDaConta(session?.user);
       setSignedIn(Boolean(session));
       setHubAccessToken(session?.access_token ?? null);
       if (!session) { setTasks([]); }
       if (event === "PASSWORD_RECOVERY") setRecoveryMode(true);
     });
     return () => { window.clearTimeout(authTimeout); listener.subscription.unsubscribe(); };
-  }, [supabase]);
+  }, [supabase, aplicarDaConta]);
+
+  /* Trocou o idioma — pelo cabeçalho, pelo perfil ou pela tela de entrar —,
+     a conta fica sabendo. Também roda quando a conta acaba de ser lida: se
+     ela ainda não tinha idioma, passa a ter o que está na tela. */
+  useEffect(() => {
+    const conta = preferenciasDaConta.current;
+    if (!conta || !contaLida || conta.idioma === language) return;
+    conta.idioma = language;
+    salvarNaConta({ idioma: language });
+  }, [language, contaLida, salvarNaConta]);
+
+  const salvarTemaNaConta = useCallback((id: string) => {
+    const tema = temaPorId(id);
+    if (preferenciasDaConta.current) preferenciasDaConta.current.tema = tema.id;
+    salvarNaConta({ tema: tema.id });
+  }, [salvarNaConta]);
 
   useEffect(() => {
     let active = true;
@@ -391,6 +466,12 @@ export function Hub() {
 
   useEffect(() => {
     const savedState = window.localStorage.getItem("artx-sidebar-collapsed");
+    // Reabre na aba em que você estava. Só as que existem: uma aba que saiu
+    // do Hub não pode deixar a tela em branco na próxima visita.
+    const ultimaAba = window.localStorage.getItem("artx-ultima-aba");
+    if (ultimaAba && (ultimaAba === "overview" || ultimaAba === "relatorio" || ultimaAba === "approvals" || ultimaAba === "config" || ultimaAba in workspaces)) {
+      setActiveView(ultimaAba as View);
+    }
     setSidebarCollapsed(savedState === "true");
     // O "pulso" dos sistemas saiu da Visão geral; o que ele guardava não serve mais.
     try { window.localStorage.removeItem("artx-system-signals"); } catch { /* sem armazenamento */ }
@@ -399,6 +480,10 @@ export function Hub() {
   useEffect(() => {
     window.localStorage.setItem("artx-sidebar-collapsed", String(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem("artx-ultima-aba", activeView); } catch { /* sem armazenamento */ }
+  }, [activeView]);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -590,14 +675,14 @@ export function Hub() {
   const executarAcaoDaJade = useCallback(async (acao: Acao): Promise<string> => {
     if (acao.tipo === "abrir") {
       const destino = destinos[acao.destino];
-      if (!destino) return "Não conheço essa aba.";
+      if (!destino) return t("Não conheço essa aba.");
       goTo(destino as View);
-      return `Abri ${acao.destino}.`;
+      return t("Abri {0}.", [acao.destino]);
     }
 
     if (acao.tipo === "criar-atividade") {
       const ok = await createActivity(acao.titulo, acao.projeto);
-      return ok ? `Criei "${acao.titulo}".` : "Não consegui criar agora. Tente de novo.";
+      return ok ? t('Criei "{0}".', [acao.titulo]) : t("Não consegui criar agora. Tente de novo.");
     }
 
     if (acao.tipo === "criar-nota") {
@@ -606,12 +691,12 @@ export function Hub() {
          nenhuma tela mostrava mais: dava para criar e não dava para ver. */
       try {
         const feita = anotarNoRelatorio(localStorage.getItem(CHAVE_RELATORIO), acao.conteudo);
-        if (!feita) return "A nota veio vazia — não guardei nada.";
+        if (!feita) return t("A nota veio vazia — não guardei nada.");
         localStorage.setItem(CHAVE_RELATORIO, JSON.stringify(feita.relatorio));
         notify("Nota guardada no Relatório");
-        return "Guardei no Relatório. As anotações de lá ficam por sete dias, e dá para estender.";
+        return t("Guardei no Relatório. As anotações de lá ficam por sete dias, e dá para estender.");
       } catch {
-        return "Não consegui guardar a nota neste navegador.";
+        return t("Não consegui guardar a nota neste navegador.");
       }
     }
 
@@ -620,14 +705,15 @@ export function Hub() {
     const alvo = tasks.find(
       (item) => !item.completed && item.title.toLocaleLowerCase().includes(acao.titulo.toLocaleLowerCase()),
     );
-    if (!alvo) return `Não achei uma atividade em aberto com "${acao.titulo}".`;
+    if (!alvo) return t('Não achei uma atividade em aberto com "{0}".', [acao.titulo]);
     await toggleTask(alvo);
-    return `Marquei "${alvo.title}" como concluída.`;
+    return t('Marquei "{0}" como concluída.', [alvo.title]);
     // `createActivity` e `toggleTask` sao funcoes normais do
     // componente, recriadas a cada render; incluí-las aqui refaria o callback
-    // toda vez e nao acrescentaria nada.
+    // toda vez e nao acrescentaria nada. O `t` entra: a resposta sai no
+    // idioma que estiver na tela quando a acao terminar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks]);
+  }, [tasks, t]);
 
   if (!sessionReady || !memberReady) {
     return <main className="loading"><img className="loading-logo" src={assetPath("/brand/artx-hub.svg")} alt="ARTX Hub" /><p>{t("Abrindo sua central...")}</p></main>;
@@ -646,6 +732,7 @@ export function Hub() {
     { id: "site", group: "Sistemas", label: "Abrir Site KauaArtx", icon: Compass, run: () => goTo("site") },
     { id: "videos", group: "Sistemas", label: "Abrir KauaArtx Video Studio", icon: Video, run: () => goTo("videos") },
     { id: "university", group: "Estudos", label: "Abrir University Path", icon: GraduationCap, run: () => goTo("university") },
+    { id: "sat", group: "Estudos", label: "Abrir Idiomas", icon: GraduationCap, run: () => goTo("sat") },
     { id: "cursos", group: "Estudos", label: "Abrir Cursos", icon: Award, run: () => goTo("cursos") },
     { id: "approvals", group: "Segurança", label: "Aprovação de contas", icon: Award, run: () => goTo("approvals") },
     { id: "config", group: "Conta", label: "Abrir o perfil", icon: UserRound, run: () => goTo("config") },
@@ -672,7 +759,7 @@ export function Hub() {
           <img className="brand-logo" src={assetPath("/brand/artx-hub.svg")} alt="" />
           <span className="brand-copy"><strong>ARTX Hub</strong><small>{t("Central pessoal")}</small></span>
         </button>
-        <button className="icon-button sidebar-collapse" onClick={() => setSidebarCollapsed((current) => !current)} aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}>
+        <button className="icon-button sidebar-collapse" onClick={() => setSidebarCollapsed((current) => !current)} aria-label={sidebarCollapsed ? t("Expandir menu") : t("Recolher menu")}>
           {sidebarCollapsed ? <PanelLeft size={17} /> : <PanelLeftClose size={17} />}
         </button>
         <button className="icon-button close-menu" onClick={() => setSidebarOpen(false)} aria-label={t("Fechar menu")}><X size={18} /></button>
@@ -688,6 +775,9 @@ export function Hub() {
       </SidebarGroup>
       <SidebarGroup label="Estudos">
         <NavButton active={activeView === "university"} icon={GraduationCap} logo={workspaces.university.logo} label="University Path" onClick={() => goTo("university")} />
+        {/* Idiomas tinha saído junto com a aba antiga de Cursos, que levava até
+            ele; quando Cursos virou sistema próprio, Idiomas ficou sem porta. */}
+        <NavButton active={activeView === "sat"} icon={GraduationCap} logo={workspaces.sat.logo} label={t("Idiomas")} onClick={() => goTo("sat")} />
         {/* Cursos é sistema próprio, com deploy e contas separadas — e mesmo
             assim se abre aqui dentro, como os outros. O link para fora fica na
             barra do quadro, ao lado do botão de tela ampla. */}
@@ -722,7 +812,7 @@ export function Hub() {
       </header>
 
       {activeView === "relatorio" && <RelatorioKaua />}
-      {activeView === "overview" && <PersonalDashboard tasks={tasks} routeSignals={routeSignals} syncError={syncError} accessToken={hubAccessToken} onOpen={goTo} onRetry={() => void loadWorkspace()} />}
+      {activeView === "overview" && <PersonalDashboard tasks={tasks} routeSignals={routeSignals} syncError={syncError} accessToken={hubAccessToken} nome={sessionName} onOpen={goTo} onRetry={() => void loadWorkspace()} />}
       {activeView === "approvals" && <AccountApprovals token={hubAccessToken} />}
       {activeView === "config" && <Configuracoes
         email={sessionEmail}
@@ -730,6 +820,7 @@ export function Hub() {
         supabase={supabase}
         avatar={avatar}
         onAvatar={setAvatar}
+        onTema={salvarTemaNaConta}
         salvar={{
           nome: async (valor) => {
             if (!supabase) throw new Error("Conta não configurada neste ambiente.");
@@ -769,7 +860,7 @@ export function Hub() {
     <nav className="mobile-dock" aria-label={t("Acessos rápidos do Hub")}>
       <button className={activeView === "overview" ? "active" : ""} onClick={() => goTo("overview")}><LayoutDashboard size={20} /><span>{t("Início")}</span></button>
       <button className={activeView === "videos" ? "active" : ""} onClick={() => goTo("videos")}><Video size={20} /><span>{t("Vídeos")}</span></button>
-      <button className={activeView === "sat" ? "active" : ""} onClick={() => goTo("sat")}><GraduationCap size={20} /><span>{t("Inglês")}</span></button>
+      <button className={activeView === "sat" ? "active" : ""} onClick={() => goTo("sat")}><GraduationCap size={20} /><span>{t("Idiomas")}</span></button>
       <button className={activeView === "university" ? "active" : ""} onClick={() => goTo("university")}><Compass size={20} /><span>{t("Universidade")}</span></button>
       <button onClick={() => setSidebarOpen(true)}><Menu size={20} /><span>{t("Tudo")}</span></button>
     </nav>
@@ -908,7 +999,8 @@ function EmbeddedWorkspaceFrame({ workspace, accessToken, memberAccessToken, ref
 function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boolean; query: string; commands: CommandItem[]; onQuery: (value: string) => void; onClose: () => void }) {
   const { t } = useI18n();
   const [activeIndex, setActiveIndex] = useState(0);
-  const filtered = commands.filter((command) => `${command.group} ${command.label}`.toLowerCase().includes(query.toLowerCase()));
+  // Procura no texto que aparece e no original: em inglês, "open" acha "Abrir".
+  const filtered = commands.filter((command) => `${command.group} ${command.label} ${t(command.group)} ${t(command.label)}`.toLowerCase().includes(query.toLowerCase()));
 
   useEffect(() => setActiveIndex(0), [query, open]);
   if (!open) return null;
@@ -927,17 +1019,18 @@ function CommandPalette({ open, query, commands, onQuery, onClose }: { open: boo
 }
 
 function MemberHub({ session, onLogout }: { session: MemberHubSession; onLogout: () => Promise<void> }) {
+  const { t } = useI18n();
   const [active, setActive] = useState<"videos" | "sat" | "university" | "cursos" | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const workspace = active ? workspaces[active] : null;
   const tokenKey: MemberWorkspace | null = active === "sat" ? "study" : active;
   const token = tokenKey ? session.appTokens?.[tokenKey] : undefined;
   return <main className="member-hub">
-    <header className="member-header"><button className="brand" onClick={() => setActive(null)}><img className="brand-logo" src={assetPath("/brand/artx-hub.svg")} alt="" /><span className="brand-copy"><strong>ARTX Hub</strong><small>Espaço de {session.username}</small></span></button><button className="command-trigger" onClick={() => void onLogout()}><LogOut size={16} /> Sair</button></header>
-    {!workspace && <section className="member-home"><p className="eyebrow">SEU ESPAÇO</p><h1>Olá, {session.username}.</h1><p>Escolha um sistema. Seu conteúdo começa vazio e fica separado de todas as outras contas.</p><div className="member-app-grid">
-      {(["videos", "sat", "university", "cursos"] as const).map(key => { const item = workspaces[key]; const Icon = item.icon; const accessKey: MemberWorkspace = key === "sat" ? "study" : key; const enabled = Boolean(session.appTokens?.[accessKey]); return <button key={key} disabled={!enabled} onClick={() => setActive(key)}><img src={item.logo} alt="" /><span><small>{item.eyebrow}</small><strong>{item.label}</strong><em>{enabled ? "Abrir meu espaço" : "Aguardando liberação"}</em></span><Icon size={20} /></button>; })}
+    <header className="member-header"><button className="brand" onClick={() => setActive(null)}><img className="brand-logo" src={assetPath("/brand/artx-hub.svg")} alt="" /><span className="brand-copy"><strong>ARTX Hub</strong><small>{t("Espaço de {0}", [session.username])}</small></span></button><button className="command-trigger" onClick={() => void onLogout()}><LogOut size={16} /> {t("Sair")}</button></header>
+    {!workspace && <section className="member-home"><p className="eyebrow">{t("SEU ESPAÇO")}</p><h1>{t("Olá, {0}.", [session.username])}</h1><p>{t("Escolha um sistema. Seu conteúdo começa vazio e fica separado de todas as outras contas.")}</p><div className="member-app-grid">
+      {(["videos", "sat", "university", "cursos"] as const).map(key => { const item = workspaces[key]; const Icon = item.icon; const accessKey: MemberWorkspace = key === "sat" ? "study" : key; const enabled = Boolean(session.appTokens?.[accessKey]); return <button key={key} disabled={!enabled} onClick={() => setActive(key)}><img src={item.logo} alt="" /><span><small>{t(item.eyebrow)}</small><strong>{t(item.label)}</strong><em>{enabled ? t("Abrir meu espaço") : t("Aguardando liberação")}</em></span><Icon size={20} /></button>; })}
     </div></section>}
-    {workspace && token && <section className="member-workspace"><div className="member-workspace-bar"><button className="command-trigger" onClick={() => setActive(null)}><ChevronRight className="member-back" size={16} /> Voltar</button><div><img src={workspace.logo} alt="" /><strong>{workspace.label}</strong></div><button className="command-trigger" onClick={() => setRefreshKey(value => value + 1)}><RefreshCw size={15} /> Atualizar</button></div><div className="member-frame"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={null} memberAccessToken={token} refreshKey={refreshKey} /></div></section>}
+    {workspace && token && <section className="member-workspace"><div className="member-workspace-bar"><button className="command-trigger" onClick={() => setActive(null)}><ChevronRight className="member-back" size={16} /> {t("Voltar")}</button><div><img src={workspace.logo} alt="" /><strong>{t(workspace.label)}</strong></div><button className="command-trigger" onClick={() => setRefreshKey(value => value + 1)}><RefreshCw size={15} /> {t("Atualizar")}</button></div><div className="member-frame"><EmbeddedWorkspaceFrame workspace={workspace} accessToken={null} memberAccessToken={token} refreshKey={refreshKey} /></div></section>}
   </main>;
 }
 
@@ -945,8 +1038,8 @@ function Login({ identity, password, message, pending, recoveryPending, waitingA
   const { t } = useI18n();
   const [showPassword, setShowPassword] = useState(false);
   const [creating, setCreating] = useState(false);
-  if (waitingApproval) return <main className="login"><div className="login-orbit" /><section className="login-pending" role="status"><div className="pending-check"><Check size={25} /></div><p className="eyebrow">PEDIDO RECEBIDO</p><h1>Aguardando aprovação.</h1><p>{message}</p><div><strong>O que acontece agora?</strong><span>O proprietário verá sua conta na aba Aprovação de contas. Depois de aprovada, volte e entre com o mesmo nome e senha.</span></div><button className="primary" type="button" onClick={onBack}>Voltar para entrar</button></section></main>;
-  return <main className="login"><div className="login-orbit" /><form onSubmit={(event) => onSubmit(event, creating)}><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}><LanguageSwitch /></div><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>{creating ? "Nova conta" : t("Central pessoal")}</small></div></div><p className="eyebrow">{creating ? "SOLICITAR ACESSO" : t("ESPAÇO PRIVADO")}</p><h1>{creating ? "Crie seu espaço." : t("Seu espaço para construir.")}</h1><p>{creating ? "Este é o espaço pessoal do Kauã, não um serviço público. Escolha um nome e uma senha: você só entra depois que o proprietário aprovar e escolher exatamente o que você pode acessar." : t("Entre para acessar seus sistemas e continuar seus estudos e a produção do canal.")}</p><label>{creating ? "Nome de usuário" : "E-mail ou nome de usuário"}<input type="text" value={identity} onChange={(event) => onIdentity(event.target.value.replace(/\\+(?=@)/g, "").replace(/\s+/g, ""))} autoComplete={creating ? "username" : "username"} autoCapitalize="none" autoCorrect="off" spellCheck={false} minLength={creating ? 3 : undefined} maxLength={creating ? 32 : undefined} pattern={creating ? "[a-zA-Z0-9][a-zA-Z0-9_.-]{2,31}" : undefined} required /></label><label>{t("Senha")}<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => onPassword(event.target.value)} autoComplete={creating ? "new-password" : "current-password"} autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go" minLength={creating ? 10 : undefined} maxLength={128} required /><button type="button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? t("Ocultar senha") : t("Mostrar senha")}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>{!creating && identity.includes("@") && <button className="login-recovery" type="button" onClick={onRecover} disabled={pending || recoveryPending}>{recoveryPending ? t("Enviando link...") : t("Esqueci minha senha")}</button>}{message && <span className="message" aria-live="polite">{t(message)}</span>}<button className="primary" type="submit" disabled={pending || recoveryPending}>{pending ? "Aguarde…" : creating ? "Pedir aprovação" : t("Entrar no Hub")} {!pending && <ArrowUpRight size={16} />}</button><button className="login-switch" type="button" disabled={pending} onClick={() => { setCreating(value => !value); onBack(); onIdentity(""); onPassword(""); }}>{creating ? "Já tenho uma conta" : "Criar conta"}</button><small className="login-footer"><span />{creating ? "Acesso só ao que o proprietário liberar para você" : t(" Acesso particular e sincronizado")}</small><a className="desktop-download" href={assetPath("/download")}><Monitor size={16} /><span>{t("Baixar aplicativo Windows")}</span></a></form></main>;
+  if (waitingApproval) return <main className="login"><div className="login-orbit" /><section className="login-pending" role="status"><div className="pending-check"><Check size={25} /></div><p className="eyebrow">{t("PEDIDO RECEBIDO")}</p><h1>{t("Aguardando aprovação.")}</h1><p>{t(message)}</p><div><strong>{t("O que acontece agora?")}</strong><span>{t("O proprietário verá sua conta na aba Aprovação de contas. Depois de aprovada, volte e entre com o mesmo nome e senha.")}</span></div><button className="primary" type="button" onClick={onBack}>{t("Voltar para entrar")}</button></section></main>;
+  return <main className="login"><div className="login-orbit" /><form onSubmit={(event) => onSubmit(event, creating)}><div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}><LanguageSwitch /></div><div className="login-brand"><img src={assetPath("/brand/artx-hub.svg")} alt="Logo ARTX Hub" /><div><strong>ARTX Hub</strong><small>{creating ? t("Nova conta") : t("Central pessoal")}</small></div></div><p className="eyebrow">{creating ? t("SOLICITAR ACESSO") : t("ESPAÇO PRIVADO")}</p><h1>{creating ? t("Crie seu espaço.") : t("Seu espaço para construir.")}</h1><p>{creating ? t("Este é o espaço pessoal do Kauã, não um serviço público. Escolha um nome e uma senha: você só entra depois que o proprietário aprovar e escolher exatamente o que você pode acessar.") : t("Entre para acessar seus sistemas e continuar seus estudos e a produção do canal.")}</p><label>{creating ? t("Nome de usuário") : t("E-mail ou nome de usuário")}<input type="text" value={identity} onChange={(event) => onIdentity(event.target.value.replace(/\\+(?=@)/g, "").replace(/\s+/g, ""))} autoComplete={creating ? "username" : "username"} autoCapitalize="none" autoCorrect="off" spellCheck={false} minLength={creating ? 3 : undefined} maxLength={creating ? 32 : undefined} pattern={creating ? "[a-zA-Z0-9][a-zA-Z0-9_.-]{2,31}" : undefined} required /></label><label>{t("Senha")}<span className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => onPassword(event.target.value)} autoComplete={creating ? "new-password" : "current-password"} autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go" minLength={creating ? 10 : undefined} maxLength={128} required /><button type="button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? t("Ocultar senha") : t("Mostrar senha")}>{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>{!creating && identity.includes("@") && <button className="login-recovery" type="button" onClick={onRecover} disabled={pending || recoveryPending}>{recoveryPending ? t("Enviando link...") : t("Esqueci minha senha")}</button>}{message && <span className="message" aria-live="polite">{t(message)}</span>}<button className="primary" type="submit" disabled={pending || recoveryPending}>{pending ? t("Aguarde…") : creating ? t("Pedir aprovação") : t("Entrar no Hub")} {!pending && <ArrowUpRight size={16} />}</button><button className="login-switch" type="button" disabled={pending} onClick={() => { setCreating(value => !value); onBack(); onIdentity(""); onPassword(""); }}>{creating ? t("Já tenho uma conta") : t("Criar conta")}</button><small className="login-footer"><span />{creating ? t("Acesso só ao que o proprietário liberar para você") : t(" Acesso particular e sincronizado")}</small><a className="desktop-download" href={assetPath("/download")}><Monitor size={16} /><span>{t("Baixar aplicativo Windows")}</span></a></form></main>;
 }
 
 function ResetPassword({ password, message, onPassword, onSubmit }: { password: string; message: string; onPassword: (value: string) => void; onSubmit: (event: React.FormEvent) => void }) {

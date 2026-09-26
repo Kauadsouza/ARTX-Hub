@@ -1,9 +1,11 @@
 /**
  * Preferências de aparência.
  *
- * Ficam neste navegador, como a escolha de idioma. Não vão para a conta de
- * propósito: é preferência de tela, e ninguém quer que o tema do computador
- * mude o do celular.
+ * Tema e idioma ficam na conta, para valer em qualquer aparelho, e com uma
+ * cópia neste navegador — é a cópia que pinta o tema antes de a conta
+ * responder. O que foi trocado aqui e ainda não chegou à conta fica marcado
+ * como pendente e ganha da conta na próxima abertura: sem isso, uma gravação
+ * que falhasse devolveria o tema antigo.
  *
  * SOBRE OS TEMAS
  *
@@ -84,6 +86,62 @@ export function guardarTema(tema: Tema): void {
  * derrubaria a página inteira, então tudo fica dentro de um try.
  */
 export const scriptDoTema = `try{var t=localStorage.getItem("${CHAVE_TEMA}");if(t==="noite"||t==="oceano"||t==="claro"||t==="areia")document.documentElement.dataset.tema=t}catch(e){}`;
+
+/* ── Tema e idioma na conta ────────────────────────────────────────────── */
+
+export type Preferencias = { tema?: Tema["id"]; idioma?: "pt" | "en" };
+
+const CHAVE_PENDENTES = "artx-preferencias-pendentes";
+
+/** Só o que é válido: um tema que existe e um idioma que o Hub fala. */
+export function lerPreferencias(bruto: unknown): Preferencias {
+  const dados = bruto && typeof bruto === "object" ? (bruto as Record<string, unknown>) : {};
+  const saida: Preferencias = {};
+  const tema = temas.find((item) => item.id === dados.tema);
+  if (tema) saida.tema = tema.id;
+  if (dados.idioma === "pt" || dados.idioma === "en") saida.idioma = dados.idioma;
+  return saida;
+}
+
+/**
+ * O que vale ao entrar: a escolha da conta, com o que foi trocado aqui e
+ * ainda não chegou lá por cima — a troca mais recente é a daqui.
+ */
+export function juntarPreferencias(conta: Preferencias, pendentes: Preferencias): Preferencias {
+  return { ...conta, ...pendentes };
+}
+
+/**
+ * Tira das pendentes o que a conta confirmou.
+ *
+ * Só sai se o valor ainda for o mesmo: se ele trocou de novo enquanto a
+ * gravação ia, a troca nova continua pendente.
+ */
+export function semConfirmadas(pendentes: Preferencias, confirmadas: Preferencias): Preferencias {
+  const saida: Preferencias = { ...pendentes };
+  if (confirmadas.tema && saida.tema === confirmadas.tema) delete saida.tema;
+  if (confirmadas.idioma && saida.idioma === confirmadas.idioma) delete saida.idioma;
+  return saida;
+}
+
+/** As trocas que ainda não chegaram à conta desta pessoa. */
+export function lerPendentes(uid: string): Preferencias {
+  try {
+    const bruto = JSON.parse(localStorage.getItem(CHAVE_PENDENTES) ?? "null") as { uid?: unknown } | null;
+    return bruto && bruto.uid === uid ? lerPreferencias(bruto) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function guardarPendentes(uid: string, pendentes: Preferencias): void {
+  try {
+    if (pendentes.tema || pendentes.idioma) localStorage.setItem(CHAVE_PENDENTES, JSON.stringify({ uid, ...pendentes }));
+    else localStorage.removeItem(CHAVE_PENDENTES);
+  } catch {
+    // Sem armazenamento: a troca vale nesta sessão e a conta tenta de novo na próxima.
+  }
+}
 
 /* ── Validação dos campos da conta ─────────────────────────────────────── */
 

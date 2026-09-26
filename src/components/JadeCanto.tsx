@@ -35,7 +35,7 @@ export function JadeCanto({
   accessToken: string | null;
   executar: ExecutarAcao;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [aberto, setAberto] = useState(false);
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [entrada, setEntrada] = useState("");
@@ -108,7 +108,7 @@ export function JadeCanto({
       const resposta = await fetch("/api/jade-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken, messages: proximas, comAcoes: true }),
+        body: JSON.stringify({ accessToken, messages: proximas, comAcoes: true, idioma: language }),
         signal: AbortSignal.timeout(35000),
       });
       const resultado = await resposta.json();
@@ -181,9 +181,9 @@ export function JadeCanto({
                     key={sugestao.rotulo}
                     type="button"
                     onClick={() => {
-                      if (sugestao.enviar) void enviar(sugestao.enviar);
+                      if (sugestao.enviar) void enviar(t(sugestao.enviar));
                       else {
-                        setEntrada(sugestao.preencher ?? "");
+                        setEntrada(t(sugestao.preencher ?? ""));
                         campo.current?.focus();
                       }
                     }}
@@ -221,7 +221,7 @@ export function JadeCanto({
       */}
       {pendente && (
         <div className="jade-canto-confirmar" role="alertdialog">
-          <p>{descreverAcao(pendente)}</p>
+          <p>{descreverAcao(pendente, t)}</p>
           <div>
             <button
               className="quick-create"

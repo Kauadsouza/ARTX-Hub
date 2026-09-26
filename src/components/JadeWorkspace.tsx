@@ -35,8 +35,10 @@ type Props = {
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 function Conversa({ accessToken }: { accessToken: string | null }) {
-  const { locale } = useI18n();
-  const en = locale === "en";
+  // `language`, e não `locale`: o locale é "en-GB" ou "pt-BR", nunca "en",
+  // e a comparação com "en" deixava a aba em português para sempre.
+  const { language } = useI18n();
+  const en = language === "en";
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -64,7 +66,7 @@ function Conversa({ accessToken }: { accessToken: string | null }) {
       const response = await fetch("/api/jade-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken, messages: next }),
+        body: JSON.stringify({ accessToken, messages: next, idioma: en ? "en" : "pt" }),
         signal: AbortSignal.timeout(35000),
       });
       const result = await response.json();
@@ -172,8 +174,10 @@ function Conversa({ accessToken }: { accessToken: string | null }) {
 }
 
 export function JadeWorkspace({ accessToken, activities, onCreateActivity, onToggleActivity }: Props) {
-  const { locale } = useI18n();
-  const en = locale === "en";
+  // `language`, e não `locale`: o locale é "en-GB" ou "pt-BR", nunca "en",
+  // e a comparação com "en" deixava a aba em português para sempre.
+  const { language } = useI18n();
+  const en = language === "en";
   const [title, setTitle] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState("");

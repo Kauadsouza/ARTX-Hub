@@ -29,7 +29,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
   const t = useCallback(<T,>(text: T, values: unknown[] = []): T => {
     if (typeof text !== "string") return text;
-    return translate(text, language).replace(/\\{(\\d+)\\}/g, (match, index: string) => Number(index) < values.length ? String(values[Number(index)]) : match) as T;
+    // Uma barra só: com duas, o regex procurava uma barra invertida antes da
+    // chave, nunca achava "{0}", e todo texto com número dentro ficava sem valor.
+    return translate(text, language).replace(/\{(\d+)\}/g, (match, index: string) => Number(index) < values.length ? String(values[Number(index)]) : match) as T;
   }, [language]);
   useEffect(() => {
     function receive(event: MessageEvent) {
@@ -46,5 +48,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 export function useI18n() { return useContext(I18nContext); }
 export function LanguageSwitch() {
   const { language, setLanguage } = useI18n();
-  return <div style={{ display: "inline-flex", gap: 3, border: "1px solid #63837766", borderRadius: 8, padding: 3 }} role="group" aria-label="Language / Idioma">{(["pt", "en"] as const).map(value => <button key={value} type="button" onClick={() => setLanguage(value)} aria-pressed={language === value} style={{ border: 0, padding: "6px 9px", borderRadius: 5, fontSize: 11, fontWeight: 700, cursor: "pointer", color: language === value ? "#fff" : "inherit", background: language === value ? "#326d52" : "transparent" }}>{value.toUpperCase()}</button>)}</div>;
+  // As cores vêm do CSS (`.idioma-troca`): escritas aqui, ignoravam o tema e o
+  // seletor ficava verde-escuro até no tema claro.
+  return (
+    <div className="idioma-troca" role="group" aria-label="Language / Idioma">
+      {(["pt", "en"] as const).map((value) => (
+        <button key={value} type="button" onClick={() => setLanguage(value)} aria-pressed={language === value}>
+          {value.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
 }

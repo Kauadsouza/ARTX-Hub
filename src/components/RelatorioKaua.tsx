@@ -55,6 +55,8 @@ import {
   salvarAnexo,
   type FichaAnexo,
 } from "@/lib/anexos";
+import { useI18n } from "./I18n";
+import type { Traduzir } from "@/lib/traducao";
 
 function guardar(relatorio: Relatorio) {
   try {
@@ -66,17 +68,25 @@ function guardar(relatorio: Relatorio) {
 }
 
 /** Prazo em palavras. "0 dias" não é como ninguém fala. */
-function prazoEmPalavras(dias: number): string {
-  if (dias <= 0) return "vence hoje";
-  if (dias === 1) return "vence amanhã";
-  return `${dias} dias`;
+function prazoEmPalavras(dias: number, t: Traduzir): string {
+  if (dias <= 0) return t("vence hoje");
+  if (dias === 1) return t("vence amanhã");
+  return t("{0} dias", [dias]);
+}
+
+/** O prazo de um documento: vencido, vence hoje, ou quantos dias faltam. */
+function prazoDoDocumento(dias: number, t: Traduzir): string {
+  if (dias < 0) return t(Math.abs(dias) > 1 ? "venceu há {0} dias" : "venceu há {0} dia", [Math.abs(dias)]);
+  if (dias === 0) return t("vence hoje");
+  return t(dias > 1 ? "{0} dias" : "{0} dia", [dias]);
 }
 
 export function RelatorioKaua() {
+  const { t } = useI18n();
   const [relatorio, setRelatorio] = useState<Relatorio>(relatorioVazio);
   const [pronto, setPronto] = useState(false);
   const [saiu, setSaiu] = useState<Anotacao[]>([]);
-  const [aviso, setAviso] = useState("");
+  const [aviso, setAviso] = useState<{ texto: string; valores?: unknown[] } | null>(null);
 
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -111,7 +121,7 @@ export function RelatorioKaua() {
         const { baixados } = await restaurar(supabase, locais);
         if (ativo && baixados > 0) {
           setFichas(await listarFichas());
-          setAviso(`${baixados} arquivo(s) recuperado(s) da sua conta.`);
+          setAviso({ texto: "{0} arquivo(s) recuperado(s) da sua conta.", valores: [baixados] });
         }
       })
       .catch(() => setFichas([]));
@@ -185,12 +195,12 @@ export function RelatorioKaua() {
       await validar(arquivo);
       const ficha = await salvarAnexo(documentoId, arquivo);
       setFichas(await listarFichas());
-      setAviso("");
+      setAviso(null);
 
       const copia = await subir(supabase, ficha);
-      if (!copia.ok) setAviso(`Guardado aqui, mas a cópia na conta falhou: ${copia.motivo}`);
+      if (!copia.ok) setAviso({ texto: "Guardado aqui, mas a cópia na conta falhou: {0}", valores: [copia.motivo] });
     } catch (erro) {
-      setAviso(erro instanceof Error ? erro.message : "Não consegui guardar esse arquivo.");
+      setAviso({ texto: erro instanceof Error ? erro.message : "Não consegui guardar esse arquivo." });
     }
   }
 
@@ -232,9 +242,9 @@ export function RelatorioKaua() {
     try {
       const { relatorio: unido, novas } = unir(relatorio, ler(await arquivo.text()));
       aplicar(unido);
-      setAviso(novas > 0 ? `${novas} item(ns) somado(s). Nada foi sobrescrito.` : "Nada de novo nesse arquivo.");
+      setAviso(novas > 0 ? { texto: "{0} item(ns) somado(s). Nada foi sobrescrito.", valores: [novas] } : { texto: "Nada de novo nesse arquivo." });
     } catch {
-      setAviso("Não consegui ler esse arquivo.");
+      setAviso({ texto: "Não consegui ler esse arquivo." });
     }
   }
 
@@ -244,19 +254,19 @@ export function RelatorioKaua() {
     <div className="relatorio-page page-enter">
       <header className="relatorio-topo">
         <div>
-          <p className="eyebrow">SÓ SEU · NÃO SAI DESTE APARELHO</p>
-          <h1>Relatório do Kauã</h1>
+          <p className="eyebrow">{t("PRIVADO · SÓ VOCÊ VÊ")}</p>
+          <h1>{t("Relatório do Kauã")}</h1>
         </div>
         <div className="relatorio-acoes">
           <span className={`relatorio-espelho ${protegido(espelho) ? "ok" : "alerta"}`} role="status">
             {protegido(espelho) ? <Cloud size={14} /> : <CloudOff size={14} />}
-            {descrever(espelho)}
+            {descrever(espelho, t)}
           </span>
           <button onClick={exportar}>
-            <Download size={15} /> Exportar
+            <Download size={15} /> {t("Exportar")}
           </button>
           <label className="relatorio-importar">
-            <Upload size={15} /> Importar
+            <Upload size={15} /> {t("Importar")}
             <input
               type="file"
               accept="application/json"
@@ -276,11 +286,11 @@ export function RelatorioKaua() {
           <AlertTriangle size={16} />
           <div>
             <strong>
-              {saiu.length} anotação{saiu.length > 1 ? "ões" : ""} passou dos {DIAS_DE_VIDA} dias e saiu.
+              {t(saiu.length > 1 ? "{0} anotações passaram dos {1} dias e saíram." : "{0} anotação passou dos {1} dias e saiu.", [saiu.length, DIAS_DE_VIDA])}
             </strong>
             <small>{saiu.map((item) => item.titulo).join(" · ")}</small>
           </div>
-          <button onClick={() => setSaiu([])} aria-label="Dispensar aviso">
+          <button onClick={() => setSaiu([])} aria-label={t("Dispensar aviso")}>
             <X size={15} />
           </button>
         </div>
@@ -290,8 +300,8 @@ export function RelatorioKaua() {
         {/* ── Anotações ──────────────────────────────────────────────── */}
         <section className="relatorio-bloco">
           <div className="relatorio-cabeca">
-            <h2>Anotações</h2>
-            <span className="relatorio-regra">somem em {DIAS_DE_VIDA} dias</span>
+            <h2>{t("Anotações")}</h2>
+            <span className="relatorio-regra">{t("somem em {0} dias", [DIAS_DE_VIDA])}</span>
           </div>
 
           <form className="relatorio-form" onSubmit={adicionarAnotacao}>
@@ -299,23 +309,23 @@ export function RelatorioKaua() {
               value={titulo}
               onChange={(evento) => setTitulo(evento.target.value)}
               maxLength={200}
-              placeholder="Nome da anotação"
-              aria-label="Nome da anotação"
+              placeholder={t("Nome da anotação")}
+              aria-label={t("Nome da anotação")}
             />
             <textarea
               value={descricao}
               onChange={(evento) => setDescricao(evento.target.value)}
               maxLength={5000}
-              placeholder="Descrição (opcional)"
-              aria-label="Descrição"
+              placeholder={t("Descrição (opcional)")}
+              aria-label={t("Descrição")}
             />
             <button type="submit" disabled={!titulo.trim()}>
-              <Plus size={15} /> Salvar
+              <Plus size={15} /> {t("Salvar")}
             </button>
           </form>
 
           {anotacoes.length === 0 ? (
-            <p className="relatorio-vazio">Nada anotado ainda. O que você escrever aqui fica por {DIAS_DE_VIDA} dias.</p>
+            <p className="relatorio-vazio">{t("Nada anotado ainda. O que você escrever aqui fica por {0} dias.", [DIAS_DE_VIDA])}</p>
           ) : (
             <ul className="relatorio-lista">
               {anotacoes.map((item) => {
@@ -324,14 +334,12 @@ export function RelatorioKaua() {
                   <li key={item.id} className={dias <= 1 ? "acabando" : ""}>
                     <div className="relatorio-item-topo">
                       <strong>{item.titulo}</strong>
-                      <span className="relatorio-prazo">{prazoEmPalavras(dias)}</span>
+                      <span className="relatorio-prazo">{prazoEmPalavras(dias, t)}</span>
                     </div>
                     {item.descricao && <p>{item.descricao}</p>}
                     <div className="relatorio-item-pe">
                       {item.renovacoes > 0 && (
-                        <small>
-                          renovada {item.renovacoes}×
-                        </small>
+                        <small>{t("renovada {0}×", [item.renovacoes])}</small>
                       )}
                       <button
                         onClick={() =>
@@ -341,14 +349,14 @@ export function RelatorioKaua() {
                           })
                         }
                       >
-                        <RotateCcw size={13} /> mais {DIAS_DE_VIDA} dias
+                        <RotateCcw size={13} /> {t("mais {0} dias", [DIAS_DE_VIDA])}
                       </button>
                       <button
                         className="relatorio-apagar"
                         onClick={() =>
                           aplicar({ ...relatorio, anotacoes: relatorio.anotacoes.filter((a) => a.id !== item.id) })
                         }
-                        aria-label={`Apagar ${item.titulo}`}
+                        aria-label={t("Apagar {0}", [item.titulo])}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -363,10 +371,8 @@ export function RelatorioKaua() {
         {/* ── Documentos para a Espanha ──────────────────────────────── */}
         <section className="relatorio-bloco">
           <div className="relatorio-cabeca">
-            <h2>Documentos · Espanha</h2>
-            <span className="relatorio-regra">
-              {progresso.feitos} de {progresso.total}
-            </span>
+            <h2>{t("Documentos · Espanha")}</h2>
+            <span className="relatorio-regra">{t("{0} de {1}", [progresso.feitos, progresso.total])}</span>
           </div>
 
           {atencao.length > 0 && (
@@ -374,14 +380,14 @@ export function RelatorioKaua() {
               <CalendarClock size={15} />
               <div>
                 <strong>
-                  {atencao.length} documento{atencao.length > 1 ? "s" : ""} pedindo atenção
+                  {t(atencao.length > 1 ? "{0} documentos pedindo atenção" : "{0} documento pedindo atenção", [atencao.length])}
                 </strong>
                 <small>
                   {atencao
                     .map((doc) => {
                       const dias = diasParaVencer(doc);
-                      if (dias === null) return doc.nome;
-                      return `${doc.nome} — ${dias < 0 ? `venceu há ${Math.abs(dias)} dia${Math.abs(dias) > 1 ? "s" : ""}` : dias === 0 ? "vence hoje" : `${dias} dia${dias > 1 ? "s" : ""}`}`;
+                      if (dias === null) return t(doc.nome);
+                      return `${t(doc.nome)} — ${prazoDoDocumento(dias, t)}`;
                     })
                     .join(" · ")}
                 </small>
@@ -390,9 +396,7 @@ export function RelatorioKaua() {
           )}
 
           <p className="relatorio-origem">
-            Lista trazida por você, não conferida por mim. Os requisitos mudam por consulado, por curso e por
-            categoria de vaga — confirme a lista vigente no Consulado-Geral da Espanha antes de pagar tradução,
-            apostila ou taxa.
+            {t("Lista trazida por você, não conferida por mim. Os requisitos mudam por consulado, por curso e por categoria de vaga — confirme a lista vigente no Consulado-Geral da Espanha antes de pagar tradução, apostila ou taxa.")}
           </p>
 
           <form className="relatorio-form linha" onSubmit={adicionarDocumento}>
@@ -400,11 +404,11 @@ export function RelatorioKaua() {
               value={novoDoc}
               onChange={(evento) => setNovoDoc(evento.target.value)}
               maxLength={200}
-              placeholder="Acrescentar um documento"
-              aria-label="Nome do documento"
+              placeholder={t("Acrescentar um documento")}
+              aria-label={t("Nome do documento")}
             />
             <button type="submit" disabled={!novoDoc.trim()}>
-              <Plus size={15} /> Adicionar
+              <Plus size={15} /> {t("Adicionar")}
             </button>
           </form>
 
@@ -417,22 +421,22 @@ export function RelatorioKaua() {
               <section key={grupo.id} className="relatorio-grupo">
                 <header>
                   <div>
-                    <h3>{grupo.titulo}</h3>
-                    <p>{grupo.resumo}</p>
+                    <h3>{t(grupo.titulo)}</h3>
+                    <p>{t(grupo.resumo)}</p>
                   </div>
                   <span className={`relatorio-quando ${grupo.agora ? "ja" : "depois"}`}>
-                    {grupo.agora ? "dá para fazer agora" : "depende de uma oportunidade"}
+                    {t(grupo.agora ? "dá para fazer agora" : "depende de uma oportunidade")}
                   </span>
                 </header>
 
-                <div className="relatorio-barra" role="img" aria-label={`${p.feitos} de ${p.total}`}>
+                <div className="relatorio-barra" role="img" aria-label={t("{0} de {1}", [p.feitos, p.total])}>
                   <span style={{ width: `${p.fracao * 100}%` }} />
                 </div>
 
                 {grupo.depende.length > 0 && (
                   <ul className="relatorio-depende">
                     {grupo.depende.map((item) => (
-                      <li key={item}>{item}</li>
+                      <li key={item}>{t(item)}</li>
                     ))}
                   </ul>
                 )}
@@ -456,17 +460,17 @@ export function RelatorioKaua() {
                             aria-pressed={doc.feito}
                           >
                             {doc.feito ? <Check size={16} /> : <Circle size={16} />}
-                            <span>{doc.nome}</span>
+                            <span>{t(doc.nome)}</span>
                           </button>
 
                           {anexos.length > 0 && <span className="relatorio-conta-anexo">{anexos.length}</span>}
 
                           <label
                             className={`relatorio-validade ${estadoValidade(doc)}`}
-                            title={doc.validade ? `Vale até ${doc.validade}` : "Definir até quando este documento vale"}
+                            title={doc.validade ? t("Vale até {0}", [doc.validade]) : t("Definir até quando este documento vale")}
                           >
                             <CalendarClock size={14} />
-                            <span className="sr-only">Validade de {doc.nome}</span>
+                            <span className="sr-only">{t("Validade de {0}", [t(doc.nome)])}</span>
                             <input
                               type="date"
                               value={doc.validade ?? ""}
@@ -481,9 +485,9 @@ export function RelatorioKaua() {
                             />
                           </label>
 
-                          <label className="relatorio-anexar" title={`Anexar arquivo a "${doc.nome}"`}>
+                          <label className="relatorio-anexar" title={t('Anexar arquivo a "{0}"', [t(doc.nome)])}>
                             <Paperclip size={14} />
-                            <span className="sr-only">Anexar arquivo a {doc.nome}</span>
+                            <span className="sr-only">{t('Anexar arquivo a "{0}"', [t(doc.nome)])}</span>
                             <input
                               type="file"
                               hidden
@@ -498,7 +502,7 @@ export function RelatorioKaua() {
                           <button
                             className="relatorio-apagar"
                             onClick={() => void apagarDocumento(doc.id)}
-                            aria-label={`Remover ${doc.nome}`}
+                            aria-label={t("Remover {0}", [t(doc.nome)])}
                           >
                             <Trash2 size={13} />
                           </button>
@@ -508,8 +512,8 @@ export function RelatorioKaua() {
                           className="relatorio-nota"
                           value={doc.nota}
                           maxLength={1000}
-                          placeholder="Observação — valor, onde tirar, protocolo…"
-                          aria-label={`Observação de ${doc.nome}`}
+                          placeholder={t("Observação — valor, onde tirar, protocolo…")}
+                          aria-label={t("Observação de {0}", [t(doc.nome)])}
                           onChange={(evento) =>
                             aplicar({
                               ...relatorio,
@@ -528,7 +532,7 @@ export function RelatorioKaua() {
                                   className="relatorio-baixar"
                                   onClick={() =>
                                     void baixar(ficha.id).then((achou) => {
-                                      if (!achou) setAviso("Esse arquivo não está mais guardado aqui.");
+                                      if (!achou) setAviso({ texto: "Esse arquivo não está mais guardado aqui." });
                                     })
                                   }
                                 >
@@ -539,7 +543,7 @@ export function RelatorioKaua() {
                                 <button
                                   className="relatorio-apagar"
                                   onClick={() => void tirarAnexo(ficha.id)}
-                                  aria-label={`Remover o arquivo ${ficha.nome}`}
+                                  aria-label={t("Remover o arquivo {0}", [ficha.nome])}
                                 >
                                   <X size={12} />
                                 </button>
@@ -559,23 +563,22 @@ export function RelatorioKaua() {
 
       <footer className="relatorio-rodape">
         <p>
-          {protegido(espelho)
+          {t(protegido(espelho)
             ? "As anotações, a checklist e os arquivos anexados têm cópia na sua conta: limpar este navegador não perde nada."
-            : "Sem a cópia na conta, tudo isto vive só neste navegador — limpar os dados do site apaga tudo."}
+            : "Sem a cópia na conta, tudo isto vive só neste navegador — limpar os dados do site apaga tudo.")}
         </p>
         {fichas.length > 0 && (
           <p className="relatorio-espaco">
-            <Paperclip size={12} /> {fichas.length} arquivo{fichas.length > 1 ? "s" : ""} guardado
-            {fichas.length > 1 ? "s" : ""} · {formatarTamanho(espacoUsado(fichas))}.{" "}
-            <strong>O exportar leva a checklist e as anotações, não os arquivos</strong> — para esses, use o botão de
-            baixar em cada um e guarde a cópia onde você quiser.
+            <Paperclip size={12} /> {t(fichas.length > 1 ? "{0} arquivos guardados" : "{0} arquivo guardado", [fichas.length])} · {formatarTamanho(espacoUsado(fichas))}.{" "}
+            <strong>{t("O exportar leva a checklist e as anotações, não os arquivos")}</strong>
+            {t(" — para esses, use o botão de baixar em cada um e guarde a cópia onde você quiser.")}
           </p>
         )}
       </footer>
 
       {aviso && (
         <p className="relatorio-aviso" role="status">
-          {aviso}
+          {t(aviso.texto, aviso.valores?.map((valor) => (typeof valor === "string" ? t(valor) : valor)))}
         </p>
       )}
     </div>

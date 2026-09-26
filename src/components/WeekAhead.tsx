@@ -3,6 +3,7 @@
 import { ArrowUpRight, CalendarClock } from "lucide-react";
 
 import { buildWeek, type RouteSignals, type Task } from "@/lib/week-ahead";
+import { useI18n } from "./I18n";
 
 /**
  * A faixa do topo do Hub.
@@ -20,14 +21,15 @@ export function WeekAhead({
   tasks: Task[];
   onOpen: (view: "site" | "videos" | "sat" | "university" | "jade" | "overview") => void;
 }) {
-  const signals = buildWeek({ routes, tasks });
+  const { t } = useI18n();
+  const signals = buildWeek({ routes, tasks, traduzir: t });
   if (signals.length === 0) return null;
 
   return (
-    <section className="week-ahead" aria-label="O que está próximo">
+    <section className="week-ahead" aria-label={t("O que está próximo")}>
       <header>
         <CalendarClock size={15} />
-        <span>O QUE ESTÁ PRÓXIMO</span>
+        <span>{t("O QUE ESTÁ PRÓXIMO")}</span>
       </header>
       <div className="week-grid">
         {signals.map((signal) => (

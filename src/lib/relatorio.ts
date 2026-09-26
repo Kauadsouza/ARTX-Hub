@@ -23,6 +23,7 @@
  */
 
 import { SEMENTE_VERSAO, idDaSemente, renomeados, semente, type GrupoId } from "./espanha.ts";
+import { semTraducao, type Traduzir } from "./traducao.ts";
 
 export const DIAS_DE_VIDA = 7;
 
@@ -361,7 +362,7 @@ export function resumoParaOHub(bruto: string | null, agora = new Date()): {
  *
  * Só lê. Devolve o texto e para onde ir; quem monta o comando é a paleta.
  */
-export function itensParaBusca(bruto: string | null, agora = new Date()): Array<{
+export function itensParaBusca(bruto: string | null, agora = new Date(), traduzir: Traduzir = semTraducao): Array<{
   id: string;
   grupo: "Anotações" | "Documentos";
   texto: string;
@@ -378,7 +379,7 @@ export function itensParaBusca(bruto: string | null, agora = new Date()): Array<
       // A descrição entra na busca junto do título: quem lembra do conteúdo e
       // não do nome ainda encontra.
       texto: nota.descricao ? `${nota.titulo} — ${nota.descricao}` : nota.titulo,
-      detalhe: dias <= 0 ? "vence hoje" : `${dias} dia${dias > 1 ? "s" : ""}`,
+      detalhe: dias <= 0 ? traduzir("vence hoje") : traduzir(dias > 1 ? "{0} dias" : "{0} dia", [dias]),
     });
   }
 
@@ -387,8 +388,8 @@ export function itensParaBusca(bruto: string | null, agora = new Date()): Array<
     itens.push({
       id: `relatorio-doc-${doc.id}`,
       grupo: "Documentos",
-      texto: doc.nota ? `${doc.nome} — ${doc.nota}` : doc.nome,
-      detalhe: doc.feito ? "pronto" : estado === "vencido" ? "vencido" : estado === "vencendo" ? "vencendo" : "pendente",
+      texto: doc.nota ? `${traduzir(doc.nome)} — ${doc.nota}` : traduzir(doc.nome),
+      detalhe: traduzir(doc.feito ? "pronto" : estado === "vencido" ? "vencido" : estado === "vencendo" ? "vencendo" : "pendente"),
     });
   }
 

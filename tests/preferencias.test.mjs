@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { scriptDoTema, temaPadrao, temaPorId, temas, validarEmail, validarNome, validarSenha } from '../src/lib/preferencias.ts';
+import { juntarPreferencias, lerPreferencias, scriptDoTema, semConfirmadas, temaPadrao, temaPorId, temas, validarEmail, validarNome, validarSenha } from '../src/lib/preferencias.ts';
 
 /** Contraste WCAG entre duas cores em hex. */
 function lum(hex) {
@@ -120,4 +120,26 @@ test('nome muito curto ou longo demais é recusado', () => {
   assert.ok(validarNome('a'.repeat(61)));
   assert.equal(validarNome('Kauã'), null);
   assert.equal(validarNome('  Kauã  '), null);
+});
+
+// ══════════════ Tema e idioma na conta ══════════════
+
+test('da conta só entra tema que existe e idioma que o Hub fala', () => {
+  assert.deepEqual(lerPreferencias({ tema: 'oceano', idioma: 'en', nome: 'Kauã' }), { tema: 'oceano', idioma: 'en' });
+  assert.deepEqual(lerPreferencias({ tema: 'rosa-choque', idioma: 'fr' }), {});
+  assert.deepEqual(lerPreferencias(null), {});
+  assert.deepEqual(lerPreferencias('oceano'), {});
+});
+
+test('a troca feita aqui e ainda não gravada ganha da conta', () => {
+  // Trocou para Areia, a gravação falhou; a conta ainda diz Oceano.
+  assert.deepEqual(juntarPreferencias({ tema: 'oceano', idioma: 'pt' }, { tema: 'areia' }), { tema: 'areia', idioma: 'pt' });
+  assert.deepEqual(juntarPreferencias({ tema: 'oceano' }, {}), { tema: 'oceano' });
+});
+
+test('a confirmação só limpa o valor que ela gravou', () => {
+  assert.deepEqual(semConfirmadas({ tema: 'claro', idioma: 'en' }, { tema: 'claro' }), { idioma: 'en' });
+  // Trocou de novo enquanto a gravação de Claro ia: Areia continua pendente.
+  assert.deepEqual(semConfirmadas({ tema: 'areia' }, { tema: 'claro' }), { tema: 'areia' });
+  assert.deepEqual(semConfirmadas({}, { idioma: 'pt' }), {});
 });

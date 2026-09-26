@@ -46,6 +46,7 @@ export function Configuracoes({
   supabase,
   avatar,
   onAvatar,
+  onTema,
 }: {
   email: string;
   nome: string;
@@ -53,14 +54,17 @@ export function Configuracoes({
   supabase: SupabaseClient | null;
   avatar: string | null;
   onAvatar: (dataUrl: string | null) => void;
+  /** Leva a escolha para a conta, para ela valer em qualquer aparelho. */
+  onTema: (id: string) => void;
 }) {
-  const { language, setLanguage } = useI18n();
+  const { t, language, setLanguage } = useI18n();
   const [tema, setTema] = useState<Tema>(() => lerTemaGuardado());
 
   function escolherTema(novo: Tema) {
     setTema(novo);
     aplicarTema(novo);
     guardarTema(novo);
+    onTema(novo.id);
   }
 
   return (
@@ -68,8 +72,8 @@ export function Configuracoes({
       <FotoDePerfil nome={nome} email={email} supabase={supabase} avatar={avatar} onAvatar={onAvatar} />
 
       {/* ── Tema ─────────────────────────────────────────────────────── */}
-      <Bloco icone={<Palette size={17} />} titulo="Tema" detalhe="Muda o Hub inteiro — fundo, cartões, textos e gráficos.">
-        <div className="perfil-temas" role="radiogroup" aria-label="Tema">
+      <Bloco icone={<Palette size={17} />} titulo="Tema" detalhe="Muda o Hub inteiro e fica salvo na sua conta, em qualquer aparelho.">
+        <div className="perfil-temas" role="radiogroup" aria-label={t("Tema")}>
           {temas.map((item) => {
             const escolhido = tema.id === item.id;
             const [fundo, superficie, acento] = item.amostra;
@@ -91,8 +95,8 @@ export function Configuracoes({
                   </span>
                 </span>
                 <span className="perfil-tema-texto">
-                  <strong>{item.nome}</strong>
-                  <small>{item.descricao}</small>
+                  <strong>{t(item.nome)}</strong>
+                  <small>{t(item.descricao)}</small>
                 </span>
                 {escolhido && <Check className="perfil-tema-marca" size={15} />}
               </button>
@@ -123,7 +127,7 @@ export function Configuracoes({
           <CampoSenha aoSalvar={salvar.senha} />
         </Bloco>
 
-        <Bloco icone={<Languages size={17} />} titulo="Idioma" detalhe="Vale neste navegador.">
+        <Bloco icone={<Languages size={17} />} titulo="Idioma" detalhe="Fica salvo na sua conta, em qualquer aparelho.">
           <div className="btn-grupo">
             <button type="button" className={`config-opcao ${language === "pt" ? "ativa" : ""}`} onClick={() => setLanguage("pt")} aria-pressed={language === "pt"}>
               Português
@@ -155,6 +159,7 @@ function FotoDePerfil({
   avatar: string | null;
   onAvatar: (dataUrl: string | null) => void;
 }) {
+  const { t } = useI18n();
   const entrada = useRef<HTMLInputElement>(null);
   const [ocupado, setOcupado] = useState(false);
   const [recado, setRecado] = useState("");
@@ -168,24 +173,24 @@ function FotoDePerfil({
     setRecado("");
     try {
       onAvatar(await enviarAvatar(supabase, arquivo));
-      setRecado("Foto atualizada.");
+      setRecado(t("Foto atualizada."));
     } catch (erro) {
-      setRecado(erro instanceof Error ? erro.message : "Não consegui trocar a foto.");
+      setRecado(erro instanceof Error ? t(erro.message) : t("Não consegui trocar a foto."));
     } finally {
       setOcupado(false);
     }
   }
 
   async function tirar() {
-    if (!window.confirm("Tirar a foto de perfil?")) return;
+    if (!window.confirm(t("Tirar a foto de perfil?"))) return;
     setOcupado(true);
     setRecado("");
     try {
       await removerAvatar(supabase);
       onAvatar(null);
-      setRecado("Foto removida.");
+      setRecado(t("Foto removida."));
     } catch (erro) {
-      setRecado(erro instanceof Error ? erro.message : "Não consegui tirar a foto.");
+      setRecado(erro instanceof Error ? t(erro.message) : t("Não consegui tirar a foto."));
     } finally {
       setOcupado(false);
     }
@@ -198,7 +203,7 @@ function FotoDePerfil({
         className="perfil-foto"
         onClick={() => entrada.current?.click()}
         disabled={ocupado}
-        aria-label={avatar ? "Trocar a foto de perfil" : "Colocar uma foto de perfil"}
+        aria-label={avatar ? t("Trocar a foto de perfil") : t("Colocar uma foto de perfil")}
       >
         {avatar ? (
           <img src={avatar} alt="" />
@@ -210,16 +215,16 @@ function FotoDePerfil({
       <input ref={entrada} type="file" accept="image/*" hidden onChange={(evento) => void trocar(evento)} />
 
       <div className="perfil-quem">
-        <p className="eyebrow">PERFIL</p>
-        <h1>{nome || "Seu perfil"}</h1>
+        <p className="eyebrow">{t("PERFIL")}</p>
+        <h1>{nome || t("Seu perfil")}</h1>
         <p>{email}</p>
         <div className="perfil-foto-acoes">
           <button type="button" onClick={() => entrada.current?.click()} disabled={ocupado}>
-            {ocupado ? "Enviando…" : avatar ? "Trocar foto" : "Colocar foto"}
+            {ocupado ? t("Enviando…") : avatar ? t("Trocar foto") : t("Colocar foto")}
           </button>
           {avatar && (
             <button type="button" className="perfil-tirar" onClick={() => void tirar()} disabled={ocupado}>
-              Tirar
+              {t("Tirar")}
             </button>
           )}
         </div>
@@ -240,13 +245,14 @@ function Bloco({
   detalhe: string;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <article className="config-bloco">
       <header>
         <span className="config-icone">{icone}</span>
         <div>
-          <strong>{titulo}</strong>
-          <small>{detalhe}</small>
+          <strong>{t(titulo)}</strong>
+          <small>{t(detalhe)}</small>
         </div>
       </header>
       {children}
@@ -277,6 +283,7 @@ function CampoUnico({
   textoBotao: string;
   aviso?: string;
 }) {
+  const { t } = useI18n();
   const [valor, setValor] = useState(valorInicial);
   const [estado, setEstado] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -289,14 +296,14 @@ function CampoUnico({
   async function enviar(evento: React.FormEvent) {
     evento.preventDefault();
     const erro = validar(valor);
-    if (erro) { setEstado(erro); return; }
+    if (erro) { setEstado(t(erro)); return; }
     setSalvando(true);
     setEstado("");
     try {
       await aoSalvar(valor.trim());
-      setEstado(aviso ?? "Salvo.");
+      setEstado(t(aviso ?? "Salvo."));
     } catch (erro) {
-      setEstado(erro instanceof Error ? erro.message : "Não consegui salvar.");
+      setEstado(erro instanceof Error ? t(erro.message) : t("Não consegui salvar."));
     } finally {
       setSalvando(false);
     }
@@ -305,11 +312,11 @@ function CampoUnico({
   return (
     <form onSubmit={enviar}>
       <label>
-        {rotulo}
+        {t(rotulo)}
         <input type={tipo} value={valor} onChange={(evento) => setValor(evento.target.value)} disabled={salvando} />
       </label>
       <button type="submit" className="quick-create" disabled={salvando || !mudou}>
-        {salvando ? "Salvando…" : textoBotao}
+        {salvando ? t("Salvando…") : t(textoBotao)}
       </button>
       <p role="status" className="config-estado">{estado}</p>
     </form>
@@ -317,6 +324,7 @@ function CampoUnico({
 }
 
 function CampoSenha({ aoSalvar }: { aoSalvar: (valor: string) => Promise<void> }) {
+  const { t } = useI18n();
   const [senha, setSenha] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
   const [estado, setEstado] = useState("");
@@ -325,7 +333,7 @@ function CampoSenha({ aoSalvar }: { aoSalvar: (valor: string) => Promise<void> }
   async function enviar(evento: React.FormEvent) {
     evento.preventDefault();
     const erro = validarSenha(senha, confirmacao);
-    if (erro) { setEstado(erro); return; }
+    if (erro) { setEstado(t(erro)); return; }
     setSalvando(true);
     setEstado("");
     try {
@@ -333,9 +341,9 @@ function CampoSenha({ aoSalvar }: { aoSalvar: (valor: string) => Promise<void> }
       // A senha nova não fica no campo depois de salva.
       setSenha("");
       setConfirmacao("");
-      setEstado("Senha alterada.");
+      setEstado(t("Senha alterada."));
     } catch (erro) {
-      setEstado(erro instanceof Error ? erro.message : "Não consegui alterar.");
+      setEstado(erro instanceof Error ? t(erro.message) : t("Não consegui alterar."));
     } finally {
       setSalvando(false);
     }
@@ -344,7 +352,7 @@ function CampoSenha({ aoSalvar }: { aoSalvar: (valor: string) => Promise<void> }
   return (
     <form onSubmit={enviar}>
       <label>
-        Nova senha
+        {t("Nova senha")}
         <input
           type="password"
           autoComplete="new-password"
@@ -354,7 +362,7 @@ function CampoSenha({ aoSalvar }: { aoSalvar: (valor: string) => Promise<void> }
         />
       </label>
       <label>
-        Confirmar
+        {t("Confirmar")}
         <input
           type="password"
           autoComplete="new-password"
@@ -364,7 +372,7 @@ function CampoSenha({ aoSalvar }: { aoSalvar: (valor: string) => Promise<void> }
         />
       </label>
       <button type="submit" className="quick-create" disabled={salvando || !senha || !confirmacao}>
-        {salvando ? "Alterando…" : "Salvar nova senha"}
+        {salvando ? t("Alterando…") : t("Salvar nova senha")}
       </button>
       <p role="status" className="config-estado">{estado}</p>
     </form>

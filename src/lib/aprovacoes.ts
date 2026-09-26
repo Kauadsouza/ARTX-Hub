@@ -16,6 +16,8 @@
  * leitura — que só acontece ao abrir a tela ou depois de uma ação dela.
  */
 
+import { semTraducao, type Traduzir } from "./traducao.ts";
+
 export type AppKey = "videos" | "study" | "university" | "cursos";
 
 export type Concessao = {
@@ -86,13 +88,17 @@ export function selecoesDoServidor(linhas: Concessao[]): Selecoes {
  * vazia ali faria o contrário exato do que está escrito nele, e nenhuma
  * confirmação conserta um botão que mente.
  */
-export function podeAplicar(estado: EstadoConta, escolhidos: number): { ok: true } | { ok: false; motivo: string } {
+export function podeAplicar(
+  estado: EstadoConta,
+  escolhidos: number,
+  traduzir: Traduzir = semTraducao,
+): { ok: true } | { ok: false; motivo: string } {
   if (escolhidos > 0 || estado === "ativa") return { ok: true };
   return {
     ok: false,
     motivo: estado === "aguardando"
-      ? "Marque ao menos um sistema para aprovar. Para negar o pedido, use Bloquear conta."
-      : "Marque ao menos um sistema para desbloquear.",
+      ? traduzir("Marque ao menos um sistema para aprovar. Para negar o pedido, use Bloquear conta.")
+      : traduzir("Marque ao menos um sistema para desbloquear."),
   };
 }
 
@@ -115,18 +121,18 @@ export type Exclusao = {
   aviso: string;
 };
 
-export function exclusaoDaConta(conta: Conta): Exclusao {
+export function exclusaoDaConta(conta: Conta, traduzir: Traduzir = semTraducao): Exclusao {
   const nome = conta.username;
 
   if (estadoDaConta(conta) === "ativa") {
     return {
       confirmacao: "digitar-nome",
       aviso: [
-        `A conta de ${nome} está em uso.`,
+        traduzir("A conta de {0} está em uso.", [nome]),
         "",
-        "Apagar remove a conta, os acessos e tudo o que ela guardou nos sistemas — progresso, planejamento, anotações. Não dá para desfazer.",
+        traduzir("Apagar remove a conta, os acessos e tudo o que ela guardou nos sistemas — progresso, planejamento, anotações. Não dá para desfazer."),
         "",
-        `Se é isso mesmo, digite o nome de usuário: ${nome}`,
+        traduzir("Se é isso mesmo, digite o nome de usuário: {0}", [nome]),
       ].join("\n"),
     };
   }
@@ -134,9 +140,9 @@ export function exclusaoDaConta(conta: Conta): Exclusao {
   return {
     confirmacao: "simples",
     aviso: [
-      `Apagar a conta de ${nome}?`,
+      traduzir("Apagar a conta de {0}?", [nome]),
       "",
-      "Ela nunca teve acesso liberado, então não há nada guardado para perder. Ainda assim, não dá para desfazer.",
+      traduzir("Ela nunca teve acesso liberado, então não há nada guardado para perder. Ainda assim, não dá para desfazer."),
     ].join("\n"),
   };
 }

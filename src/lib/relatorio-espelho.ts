@@ -24,6 +24,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ler, relatorioVazio, unir, type Relatorio } from "./relatorio.ts";
+import { semTraducao, type Traduzir } from "./traducao.ts";
 
 /** Chave do payload dentro de `hub_app_state`. */
 const APP = "relatorio";
@@ -125,16 +126,16 @@ export async function empurrar(
 }
 
 /** Frase curta para a tela, sem jargão. */
-export function descrever(estado: EstadoEspelho): string {
+export function descrever(estado: EstadoEspelho, traduzirTela: Traduzir = semTraducao): string {
   switch (estado.tipo) {
     case "iniciando":
-      return "Preparando a cópia na conta…";
+      return traduzirTela("Preparando a cópia na conta…");
     case "guardado":
-      return "Cópia guardada na sua conta.";
+      return traduzirTela("Cópia guardada na sua conta.");
     case "so-local":
-      return `Só neste aparelho. ${estado.motivo}`;
+      return traduzirTela("Só neste aparelho. {0}", [traduzirTela(estado.motivo)]);
     case "falhou":
-      return `A cópia não subiu. ${estado.motivo}`;
+      return traduzirTela("A cópia não subiu. {0}", [traduzirTela(estado.motivo)]);
   }
 }
 

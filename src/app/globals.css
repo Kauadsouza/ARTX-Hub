@@ -897,3 +897,95 @@ select { min-width: 0; border: 1px solid var(--line); border-radius: 8px; backgr
   .perfil-temas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .perfil-grade { grid-template-columns: 1fr; }
 }
+
+/* ══ Visão geral viva ═══════════════════════════════════════════════════
+   O movimento tem função: as barras crescem para mostrar de onde o número
+   veio, os cartões entram em ordem para o olho saber por onde começar, e o
+   ponto "ao vivo" diz que a página está acompanhando, não parada. */
+
+@keyframes painel-entra { from { opacity: 0; transform: translateY(8px); } }
+@keyframes painel-cresce-x { from { transform: scaleX(0); } }
+@keyframes painel-cresce-y { from { transform: scaleY(0); } }
+@keyframes painel-pulsa { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--mint) 55%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--mint) 0%, transparent); } }
+@keyframes painel-gira { to { transform: rotate(360deg); } }
+@keyframes painel-chama { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--amber) 35%, transparent); } 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--amber) 0%, transparent); } }
+
+.painel-vivo .painel-numero,
+.painel-vivo .painel-cartao { animation: painel-entra .45s cubic-bezier(.2, .8, .2, 1) both; }
+
+.painel-subtitulo { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+
+/* ── O selo "ao vivo" ── */
+.painel-ao-vivo { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: 30px; background: var(--surface); color: var(--muted); font-size: 12px; cursor: pointer; }
+.painel-ao-vivo:hover { color: var(--text); border-color: var(--violet); }
+.painel-ao-vivo i { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); animation: painel-pulsa 2.4s ease-in-out infinite; }
+.painel-ao-vivo.buscando svg { animation: painel-gira .9s linear infinite; }
+.painel-ao-vivo.falhou i { background: var(--amber); animation: none; }
+
+/* ── Os números ── */
+.painel-numero { position: relative; overflow: hidden; }
+.painel-numero-icone { position: absolute; top: 16px; right: 16px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: color-mix(in srgb, var(--violet) 12%, var(--surface)); color: var(--violet); }
+.painel-numero.chamativo { border-color: color-mix(in srgb, var(--amber) 45%, var(--line)); }
+.painel-numero.chamativo .painel-numero-icone { background: color-mix(in srgb, var(--amber) 16%, var(--surface)); color: var(--amber); animation: painel-chama 2.2s ease-in-out infinite; }
+
+/* ── Barras que crescem ao aparecer ── */
+.painel-vivo .medidor-cheio { transform-origin: left center; animation: painel-cresce-x .8s cubic-bezier(.2, .8, .2, 1) both; transition: width .6s cubic-bezier(.2, .8, .2, 1); }
+.painel-vivo .funil-barra { transform-origin: bottom center; animation: painel-cresce-y .7s cubic-bezier(.2, .8, .2, 1) both; transition: height .6s cubic-bezier(.2, .8, .2, 1); }
+
+/* ── Vazio com saída: em vez de só dizer, leva até lá ── */
+.painel-vazio { display: grid; justify-items: start; gap: 10px; }
+.painel-vazio p { margin: 4px 0 0; color: var(--subtle); font-size: 12.5px; line-height: 1.6; }
+.painel-vazio button { padding: 7px 13px; border: 1px solid var(--line-strong); border-radius: 9px; background: transparent; color: var(--text); font-size: 12px; cursor: pointer; }
+.painel-vazio button:hover { border-color: var(--violet); }
+
+/* ── Ritmo de estudo ── */
+.ritmo { display: grid; grid-template-columns: auto 1fr; gap: 22px; align-items: end; }
+.ritmo-sequencia { display: grid; justify-items: center; gap: 2px; min-width: 82px; padding: 14px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-raised); color: var(--subtle); text-align: center; }
+.ritmo-sequencia strong { color: var(--text); font-size: 30px; font-weight: 650; line-height: 1; }
+.ritmo-sequencia span { font-size: 11px; }
+.ritmo-sequencia.acesa { border-color: color-mix(in srgb, var(--amber) 40%, var(--line)); background: color-mix(in srgb, var(--amber) 9%, var(--surface)); color: var(--amber); }
+.ritmo-colunas { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); align-items: end; height: 132px; }
+.ritmo-dia { display: grid; grid-template-rows: 1fr auto; justify-items: center; height: 100%; padding: 0 2px; }
+.ritmo-barra-area { display: flex; align-items: flex-end; justify-content: center; width: calc(100% + 4px); height: 100%; margin: 0 -2px; border-bottom: 1px solid var(--line-strong); }
+.ritmo-barra { display: block; width: min(14px, 70%); border-radius: 4px 4px 0 0; background: var(--grafico-1); transform-origin: bottom center; animation: painel-cresce-y .7s cubic-bezier(.2, .8, .2, 1) both; }
+.ritmo-dia.hoje .ritmo-barra { background: var(--amber); }
+.ritmo-rotulo { margin-top: 6px; color: var(--subtle); font-size: 10px; text-transform: uppercase; }
+.ritmo-dia.hoje .ritmo-rotulo { color: var(--amber); font-weight: 700; }
+
+/* ── Acontecendo ── */
+.linha-do-tempo { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.linha-do-tempo li { animation: painel-entra .4s cubic-bezier(.2, .8, .2, 1) both; }
+.linha-do-tempo button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 8px; border: 0; border-radius: 10px; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.linha-do-tempo button:hover { background: var(--surface-hover); }
+.linha-do-tempo-icone { display: grid; place-items: center; flex-shrink: 0; width: 28px; height: 28px; border-radius: 9px; }
+.linha-do-tempo-icone.aula { background: color-mix(in srgb, var(--violet) 13%, var(--surface)); color: var(--violet); }
+.linha-do-tempo-icone.video { background: color-mix(in srgb, var(--blue) 13%, var(--surface)); color: var(--blue); }
+.linha-do-tempo-icone.pedido { background: color-mix(in srgb, var(--amber) 15%, var(--surface)); color: var(--amber); }
+.linha-do-tempo-texto { display: grid; gap: 1px; flex: 1; min-width: 0; }
+.linha-do-tempo-texto strong, .linha-do-tempo-texto small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.linha-do-tempo-texto strong { font-size: 12.5px; font-weight: 600; }
+.linha-do-tempo-texto small { color: var(--subtle); font-size: 11px; }
+.linha-do-tempo time { flex-shrink: 0; color: var(--subtle); font-size: 11px; }
+
+/* ── As próximas atividades, embaixo da meta ── */
+.painel-proximas { display: grid; gap: 6px; margin: 4px 0 0; padding: 12px 0 0; border-top: 1px solid var(--line); list-style: none; }
+.painel-proximas li { position: relative; padding-left: 16px; overflow: hidden; color: var(--muted); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; }
+.painel-proximas li::before { content: ""; position: absolute; left: 2px; top: 6px; width: 6px; height: 6px; border: 1.5px solid var(--subtle); border-radius: 50%; }
+
+@media (max-width: 620px) {
+  .ritmo { grid-template-columns: 1fr; }
+  .ritmo-sequencia { grid-auto-flow: column; justify-content: start; align-items: baseline; gap: 8px; min-width: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .painel-vivo .painel-numero, .painel-vivo .painel-cartao, .painel-vivo .medidor-cheio, .painel-vivo .funil-barra,
+  .ritmo-barra, .linha-do-tempo li, .painel-ao-vivo i, .painel-ao-vivo.buscando svg, .painel-numero.chamativo .painel-numero-icone { animation: none; }
+  .painel-vivo .medidor-cheio, .painel-vivo .funil-barra { transition: none; }
+}
+
+/* O seletor de idioma do cabeçalho. Tinha as cores escritas no componente,
+   e ficava verde-escuro até no tema claro. */
+.idioma-troca { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid color-mix(in srgb, var(--mint) 35%, var(--line)); border-radius: 8px; }
+.idioma-troca button { padding: 6px 9px; border: 0; border-radius: 5px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
+.idioma-troca button:hover { color: var(--text); }
+.idioma-troca button[aria-pressed="true"] { background: color-mix(in srgb, var(--mint) 42%, var(--jade-fundo)); color: var(--jade-brilho); }

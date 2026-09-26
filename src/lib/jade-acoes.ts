@@ -17,6 +17,8 @@
  * pedido.
  */
 
+import { semTraducao, type Traduzir } from "./traducao.ts";
+
 export type Acao =
   | { tipo: "criar-atividade"; titulo: string; projeto: string | null }
   | { tipo: "criar-nota"; conteudo: string }
@@ -42,16 +44,18 @@ export function pedeConfirmacao(acao: Acao): boolean {
 }
 
 /** A frase que a confirmação mostra. Diz o efeito, não o nome do comando. */
-export function descreverAcao(acao: Acao): string {
+export function descreverAcao(acao: Acao, traduzir: Traduzir = semTraducao): string {
   switch (acao.tipo) {
     case "criar-atividade":
-      return `Criar a atividade "${acao.titulo}"${acao.projeto ? ` em ${acao.projeto}` : ""}?`;
+      return acao.projeto
+        ? traduzir('Criar a atividade "{0}" em {1}?', [acao.titulo, acao.projeto])
+        : traduzir('Criar a atividade "{0}"?', [acao.titulo]);
     case "criar-nota":
-      return `Guardar no Relatório: "${acao.conteudo.slice(0, 80)}"?`;
+      return traduzir('Guardar no Relatório: "{0}"?', [acao.conteudo.slice(0, 80)]);
     case "concluir-atividade":
-      return `Marcar "${acao.titulo}" como concluída?`;
+      return traduzir('Marcar "{0}" como concluída?', [acao.titulo]);
     case "abrir":
-      return `Abrir ${acao.destino}?`;
+      return traduzir("Abrir {0}?", [acao.destino]);
   }
 }
 

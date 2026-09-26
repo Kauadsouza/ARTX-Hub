@@ -3,12 +3,15 @@ import { prisma } from "@/lib/prisma";
 import { requireHubOwner } from "@/lib/contas-auth";
 import {
   ROTULO_ETAPA,
+  lerEstudo,
   lerResumoDeCursos,
   progressoDoVideo,
   type Bloco,
   type CursoNoPainel,
+  type Estudo,
   type Etapa,
   type EstadoBloco,
+  type Pedido,
   type VideoNoPainel,
 } from "@/lib/painel";
 
@@ -31,53 +34,103 @@ import {
 
 export const runtime = "nodejs";
 
-async function cursosDoDono(): Promise<CursoNoPainel[] | null> {
+async function cursosDoDono(): Promise<{ cursos: CursoNoPainel[]; estudo: Estudo | null } | null> {
   try {
     const estado = await prisma.memberState.findUnique({
       where: { principal_app: { principal: "owner", app: "cursos" } },
       select: { payload: true },
     });
-    return lerResumoDeCursos(estado?.payload ?? null);
+    const payload = estado?.payload ?? null;
+    return { cursos: lerResumoDeCursos(payload), estudo: lerEstudo(payload) };
   } catch {
     return null;
   }
 }
 
-async function videosDoDono(): Promise<VideoNoPainel[] | null> {
+/*
+  Uma consulta só para os vídeos, e não duas em sequência.
+
+  Antes eram duas idas ao banco — os vídeos, depois os blocos de cada um — e
+  a segunda só saía quando a primeira voltava. Aqui o banco já devolve cada
+  vídeo com a contagem dos blocos por estado, e a conta do avanço é feita a
+  partir dessas contagens.
+*/
+type LinhaVideo = {
+  id: string;
+  title: string;
+  stage: string;
+  atualizado: Date;
+  blocos: number;
+  grav_pronto: number;
+  grav_andando: number;
+  edit_pronto: number;
+  edit_andando: number;
+};
+
+function blocosDaContagem(l: LinhaVideo): Bloco[] {
+  // O avanço de uma etapa só olha o estado daquela etapa, então dá para
+  // remontar os blocos a partir das contagens sem perder nada.
+  const lista: Bloco[] = [];
+  for (let i = 0; i < l.blocos; i++) {
+    const gravacao: EstadoBloco = i < l.grav_pronto ? "PRONTO" : i < l.grav_pronto + l.grav_andando ? "EM_PROGRESSO" : "PENDENTE";
+    const edicao: EstadoBloco = i < l.edit_pronto ? "PRONTO" : i < l.edit_pronto + l.edit_andando ? "EM_PROGRESSO" : "PENDENTE";
+    lista.push({ gravacao, edicao });
+  }
+  return lista;
+}
+
+async function videosDoDono(): Promise<(VideoNoPainel & { atualizadoEm: string })[] | null> {
   try {
-    const videos = await prisma.$queryRaw<{ id: string; title: string; stage: string }[]>`
-      SELECT id, title, stage::text AS stage
-      FROM "Video"
-      WHERE "ownerId" = 'owner'
-      ORDER BY "updatedAt" DESC
+    const linhas = await prisma.$queryRaw<LinhaVideo[]>`
+      SELECT v.id, v.title, v.stage::text AS stage, v."updatedAt" AS atualizado,
+        count(b.id)::int AS blocos,
+        count(b.id) FILTER (WHERE b."recordingStatus" = 'PRONTO')::int AS grav_pronto,
+        count(b.id) FILTER (WHERE b."recordingStatus" = 'EM_PROGRESSO')::int AS grav_andando,
+        count(b.id) FILTER (WHERE b."editingStatus" = 'PRONTO')::int AS edit_pronto,
+        count(b.id) FILTER (WHERE b."editingStatus" = 'EM_PROGRESSO')::int AS edit_andando
+      FROM "Video" v
+      LEFT JOIN "ScriptBlock" b ON b."videoId" = v.id
+      WHERE v."ownerId" = 'owner'
+      GROUP BY v.id
+      ORDER BY v."updatedAt" DESC
       LIMIT 40
     `;
-    if (!videos.length) return [];
-
-    const ids = videos.map((video) => video.id);
-    const blocos = await prisma.$queryRaw<{ videoId: string; gravacao: EstadoBloco; edicao: EstadoBloco }[]>`
-      SELECT "videoId", "recordingStatus"::text AS gravacao, "editingStatus"::text AS edicao
-      FROM "ScriptBlock"
-      WHERE "videoId" = ANY(${ids})
-    `;
-
-    const porVideo = new Map<string, Bloco[]>();
-    for (const b of blocos) {
-      const lista = porVideo.get(b.videoId) ?? [];
-      lista.push({ gravacao: b.gravacao, edicao: b.edicao });
-      porVideo.set(b.videoId, lista);
-    }
-
-    return videos.map((video) => {
-      const etapa = video.stage as Etapa;
+    return linhas.map((l) => {
+      const etapa = l.stage as Etapa;
       return {
-        id: video.id,
-        titulo: video.title || "Sem título",
+        id: l.id,
+        titulo: l.title || "Sem título",
         etapa,
-        rotulo: ROTULO_ETAPA[etapa] ?? video.stage,
-        progresso: progressoDoVideo(video.stage, porVideo.get(video.id) ?? []),
+        rotulo: ROTULO_ETAPA[etapa] ?? l.stage,
+        progresso: progressoDoVideo(l.stage, blocosDaContagem(l)),
+        atualizadoEm: new Date(l.atualizado).toISOString(),
       };
     });
+  } catch {
+    return null;
+  }
+}
+
+const NOME_DO_SISTEMA: Record<string, string> = { videos: "Vídeos", study: "Inglês", university: "Universidades", cursos: "Cursos" };
+
+/** Quem está esperando uma decisão sua — o número que mais pede ação. */
+async function pedidosPendentes(): Promise<Pedido[] | null> {
+  try {
+    const linhas = await prisma.memberGrant.findMany({
+      where: { status: "pending", app: { not: "hub" } },
+      select: { app: true, updatedAt: true, member: { select: { username: true } } },
+      orderBy: { updatedAt: "desc" },
+      take: 60,
+    });
+    // Uma entrada por pessoa, com todos os sistemas que ela pediu.
+    const porPessoa = new Map<string, Pedido>();
+    for (const l of linhas) {
+      const atual = porPessoa.get(l.member.username);
+      const sistema = NOME_DO_SISTEMA[l.app] ?? l.app;
+      if (atual) atual.sistemas.push(sistema);
+      else porPessoa.set(l.member.username, { usuario: l.member.username, sistemas: [sistema], quando: l.updatedAt.toISOString() });
+    }
+    return [...porPessoa.values()];
   } catch {
     return null;
   }
@@ -104,12 +157,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const [cursos, videos] = await Promise.all([cursosDoDono(), videosDoDono()]);
+  // As três leituras saem juntas: nenhuma depende da outra.
+  const [daConta, videos, pedidos] = await Promise.all([cursosDoDono(), videosDoDono(), pedidosPendentes()]);
 
   // `null` é "não deu para ler"; `[]` é "não há nada". A tela mostra coisas
   // diferentes para cada um, então a diferença precisa chegar até ela.
   return NextResponse.json(
-    { cursos, videos, lidoEm: new Date().toISOString() },
+    {
+      cursos: daConta?.cursos ?? null,
+      estudo: daConta ? daConta.estudo : null,
+      videos,
+      pedidos,
+      lidoEm: new Date().toISOString(),
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

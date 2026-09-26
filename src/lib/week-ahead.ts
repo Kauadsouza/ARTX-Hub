@@ -14,6 +14,8 @@
  * significaria manter dois calendários que divergem em silêncio.
  */
 
+import { semTraducao, type Traduzir } from "./traducao.ts";
+
 export type Urgency = "agora" | "semana" | "mes" | "adiante";
 
 export type Signal = {
@@ -75,10 +77,13 @@ export function buildWeek({
   routes,
   tasks,
   now = new Date(),
+  traduzir = semTraducao,
 }: {
   routes?: RouteSignals | null;
   tasks?: Task[];
   now?: Date;
+  /** O tradutor da tela; sem ele, as frases saem em português. */
+  traduzir?: Traduzir;
 }): Signal[] {
   const signals: Signal[] = [];
 
@@ -90,8 +95,8 @@ export function buildWeek({
         target: "university",
         urgency: urgencyFor(days),
         title: routes.nextDeadline.label,
-        value: days === 0 ? "hoje" : days === 1 ? "1 dia" : `${days} dias`,
-        detail: `Rota ${routes.nextDeadline.routeName}`,
+        value: days === 0 ? traduzir("hoje") : days === 1 ? traduzir("1 dia") : traduzir("{0} dias", [days]),
+        detail: traduzir("Rota {0}", [routes.nextDeadline.routeName]),
       });
     }
   }
@@ -101,9 +106,9 @@ export function buildWeek({
       id: "no-universities",
       target: "university",
       urgency: "semana",
-      title: "Nenhuma universidade escolhida ainda",
+      title: traduzir("Nenhuma universidade escolhida ainda"),
       value: `${routes.routeCount}`,
-      detail: routes.routeCount === 1 ? "rota sem destino definido" : "rotas sem destino definido",
+      detail: traduzir(routes.routeCount === 1 ? "rota sem destino definido" : "rotas sem destino definido"),
     });
   }
 
@@ -119,9 +124,9 @@ export function buildWeek({
       id: "tasks",
       target: targetFor[topKey] ?? "overview",
       urgency: open.length > 8 ? "semana" : "mes",
-      title: open.length === 1 ? "1 passo em aberto" : `${open.length} passos em aberto`,
+      title: open.length === 1 ? traduzir("1 passo em aberto") : traduzir("{0} passos em aberto", [open.length]),
       value: String(topCount),
-      detail: `concentrados em ${projectLabel(topKey)}`,
+      detail: traduzir("concentrados em {0}", [traduzir(projectLabel(topKey))]),
     });
   }
 
