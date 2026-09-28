@@ -550,7 +550,6 @@
   "O lugar de guardar arquivos ainda não foi criado no banco. Rode a migração MemberFile.": "File storage hasn't been created in the database yet. Run the MemberFile migration.",
   "Sessão inválida. Entre novamente.": "Invalid session. Please sign in again.",
   "Entre na sua conta para usar o assistente.": "Sign in to use the assistant.",
-  "Autenticação indisponível no momento.": "Authentication is unavailable right now.",
   "Hub não configurado.": "Hub not configured.",
   "Mensagem inválida.": "Invalid message.",
   "Solicitação inválida.": "Invalid request.",

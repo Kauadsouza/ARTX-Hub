@@ -49,9 +49,34 @@ export async function matchesPassword(senha: string, guardada: string) {
   return atual.length === esperado.length && timingSafeEqual(atual, esperado);
 }
 
+/**
+ * De onde veio o pedido, para o limite de tentativas.
+ *
+ * Na Vercel, `x-real-ip` é escrito pela própria plataforma e não dá para
+ * forjar. A exceção é a ponte do sistema de cursos: ali quem chega é o
+ * servidor dos cursos, e todo mundo pareceria vir do mesmo lugar — um
+ * atacante travaria o login de todos. A ponte repassa o IP de quem pediu,
+ * e ele só vale acompanhado do segredo que só os dois servidores conhecem.
+ */
+export function ipDoPedido(request: Request): string {
+  const segredo = process.env.ARTX_BRIDGE_SECRET;
+  const enviado = request.headers.get("x-artx-bridge-secret");
+  const repassado = request.headers.get("x-artx-client-ip");
+  if (segredo && enviado && repassado && iguais(segredo, enviado)) return repassado.slice(0, 64);
+  return request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+}
+
+function iguais(a: string, b: string): boolean {
+  const x = Buffer.from(digest(a));
+  const y = Buffer.from(digest(b));
+  return timingSafeEqual(x, y);
+}
+
 /** Tentativas por janela de 15 minutos, para senha não ser adivinhada na força. */
 export async function throttle(chave: string, max = 12) {
   const balde = `${chave}:${Math.floor(Date.now() / 900000)}`;
+  // Baldes de janelas passadas não servem mais para nada; saem de vez em quando.
+  if (Math.random() < 0.05) void prisma.accessThrottle.deleteMany({ where: { expiresAt: { lt: new Date() } } }).catch(() => {});
   const linha = await prisma.accessThrottle.upsert({
     where: { key: balde },
     create: { key: balde, expiresAt: new Date(Date.now() + 900000) },
@@ -62,6 +87,8 @@ export async function throttle(chave: string, max = 12) {
 
 export async function issueMemberSession(principal: string, app: Sistema) {
   const token = randomBytes(32).toString("hex");
+  // Sessão vencida já não entra, mas ficava guardada para sempre. Sai aqui.
+  void prisma.memberSession.deleteMany({ where: { expiresAt: { lt: new Date() } } }).catch(() => {});
   await prisma.memberSession.create({
     data: { digest: digest(token), principal, app, expiresAt: new Date(Date.now() + 86400000) },
   });
@@ -109,7 +136,8 @@ export async function requireHubOwner(token: string) {
   });
   if (!res.ok) throw new Error("Sessão administrativa inválida.");
   const user = await res.json();
-  if (!user.id || user.email?.toLowerCase() !== email) {
+  // E-mail igual não basta: precisa ser um e-mail confirmado.
+  if (!user.id || user.email?.toLowerCase() !== email || !user.email_confirmed_at) {
     throw new Error("Apenas o proprietário pode administrar contas.");
   }
   return user.id as string;

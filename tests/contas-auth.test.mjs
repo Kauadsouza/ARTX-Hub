@@ -88,7 +88,10 @@ test('ser dono é confirmado no provedor, não na palavra do navegador', async (
     globalThis.fetch = async () => Response.json({ id: 'another-account', email: 'someone@example.test' });
     await assert.rejects(requireHubOwner('test-token'), 'outro e-mail não administra');
 
-    globalThis.fetch = async () => Response.json({ id: 'verified-owner', email: 'owner@example.test' });
+    globalThis.fetch = async () => Response.json({ id: 'unconfirmed', email: 'owner@example.test', email_confirmed_at: null });
+    await assert.rejects(requireHubOwner('test-token'), 'o e-mail certo sem confirmação não administra');
+
+    globalThis.fetch = async () => Response.json({ id: 'verified-owner', email: 'owner@example.test', email_confirmed_at: '2026-01-01T00:00:00Z' });
     assert.equal(await requireHubOwner('test-token'), 'verified-owner');
 
     globalThis.fetch = async () => new Response(null, { status: 401 });
@@ -120,5 +123,22 @@ test('a lista de origens é fechada e não tem curinga', () => {
   assert.doesNotMatch(bloco, /\*/, 'nada de origem curinga');
   for (const sistema of ['artx-hub', 'sistema-videos', 'sat-simulado', 'university-path', 'cursos-artx']) {
     assert.ok(bloco.includes(sistema), `${sistema} precisa poder pedir login`);
+  }
+});
+
+test('o IP repassado pela ponte só vale com o segredo certo', async () => {
+  const { ipDoPedido } = await import('../src/lib/contas-auth.ts');
+  const antes = process.env.ARTX_BRIDGE_SECRET;
+  try {
+    process.env.ARTX_BRIDGE_SECRET = 'segredo-de-teste';
+    const pedido = (cabecalhos) => new Request('https://hub.test/api/contas', { headers: cabecalhos });
+    assert.equal(ipDoPedido(pedido({ 'x-real-ip': '1.1.1.1' })), '1.1.1.1');
+    assert.equal(ipDoPedido(pedido({ 'x-real-ip': '1.1.1.1', 'x-artx-client-ip': '9.9.9.9', 'x-artx-bridge-secret': 'errado' })), '1.1.1.1', 'segredo errado não troca o IP');
+    assert.equal(ipDoPedido(pedido({ 'x-real-ip': '1.1.1.1', 'x-artx-client-ip': '9.9.9.9', 'x-artx-bridge-secret': 'segredo-de-teste' })), '9.9.9.9');
+    delete process.env.ARTX_BRIDGE_SECRET;
+    assert.equal(ipDoPedido(pedido({ 'x-real-ip': '1.1.1.1', 'x-artx-client-ip': '9.9.9.9', 'x-artx-bridge-secret': '' })), '1.1.1.1', 'sem segredo configurado, ninguém troca o IP');
+  } finally {
+    if (antes === undefined) delete process.env.ARTX_BRIDGE_SECRET;
+    else process.env.ARTX_BRIDGE_SECRET = antes;
   }
 });

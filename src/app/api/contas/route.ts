@@ -6,6 +6,7 @@ import {
   SISTEMAS_DE_PESSOA,
   digest,
   hashPassword,
+  ipDoPedido,
   issueMemberSession,
   matchesPassword,
   memberIdentity,
@@ -255,8 +256,7 @@ export async function POST(request: Request) {
       if (!/^[a-z0-9][a-z0-9_.-]{2,31}$/.test(username) || password.length < 10 || password.length > 128) {
         throw new Error("Use um nome de 3–32 caracteres (letras, números, ponto ou traço) e uma senha de 10–128 caracteres.");
       }
-      const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-      await throttle(`ip:${digest(ip)}`, 30);
+      await throttle(`ip:${digest(ipDoPedido(request))}`, 30);
       await throttle(`user:${username}`);
       const conta = await prisma.memberAccount.findUnique({ where: { username } });
 

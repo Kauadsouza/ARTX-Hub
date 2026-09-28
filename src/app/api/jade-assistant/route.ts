@@ -1,4 +1,5 @@
 import { instrucoesDeAcao } from "../../../lib/jade-acoes.ts";
+import { requireHubOwner, throttle } from "../../../lib/contas-auth.ts";
 
 const SYSTEM_PROMPT = "Você é a Jade, a inteligência do ARTX Hub. Ajuda o proprietário a melhorar e organizar o próprio Hub: sugerir ajustes de produto, priorizar o que construir a seguir, explicar como usar os sistemas (Vídeos, Cursos, Universidades, Relatório) e apontar problemas de UX. Você não tem acesso a arquivos do computador dele. Responda em português, de forma direta e prática.";
 
@@ -92,18 +93,19 @@ export async function POST(request: Request) {
     return Response.json({ error: "Mensagem inválida." }, { status: 400 });
   }
 
-  let userResponse: Response;
+  /* Só o dono, e com limite. A chave da Anthropic é paga: uma sessão
+     qualquer do Supabase — ou um token do dono roubado — não pode virar uma
+     torneira aberta de chamadas. */
+  let dono: string;
   try {
-    userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: { apikey: supabaseKey, Authorization: `Bearer ${accessToken}` },
-      cache: "no-store",
-      signal: AbortSignal.timeout(10_000),
-    });
+    dono = await requireHubOwner(accessToken);
   } catch {
-    return Response.json({ error: "Autenticação indisponível no momento." }, { status: 503 });
-  }
-  if (!userResponse.ok) {
     return Response.json({ error: "Sessão inválida. Entre novamente." }, { status: 401 });
+  }
+  try {
+    await throttle(`jade:${dono}`, 60);
+  } catch {
+    return Response.json({ error: "Muitas mensagens seguidas. Espere alguns minutos." }, { status: 429 });
   }
 
   let anthropicResponse: Response;
