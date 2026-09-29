@@ -29,3 +29,19 @@ test('only audio practice can request a device permission', () => {
   assert.equal(p.canRequestAudio('media', p.HUB_URL, ['audio']), false);
   assert.equal(p.canRequestAudio('geolocation', p.STUDY_ORIGIN, ['audio']), false);
 });
+
+test('os Cursos abrem num quadro e podem baixar o certificado', () => {
+  assert.equal(p.canNavigate('https://cursos-artx.vercel.app/', false), true);
+  assert.equal(p.canNavigate('https://cursos-artx.vercel.app/', true), false, 'nunca vira a janela principal');
+  assert.equal(p.canDownload('blob:https://cursos-artx.vercel.app/8b1d'), true);
+});
+
+test('o player do YouTube e a calculadora entram só como quadro', () => {
+  for (const url of ['https://www.youtube-nocookie.com/embed/UuIEbpQms8o', 'https://www.desmos.com/calculator']) {
+    assert.equal(p.canNavigate(url, false), true, url);
+    assert.equal(p.canNavigate(url, true), false, url);
+    assert.equal(p.canDownload(url), false, url);
+  }
+  assert.equal(p.canNavigate('https://www.youtube.com/watch?v=x', false), false, 'o YouTube com rastreio continua de fora');
+  assert.equal(p.canNavigate('http://www.youtube-nocookie.com/embed/x', false), false, 'sem HTTPS, não');
+});
