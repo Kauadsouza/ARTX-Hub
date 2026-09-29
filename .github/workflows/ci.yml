@@ -23,7 +23,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm audit --audit-level=moderate
-      - run: node --test desktop/tests/*.test.cjs
-      - run: node --experimental-strip-types --test tests/*.test.mjs
+      # O mesmo comando de quem roda os testes na máquina: ele liga a condição
+      # react-server, sem a qual os módulos que só rodam no servidor recusam
+      # carregar e os testes das rotas caem antes de começar.
+      - run: npm test
       - run: npm run lint
       - run: npm run build
