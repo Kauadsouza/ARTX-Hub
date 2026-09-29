@@ -6,6 +6,17 @@ const STUDY_ORIGIN = 'https://sat-simulado.vercel.app';
 const WORKSPACE_ORIGINS = new Set([
   HUB_ORIGIN, STUDY_ORIGIN, 'https://sistema-videos.vercel.app',
   'https://university-path-six.vercel.app', 'https://kauaartx.vercel.app',
+  // Os Cursos nasceram depois da lista e ficaram de fora: o quadro era
+  // bloqueado e a aba abria em branco no aplicativo.
+  'https://cursos-artx.vercel.app',
+]);
+
+// O que os sistemas embutem por dentro: o player do YouTube (a versão sem
+// cookies, nos Cursos) e a calculadora do simulado. Só como quadro — daqui
+// não sai download nem pedido de permissão.
+const EMBED_ORIGINS = new Set([
+  'https://www.youtube-nocookie.com',
+  'https://www.desmos.com',
 ]);
 
 function secureURL(value) {
@@ -17,8 +28,9 @@ function secureURL(value) {
 
 function isHub(value) { return secureURL(value)?.origin === HUB_ORIGIN; }
 function isWorkspace(value) { return WORKSPACE_ORIGINS.has(secureURL(value)?.origin); }
+function isEmbed(value) { return EMBED_ORIGINS.has(secureURL(value)?.origin); }
 function canNavigate(value, mainFrame) {
-  return mainFrame ? isHub(value) : value === 'about:blank' || isWorkspace(value);
+  return mainFrame ? isHub(value) : value === 'about:blank' || isWorkspace(value) || isEmbed(value);
 }
 function externalTarget(value) {
   // Só HTTPS, sem exceção. Nenhum protocolo próprio de aplicativo local é
